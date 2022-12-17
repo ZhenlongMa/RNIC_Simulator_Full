@@ -54,6 +54,9 @@
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
 
+#define INVALID_QPN 0xffffffff
+#define INVALID_CORE 0xff
+
 namespace HanGuRnicDef {
 
 struct QpcResc;
@@ -287,7 +290,7 @@ typedef std::shared_ptr<CqDesc> CqDescPtr;
 struct MrReqRsp {
     
     MrReqRsp(uint8_t type, uint8_t chnl, uint32_t lkey, 
-            uint32_t len, uint32_t vaddr) {
+            uint32_t len, uint32_t vaddr, uint8_t coreID = INVALID_CORE) {
         this->type = type;
         this->chnl = chnl;
         this->lkey = lkey;
@@ -295,11 +298,17 @@ struct MrReqRsp {
         this->offset = vaddr;
         
         this->wrDataReq = nullptr;
+        this->coreID = coreID;
+    }
+    MrReqRsp()
+    {
+        this->coreID = INVALID_CORE;
     }
 
     uint8_t  type  ; /* 1 - wreq; 2 - rreq, 3 - rrsp; */
     uint8_t  chnl  ; /* 1 - wreq TX cq; 2 - wreq RX cq; 3 - wreq TX data; 4 - wreq RX data;
                       * 5 - rreq TX Desc; 6 - rreq RX Desc; 7 - rreq TX Data; 8 - rreq RX Data */
+    uint8_t coreID;
     uint32_t lkey  ;
     uint32_t length; /* in Bytes */
     uint32_t offset; /* Accessed VAddr, used to compared with vaddr in MPT, 
@@ -332,7 +341,7 @@ const uint8_t MR_RCHNL_RX_DATA = 0x08;
 
 
 struct CxtReqRsp {
-    CxtReqRsp (uint8_t type, uint8_t chnl, uint32_t num, uint32_t sz = 1, uint8_t idx = 0, uint8_t core) {
+    CxtReqRsp (uint8_t type, uint8_t chnl, uint32_t num, uint32_t sz = 1, uint8_t idx = 0, uint8_t core = INVALID_CORE) {
         this->type = type;
         this->chnl = chnl;
         this->num  = num;
