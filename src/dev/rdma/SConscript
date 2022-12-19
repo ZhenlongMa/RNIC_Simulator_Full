@@ -49,6 +49,7 @@ DebugFlag('RescCache')
 DebugFlag('CxtResc')
 DebugFlag('RdmaEngine')
 DebugFlag('MrResc')
+DebugFlag('RdmaArray')
 
 CompoundFlag('HanGu', ['HanGuDriver', 'HanGuRnic', 'PioEngine', 'CcuEngine', 'RescCache', 'CxtResc', 'DmaEngine',
-    'RdmaEngine', 'MrResc'])
+    'RdmaEngine', 'MrResc', 'RdmaArray'])

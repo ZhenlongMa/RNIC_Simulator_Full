@@ -70,7 +70,7 @@ def main():
 
     debug = ""
     # debug = "PioEngine,CcuEngine,MrResc,HanGuDriver,RescCache,Ethernet,RdmaEngine,"
-    debug +="HanGuRnic,CxtResc,DmaEngine"
+    debug +="HanGuRnic,CxtResc,DmaEngine,RdmaArray"
 
     test_prog = "'tests/test-progs/hangu-rnic/bin/server"
     opt = "'-s " + str(svr_lid) + " -t " + str(num_nodes - 1) + " -m " + str(params.op_mode)

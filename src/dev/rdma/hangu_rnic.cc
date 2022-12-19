@@ -50,12 +50,12 @@ using namespace std;
 HanGuRnic::HanGuRnic(const Params *p)
   : RdmaNic(p), etherInt(NULL),
     doorbellVector(p->reorder_cap),
-    coreQpn(p->core_num),
+    // coreQpn(p->core_num),
     ceuProcEvent      ([this]{ ceuProc();      }, name()),
     doorbellProcEvent ([this]{ doorbellProc(); }, name()),
     mboxEvent([this]{ mboxFetchCpl();    }, name()),
     //rdmaEngine  (this, name() + ".RdmaEngine", p->reorder_cap),
-    rdmaArray(this, p->core_num, p->reorder_cap, name()),
+    rdmaArray(this, p->rdma_core_num, p->reorder_cap, name()),
     mrRescModule(this, name() + ".MrRescModule", p->mpt_cache_num, p->mtt_cache_num),
     cqcModule   (this, name() + ".CqcModule", p->cqc_cache_num),
     qpcModule   (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
@@ -1898,10 +1898,8 @@ HanGuRnic::RdmaEngine::rcuProcessing () {
 ///////////////////////////// HanGuRnic::RDMA Array relevant {begin}////////////////////////////
 
 HanGuRnic::RdmaArray::RdmaArray(HanGuRnic *rNic, uint8_t corenum, uint32_t reorderCap, const std::string n) :
-    rdmaEngineVec(corenum),
-    doorbellVectorVec(corenum),
-    df2ccuIdxFifoVec(corenum),
-    coreQpn(corenum),
+    // coreQpn(corenum),
+    _name(n),
 
     txQpAddrRspEvent([this]{txQpAddrRspSch();}, n),
     txQpcRspEvent([this]{txQpCtxRspSch();}, n),
@@ -1920,14 +1918,38 @@ HanGuRnic::RdmaArray::RdmaArray(HanGuRnic *rNic, uint8_t corenum, uint32_t reord
     rdRpuDataRdReqEvent([this]{rdRpuDataRdReqSch();}, n),
     rdRpuDataRdRspEvent([this]{rdRpuDataRdRspAlloc();}, n),
     rcvCqcRdRspEvent([this]{rcvCqcRdRspAlloc();}, n),
-    rcvCqDescWrReqEvent([this]{rcvCqDescWrReqSch();}, n)
+    rcvCqDescWrReqEvent([this]{rcvCqDescWrReqSch();}, n),
+
+    doorbellVectorVec(corenum),
+    df2ccuIdxFifoVec(corenum),
+    rdmaEngineVec(corenum),
+    txQpAddrRspCoreQueVec(corenum),
+    descReqFifoVec(corenum),
+    txdescRspFifoVec(corenum),
+    txQpcRspQueVec(corenum),
+    txDataRdReqQueVec(corenum),
+    txDataRdRspQueVec(corenum),
+    txPktArbQueVec(corenum),
+    sqCqcRspQueVec(corenum),
+    rxPktQueVec(corenum),
+    rxQpcRspQueVec(corenum),
+    rxDescRdReqQueVec(corenum),
+    rxdescRdRspQueVec(corenum),
+    rcvDataRdReqQueVec(corenum),
+    wrRpuDataWrReqQueVec(corenum),
+    rdRpuDataRdReqQueVec(corenum),
+    rdRpuDataRdRspQueVec(corenum),
+    rcvCqcRdRspQueVec(corenum),
+    rcvCqDescWrReqQueVec(corenum)
 {
     for (uint8_t coreID = 0; coreID < corenum; coreID++)
     {
-        std::shared_ptr<RdmaEngine> rdmaEngine = make_shared<RdmaEngine>(rNic, rNic->name() + ".RdmaArray.RdmaEngine", reorderCap, coreID); // fix name
+        std::shared_ptr<RdmaEngine> rdmaEngine = make_shared<RdmaEngine>(rNic, 
+            name() + ".RdmaEngine[" + std::to_string(coreID) + "]", 
+            reorderCap, coreID);
         rdmaEngineVec.push_back(rdmaEngine);
 
-        coreQpn.push_back(INVALID_QPN);
+        // coreQpn.push_back(INVALID_QPN);
 
         std::queue<uint8_t> IdxQue;
         df2ccuIdxFifoVec.push_back(IdxQue);
@@ -1946,6 +1968,48 @@ HanGuRnic::RdmaArray::RdmaArray(HanGuRnic *rNic, uint8_t corenum, uint32_t reord
 
         std::queue<CxtReqRspPtr> txQpcRspQue;
         txQpcRspQueVec.push_back(txQpcRspQue);
+
+        std::queue<MrReqRspPtr> txDataRdReqQue;
+        txDataRdReqQueVec.push_back(txDataRdReqQue);
+
+        std::queue<MrReqRspPtr> txDataRdRspQue;
+        txDataRdRspQueVec.push_back(txDataRdReqQue);
+        
+        std::queue<EthPacketPtr> txPktArbQue;
+        txPktArbQueVec.push_back(txPktArbQue);
+
+        std::queue<CxtReqRspPtr> sqCqcRspQue;
+        sqCqcRspQueVec.push_back(sqCqcRspQue);
+
+        std::queue<EthPacketPtr> rxPktQue;
+        rxPktQueVec.push_back(rxPktQue);
+
+        std::queue<CxtReqRspPtr> rxQpcRspQue;
+        rxQpcRspQueVec.push_back(rxQpcRspQue);
+
+        std::queue<MrReqRspPtr> rxDescRdReqQue;
+        rxDescRdReqQueVec.push_back(rxDescRdReqQue);
+
+        std::queue<RxDescPtr> rxdescRdRspQue;
+        rxdescRdRspQueVec.push_back(rxdescRdRspQue);
+        
+        std::queue<MrReqRspPtr> rcvDataRdReqQue;
+        rcvDataRdReqQueVec.push_back(rcvDataRdReqQue);
+
+        std::queue<MrReqRspPtr> wrRpuDataWrReqQue;
+        wrRpuDataWrReqQueVec.push_back(wrRpuDataWrReqQue);
+
+        std::queue<MrReqRspPtr> rdRpuDataRdReqQue;
+        rdRpuDataRdReqQueVec.push_back(rdRpuDataRdReqQue);
+
+        std::queue<MrReqRspPtr> rdRpuDataRdRspQue;
+        rdRpuDataRdRspQueVec.push_back(rdRpuDataRdRspQue);
+
+        std::queue<CxtReqRspPtr> rcvCqcRdRspQue;
+        rcvCqcRdRspQueVec.push_back(rcvCqcRdRspQue);
+
+        std::queue<MrReqRspPtr> rcvCqDescWrReqQue;
+        rcvCqDescWrReqQueVec.push_back(rcvCqDescWrReqQue);
     }
 }
 
@@ -2211,8 +2275,8 @@ void HanGuRnic::RdmaArray::recvPktSch()
     EthPacketPtr pkt;
     pkt = rNic->rxFifo.front();
     BTH *bth = (BTH *)(pkt->data + ETH_ADDR_LEN * 2);
-    uint8_t type = (bth->op_destQpn >> 24) & 0x1f;
-    uint8_t srv  = bth->op_destQpn >> 29;
+    // uint8_t type = (bth->op_destQpn >> 24) & 0x1f;
+    // uint8_t srv  = bth->op_destQpn >> 29;
     uint32_t dstQpn = bth->op_destQpn & 0xffffff;
     uint8_t coreID = AllocCore(dstQpn);
     
@@ -2460,7 +2524,7 @@ void HanGuRnic::RdmaArray::rcvCqDescWrReqSch()
         }
     }
     assert(cqDescWrReq != nullptr);
-    rNic->cqWreqFifo.push(cqWreq);
+    rNic->cqWreqFifo.push(cqDescWrReq);
     if (!rNic->mrRescModule.transReqEvent.scheduled()) { // If not scheduled yet, schedule the event.
         rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
     }

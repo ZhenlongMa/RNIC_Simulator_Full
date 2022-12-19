@@ -135,7 +135,7 @@ class HanGuRnic : public RdmaNic {
         
         uint8_t coreNum;
 
-        std::vector<uint32_t> coreQpn;
+        // std::vector<uint32_t> coreQpn;
 
         /* -----------------------CCU Relevant {end}----------------------- */
 
@@ -251,7 +251,6 @@ class HanGuRnic : public RdmaNic {
                     messageEnd(true),
                     rs2rpVector(elemCap),
                     coreID(coreid),
-                    curQpn(INVALID_QPN),
                     dfuEvent ([this]{ dfuProcessing(); }, n),
                     dduEvent ([this]{ dduProcessing(); }, n),
                     dpuEvent ([this]{ dpuProcessing(); }, n),
@@ -262,7 +261,9 @@ class HanGuRnic : public RdmaNic {
                     rpuEvent ([this]{ rpuProcessing(); }, n),
                     rcvRpuEvent  ([this]{rcvRpuProcessing();  }, n),
                     rdCplRpuEvent([this]{rdCplRpuProcessing();}, n),
-                    rcuEvent([this]{ rcuProcessing();}, n) { 
+                    rcuEvent([this]{ rcuProcessing();}, n),
+                    curQpn(INVALID_QPN)
+                    { 
                         for (uint32_t x = 0; x < elemCap; ++x) {
                             dp2ddIdxFifo.push(x);
                             rp2raIdxFifo.push(x);
@@ -322,6 +323,7 @@ class HanGuRnic : public RdmaNic {
             private:
                 uint8_t coreNum;
                 HanGuRnic *rNic;
+                std::string _name;
             public:
                 RdmaArray(HanGuRnic *rnic, uint8_t corenum, uint32_t reorderCap, const std::string n);
 
@@ -368,7 +370,7 @@ class HanGuRnic : public RdmaNic {
                 std::vector<std::queue<CxtReqRspPtr>> rcvCqcRdRspQueVec;
                 std::vector<std::queue<MrReqRspPtr>> rcvCqDescWrReqQueVec;
                 
-                std::vector<uint32_t> coreQpn;
+                // std::vector<uint32_t> coreQpn;
 
                 void postQpcReq(CxtReqRspPtr Req);
                 void txQpAddrRspSch();
@@ -392,6 +394,7 @@ class HanGuRnic : public RdmaNic {
                 void rcvCqcRdRspAlloc();
                 void rcvCqDescWrReqSch();
                 uint8_t AllocCore(uint32_t qpn);
+                std::string name() { return _name; }
         };
         RdmaArray rdmaArray;
         /* -----------------------RDMA Array Relevant{end}------------------------ */
