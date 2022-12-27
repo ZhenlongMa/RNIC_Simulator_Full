@@ -5,7 +5,7 @@
 #include <getopt.h>
 #include <pthread.h>
 
-#define TEST_QP_NUM   512
+#define TEST_QP_NUM   1
 #define TEST_CQ_NUM ((TEST_QP_NUM / (300 / num_client) ) + 1)
 #define TEST_WR_NUM 10
 #define LATENCY_WR_NUM 1

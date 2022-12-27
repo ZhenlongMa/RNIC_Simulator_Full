@@ -2,10 +2,11 @@ import os
 import time
 import datetime
 
-CLIENT_NUM = 3
+CLIENT_NUM = 1
 QP_CACHE_CAP = 300
 REORDER_CAP  = 64
-QP_NUM_LIST = [512, 256, 128, 64, 32, 16, 8, 4, 2, 1] # 1, 2, 4, 8, 16, 32, 64, 128, 256, 512
+# QP_NUM_LIST = [512, 256, 128, 64, 32, 16, 8, 4, 2, 1] # 1, 2, 4, 8, 16, 32, 64, 128, 256, 512
+QP_NUM_LIST = [1]
 
 WR_TYPE = 0 # 0 -  rdma write; 1 - rdma read
 PCIE_TYPE = "X16"

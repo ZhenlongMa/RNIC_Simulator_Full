@@ -55,7 +55,7 @@ HanGuRnic::HanGuRnic(const Params *p)
     doorbellProcEvent ([this]{ doorbellProc(); }, name()),
     mboxEvent([this]{ mboxFetchCpl();    }, name()),
     //rdmaEngine  (this, name() + ".RdmaEngine", p->reorder_cap),
-    rdmaArray(this, p->rdma_core_num, p->reorder_cap, name()),
+    rdmaArray(this, p->rdma_core_num, p->reorder_cap, name() + ".RdmaArray"),
     mrRescModule(this, name() + ".MrRescModule", p->mpt_cache_num, p->mtt_cache_num),
     cqcModule   (this, name() + ".CqcModule", p->cqc_cache_num),
     qpcModule   (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
@@ -65,7 +65,9 @@ HanGuRnic::HanGuRnic(const Params *p)
     pciBandwidth(p->pci_speed),
     etherBandwidth(p->ether_speed),
     LinkDelay     (p->link_delay),
-    ethRxPktProcEvent([this]{ ethRxPktProc(); }, name()) {
+    ethRxPktProcEvent([this]{ ethRxPktProc(); }, name()), 
+    coreNum(p->rdma_core_num)
+{
 
     HANGU_PRINT(HanGuRnic, " qpc_cache_cap %d  reorder_cap %d cpuNum 0x%x\n", p->qpc_cache_cap, p->reorder_cap, p->cpu_num);
 
@@ -73,9 +75,9 @@ HanGuRnic::HanGuRnic(const Params *p)
     syncCnt = 0;
     syncSucc = 0;
 
-    for (int i = 0; i < p->reorder_cap; ++i) {
-        df2ccuIdxFifo.push(i);
-    }
+    // for (int i = 0; i < p->reorder_cap; ++i) {
+    //     df2ccuIdxFifo.push(i);
+    // }
 
     etherInt = new HanGuRnicInt(name() + ".int", this);
 
@@ -393,33 +395,43 @@ HanGuRnic::ceuProc () {
 void
 HanGuRnic::doorbellProc () {
 
-    HANGU_PRINT(HanGuRnic, " CCU.doorbellProc! db_size %d\n", pio2ccuDbFifo.size());
+    HANGU_PRINT(HanGuRnic, " CCU.doorbellProc! db_size: %d\n", pio2ccuDbFifo.size());
 
     /* read doorbell info */
     assert(pio2ccuDbFifo.size());
+    // HANGU_PRINT(CcuEngine, "before pio2ccuDbFifo front!\n");
     DoorbellPtr dbell = pio2ccuDbFifo.front();
+    assert(dbell != nullptr);
+    // HANGU_PRINT(CcuEngine, "RDMA Array name: %s!\n", rdmaArray.name());
+    // HANGU_PRINT(CcuEngine, "after pio2ccuDbFifo front!\n");
 
-    int CoreID;
+    uint8_t CoreID;
 
+    // HANGU_PRINT(CcuEngine, "Before Allocating core!\n");
     CoreID = rdmaArray.AllocCore(dbell->qpn);
+    HANGU_PRINT(CcuEngine, "RDMA Core Allocated, Core ID: %d!\n", CoreID);
 
-    if (CoreID < 0)
+    if (CoreID == INVALID_CORE)
     {
-        HANGU_PRINT(CcuEngine, " CCU.doorbellProc, RDMA Core allocation failed, exit the schedule\n");
+        HANGU_PRINT(CcuEngine, "CCU.doorbellProc, RDMA Core allocation failed, exit the schedule\n");
         return;
     }
 
     /* If there's no valid idx, exit the schedule */
     if (rdmaArray.df2ccuIdxFifoVec[CoreID].size() == 0) {
-        HANGU_PRINT(CcuEngine, " CCU.doorbellProc, If there's no valid idx, exit the schedule\n");
+        HANGU_PRINT(CcuEngine, "CCU.doorbellProc, If there's no valid idx, exit the schedule\n");
         return;
     }
 
+    // HANGU_PRINT(CcuEngine, " before pio2ccuDbFifo pop!\n");
     pio2ccuDbFifo.pop();
+    // HANGU_PRINT(CcuEngine, " pio2ccuDbFifo pop!\n");
 
     /* Push doorbell to doorbell fifo */
     uint8_t idx = rdmaArray.df2ccuIdxFifoVec[CoreID].front();
     rdmaArray.df2ccuIdxFifoVec[CoreID].pop();
+    HANGU_PRINT(CcuEngine, "index got by ccu! rdmaArray.df2ccuIdxFifoVec[%d].size: %d\n", 
+        CoreID, rdmaArray.df2ccuIdxFifoVec[CoreID].size());
     rdmaArray.doorbellVectorVec[CoreID][idx] = dbell;
     /* We don't schedule it here, cause it should be 
      * scheduled by Context Module. */
@@ -434,8 +446,8 @@ HanGuRnic::doorbellProc () {
     // qpcModule.postQpcReq(qpAddrReq); // add core information
     rdmaArray.postQpcReq(qpAddrReq);
 
-    HANGU_PRINT(CcuEngine, " CCU.doorbellProc: db.qpn %d df2ccuIdxFifo.size %d idx %d\n", 
-            dbell->qpn, df2ccuIdxFifo.size(), idx);
+    // HANGU_PRINT(CcuEngine, " CCU.doorbellProc: db.qpn %d df2ccuIdxFifo.size %d idx %d\n", 
+    //         dbell->qpn, df2ccuIdxFifo.size(), idx);
 
     /* If there still has elem in fifo, schedule myself again */
     // if (df2ccuIdxFifo.size() && pio2ccuDbFifo.size()) {
@@ -483,11 +495,22 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
 
     /* Get doorbell rrelated to the qpc
      * If the index fifo is empty, reschedule ccu.dfu event */
-    assert(rnic->doorbellVector[idx] != nullptr);
-    DoorbellPtr dbell = rnic->doorbellVector[idx];
-    rnic->doorbellVector[idx] = nullptr;
-    rnic->df2ccuIdxFifo.push(idx);
-    if ((rnic->df2ccuIdxFifo.size() == 1) && rnic->pio2ccuDbFifo.size()) { 
+    // assert(rnic->doorbellVector[idx] != nullptr);
+    // DoorbellPtr dbell = rnic->doorbellVector[idx];
+    // rnic->doorbellVector[idx] = nullptr;
+    // rnic->df2ccuIdxFifo.push(idx);
+    // if ((rnic->df2ccuIdxFifo.size() == 1) && rnic->pio2ccuDbFifo.size()) 
+    // { 
+    //     if (!rnic->doorbellProcEvent.scheduled()) {
+    //         rnic->schedule(rnic->doorbellProcEvent, curTick() + rnic->clockPeriod());
+    //     }
+    // }
+    assert(rnic->rdmaArray.doorbellVectorVec[coreID][idx] != nullptr);
+    DoorbellPtr dbell = rnic->rdmaArray.doorbellVectorVec[coreID][idx];
+    rnic->rdmaArray.doorbellVectorVec[coreID][idx] = nullptr;
+    rnic->rdmaArray.df2ccuIdxFifoVec[coreID].push(idx);
+    if ((rnic->rdmaArray.df2ccuIdxFifoVec[coreID].size() == 1) && rnic->pio2ccuDbFifo.size()) 
+    { 
         if (!rnic->doorbellProcEvent.scheduled()) {
             rnic->schedule(rnic->doorbellProcEvent, curTick() + rnic->clockPeriod());
         }
@@ -509,7 +532,7 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
     /* Post Descriptor read request to MR Module */
     MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
             qpcRsp->txQpcRsp->sndWqeBaseLkey, 
-            txDescLenSel(dbell->num) << 5, dbell->offset);
+            txDescLenSel(dbell->num) << 5, dbell->offset, coreID);
     descReq->txDescRsp = new TxDesc[dbell->num];
 
     // rnic->descReqFifo.push(descReq);
@@ -1359,6 +1382,7 @@ HanGuRnic::RdmaEngine::rauProcessing () {
 
     assert(rnic->rdmaArray.rxPktQueVec[coreID].size());
     EthPacketPtr rxPkt = rnic->rdmaArray.rxPktQueVec[coreID].front();
+    assert(rxPkt != nullptr);
     BTH *bth = (BTH *)(rxPkt->data + ETH_ADDR_LEN * 2);
 
     // for (int i = 0; i < rxPkt->length; ++i) {
@@ -1735,12 +1759,13 @@ HanGuRnic::RdmaEngine::rpuProcessing () {
     // QpcResc* qpc = rnic->qpcModule.rxQpcRspFifo.front()->rxQpcRsp;
     // uint8_t idx = rnic->qpcModule.rxQpcRspFifo.front()->idx;
     // rnic->qpcModule.rxQpcRspFifo.pop();
-    assert(rnic->rdmaArray.sqCqcRspQueVec[coreID].size());
-    QpcResc* qpc = rnic->rdmaArray.sqCqcRspQueVec[coreID].front()->rxQpcRsp;
-    uint8_t idx = rnic->rdmaArray.sqCqcRspQueVec[coreID].front()->idx;
-    rnic->rdmaArray.sqCqcRspQueVec[coreID].pop();
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.rpuProcessing: Get QPC from cxtRspProcessing. srcQpn: %d, dstQpn %d, qpc->rcvWqeOffset: %d, idx %d\n", 
-            qpc->srcQpn, qpc->destQpn, qpc->rcvWqeOffset, idx);
+    assert(rnic->rdmaArray.rxQpcRspQueVec[coreID].size());
+    HANGU_PRINT(RdmaEngine, "RdmaEngine[%d].rpuProcessing: rxQpcRspQueVec size: %d\n", coreID, rnic->rdmaArray.rxQpcRspQueVec[coreID].size());
+    QpcResc* qpc = rnic->rdmaArray.rxQpcRspQueVec[coreID].front()->rxQpcRsp;
+    uint8_t idx = rnic->rdmaArray.rxQpcRspQueVec[coreID].front()->idx;
+    rnic->rdmaArray.rxQpcRspQueVec[coreID].pop();
+    HANGU_PRINT(RdmaEngine, "RdmaEngine[%d].rpuProcessing: Get QPC from cxtRspProcessing. srcQpn: %d, dstQpn %d, qpc->rcvWqeOffset: %d, idx %d\n", 
+            coreID, qpc->srcQpn, qpc->destQpn, qpc->rcvWqeOffset, idx);
     
     for (int i = 0; i < 100; ++i) {
         if (rs2rpVector[i] != nullptr) {
@@ -1836,6 +1861,7 @@ HanGuRnic::RdmaEngine::rpuProcessing () {
     if (rnic->rdmaArray.rxQpcRspQueVec[coreID].size())
     {
         if (!rpuEvent.scheduled()) { /* Schedule RdmaEngine.rpuProcessing */
+            HANGU_PRINT(RdmaEngine, "RdmaEngine[%d].rpuProcessing: Call myself!\n", coreID);
             rnic->schedule(rpuEvent, curTick() + rnic->clockPeriod());
         }
     }
@@ -1855,23 +1881,26 @@ HanGuRnic::RdmaEngine::rcuProcessing () {
     //         rnic->rxCqcRspFifo.front()->txCqcRsp->offset);
     // rnic->rxCqcRspFifo.pop();
     assert(rnic->rdmaArray.rcvCqcRdRspQueVec[coreID].size());
+    assert(rp2rcFifo.size() != 0);
     MrReqRspPtr cqWreq = make_shared<MrReqRsp>(DMA_TYPE_WREQ, TPT_WCHNL_RX_CQUE,
         rnic->rdmaArray.rcvCqcRdRspQueVec[coreID].front()->txCqcRsp->lkey, sizeof(CqDesc), 
         rnic->rdmaArray.rcvCqcRdRspQueVec[coreID].front()->txCqcRsp->offset, coreID);
     rnic->rdmaArray.rcvCqcRdRspQueVec[coreID].pop();
 
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.rcuProcessing: cq lkey %d, cq offset %d\n", cqWreq->lkey, cqWreq->offset);
+    HANGU_PRINT(RdmaEngine, "RdmaEngine[%d].rcuProcessing: cq lkey %d, cq offset %d\n", coreID, cqWreq->lkey, cqWreq->offset);
 
     cqWreq->cqDescReq = new CqDesc(rp2rcFifo.front()->srvType, 
                                     rp2rcFifo.front()->transType, 
                                     rp2rcFifo.front()->byteCnt, 
                                     rp2rcFifo.front()->qpn, 
                                     rp2rcFifo.front()->cqn);
+    HANGU_PRINT(RdmaEngine, "RdmaEngine[%d].rcuProcessing: CQ descriptor created!\n", coreID);
     rp2rcFifo.pop();
 
 
     // rnic->cqWreqFifo.push(cqWreq);
     rnic->rdmaArray.rcvCqDescWrReqQueVec[coreID].push(cqWreq);
+    HANGU_PRINT(RdmaEngine, "RdmaEngine[%d].rcuProcessing: RECV CQ desc pushed to rcvCqDescWrReqQueVec!\n", coreID);
 
 
     // if (!rnic->mrRescModule.transReqEvent.scheduled()) { // If not scheduled yet, schedule the event.
@@ -1899,6 +1928,7 @@ HanGuRnic::RdmaEngine::rcuProcessing () {
 
 HanGuRnic::RdmaArray::RdmaArray(HanGuRnic *rNic, uint8_t corenum, uint32_t reorderCap, const std::string n) :
     // coreQpn(corenum),
+    rNic(rNic),
     _name(n),
 
     txQpAddrRspEvent([this]{txQpAddrRspSch();}, n),
@@ -1920,27 +1950,28 @@ HanGuRnic::RdmaArray::RdmaArray(HanGuRnic *rNic, uint8_t corenum, uint32_t reord
     rcvCqcRdRspEvent([this]{rcvCqcRdRspAlloc();}, n),
     rcvCqDescWrReqEvent([this]{rcvCqDescWrReqSch();}, n),
 
-    doorbellVectorVec(corenum),
-    df2ccuIdxFifoVec(corenum),
-    rdmaEngineVec(corenum),
-    txQpAddrRspCoreQueVec(corenum),
-    descReqFifoVec(corenum),
-    txdescRspFifoVec(corenum),
-    txQpcRspQueVec(corenum),
-    txDataRdReqQueVec(corenum),
-    txDataRdRspQueVec(corenum),
-    txPktArbQueVec(corenum),
-    sqCqcRspQueVec(corenum),
-    rxPktQueVec(corenum),
-    rxQpcRspQueVec(corenum),
-    rxDescRdReqQueVec(corenum),
-    rxdescRdRspQueVec(corenum),
-    rcvDataRdReqQueVec(corenum),
-    wrRpuDataWrReqQueVec(corenum),
-    rdRpuDataRdReqQueVec(corenum),
-    rdRpuDataRdRspQueVec(corenum),
-    rcvCqcRdRspQueVec(corenum),
-    rcvCqDescWrReqQueVec(corenum)
+    // doorbellVectorVec(corenum),
+    // df2ccuIdxFifoVec(corenum),
+    // rdmaEngineVec(corenum),
+    // txQpAddrRspCoreQueVec(corenum),
+    // descReqFifoVec(corenum),
+    // txdescRspFifoVec(corenum),
+    // txQpcRspQueVec(corenum),
+    // txDataRdReqQueVec(corenum),
+    // txDataRdRspQueVec(corenum),
+    // txPktArbQueVec(corenum),
+    // sqCqcRspQueVec(corenum),
+    // rxPktQueVec(corenum),
+    // rxQpcRspQueVec(corenum),
+    // rxDescRdReqQueVec(corenum),
+    // rxdescRdRspQueVec(corenum),
+    // rcvDataRdReqQueVec(corenum),
+    // wrRpuDataWrReqQueVec(corenum),
+    // rdRpuDataRdReqQueVec(corenum),
+    // rdRpuDataRdRspQueVec(corenum),
+    // rcvCqcRdRspQueVec(corenum),
+    // rcvCqDescWrReqQueVec(corenum),
+    coreNum(corenum)
 {
     for (uint8_t coreID = 0; coreID < corenum; coreID++)
     {
@@ -1952,9 +1983,15 @@ HanGuRnic::RdmaArray::RdmaArray(HanGuRnic *rNic, uint8_t corenum, uint32_t reord
         // coreQpn.push_back(INVALID_QPN);
 
         std::queue<uint8_t> IdxQue;
+        for(int i = 0; i < reorderCap; i++)
+        {
+            IdxQue.push(i);
+        }
         df2ccuIdxFifoVec.push_back(IdxQue);
+        // HANGU_PRINT(RdmaArray, "IdxQue.size: %d\n", IdxQue.size());
+        // HANGU_PRINT(RdmaArray, "df2ccuIdxFifoVec[%d].size: %d\n", coreID, df2ccuIdxFifoVec[coreID].size());
 
-        std::vector<DoorbellPtr> dbVec;
+        std::vector<DoorbellPtr> dbVec(reorderCap);
         doorbellVectorVec.push_back(dbVec);
 
         std::queue<CxtReqRspPtr> txQpAddrRspQue;
@@ -2011,12 +2048,28 @@ HanGuRnic::RdmaArray::RdmaArray(HanGuRnic *rNic, uint8_t corenum, uint32_t reord
         std::queue<MrReqRspPtr> rcvCqDescWrReqQue;
         rcvCqDescWrReqQueVec.push_back(rcvCqDescWrReqQue);
     }
+    // HANGU_PRINT(RdmaArray, "RDMA Array initialization finished!\n");
 }
 
 // Allocate an RDMA core for each doorbell
 uint8_t HanGuRnic::RdmaArray::AllocCore(uint32_t qpn)
 {
-    return qpn % rNic->coreNum;
+    uint8_t coreID;
+
+    for (int i = 0; i < coreNum; i++)
+    {
+        if (rdmaEngineVec[i]->curQpn == qpn || rdmaEngineVec[i]->curQpn == INVALID_QPN)
+        {
+            coreID = i;
+            rdmaEngineVec[coreID]->curQpn = qpn;
+            break;
+        }
+    }
+    
+    HANGU_PRINT(RdmaArray, "Allocating RDMA Core: %d, QPN: 'h%x, curQpn: 'h%x\n", 
+        coreID, qpn, rdmaEngineVec[coreID]->curQpn);
+    assert(rdmaEngineVec[coreID]->curQpn == qpn || rdmaEngineVec[coreID]->curQpn == INVALID_QPN);
+    return coreID;
 }
 
 // Schedule QP address to corresponding core
@@ -2061,7 +2114,7 @@ void HanGuRnic::RdmaArray::txDescReqProc()
         if (descReqFifoVec[(i + TransReqSchPin) % coreNum].size() != 0)
         {
             MrReq = descReqFifoVec[(i + TransReqSchPin) % coreNum].front();
-            MrReq->coreID = i;
+            // MrReq->coreID = i;
             descReqFifoVec[(i + TransReqSchPin) % coreNum].pop();
             TransReqSchPin = i + 1;
             break;
@@ -2091,6 +2144,7 @@ void HanGuRnic::RdmaArray::txDescRspSch()
     assert(rNic->txdescRspFifo.size());
     MrReqRspPtr MrRsp = rNic->txdescRspFifo.front();
     rNic->txdescRspFifo.pop();
+    assert(MrRsp->coreID != INVALID_CORE);
     HANGU_PRINT(RdmaArray, "tx desc response received in RDMA Array! core ID: %d, length: %d\n", MrRsp->coreID, MrRsp->length);
 
     TxDescPtr txDesc;
@@ -2101,9 +2155,19 @@ void HanGuRnic::RdmaArray::txDescRspSch()
         txdescRspFifoVec[MrRsp->coreID].push(txDesc); // clock
     }
 
-    if (rdmaEngineVec[MrRsp->coreID]->dduEvent.scheduled() != 0)
+    HANGU_PRINT(RdmaArray, "tx desc response sent to txdescRspFifoVec! core ID: %d, length: %d\n", MrRsp->coreID, MrRsp->length);
+
+    if (!rdmaEngineVec[MrRsp->coreID]->dduEvent.scheduled())
     {
         rNic->schedule(rdmaEngineVec[MrRsp->coreID]->dduEvent, curTick() + rNic->clockPeriod());
+    }
+
+    if (!rNic->txdescRspFifo.empty())
+    {
+        if (!txdduDescRspEvent.scheduled())
+        {
+            rNic->schedule(txdduDescRspEvent, curTick() + rNic->clockPeriod());
+        }
     }
 }
 
@@ -2128,7 +2192,7 @@ void HanGuRnic::RdmaArray::txQpCtxRspSch()
     }
     if (rNic->qpcModule.txQpcRspFifo.size() != 0)
     {
-        if (txQpcRspEvent.scheduled() != 0)
+        if (!txQpcRspEvent.scheduled())
         {
             rNic->schedule(txQpcRspEvent, curTick() + rNic->clockPeriod());
         }
@@ -2145,7 +2209,7 @@ void HanGuRnic::RdmaArray::txDataRdReqProc()
         if (txDataRdReqQueVec[(i + SchPin) % coreNum].size() != 0)
         {
             MrReq = txDataRdReqQueVec[(i + SchPin) % coreNum].front();
-            MrReq->coreID = i;
+            // MrReq->coreID = i;
             txDataRdReqQueVec[(i + SchPin) % coreNum].pop();
             SchPin = i + 1;
             break;
@@ -2297,10 +2361,12 @@ void HanGuRnic::RdmaArray::recvQpcRspSch()
 {
     assert(rNic->qpcModule.rxQpcRspFifo.size());
     CxtReqRspPtr ctx = rNic->qpcModule.rxQpcRspFifo.front();
+    rNic->qpcModule.rxQpcRspFifo.pop();
     assert(ctx->coreID != INVALID_CORE);
     assert(ctx->rxQpcRsp->srcQpn == rdmaEngineVec[ctx->coreID]->curQpn);
     
     rxQpcRspQueVec[ctx->coreID].push(ctx);
+    HANGU_PRINT(RdmaArray, "QPC response pushed to rxQpcRspQueVec[%d]!\n", ctx->coreID);
     if (!rdmaEngineVec[ctx->coreID]->rpuEvent.scheduled())
     {
         rNic->schedule(rdmaEngineVec[ctx->coreID]->rpuEvent, curTick() + rNic->clockPeriod());
@@ -2490,6 +2556,7 @@ void HanGuRnic::RdmaArray::rcvCqcRdRspAlloc()
 {
     CxtReqRspPtr cqcRsp;
     cqcRsp = rNic->rxCqcRspFifo.front();
+    rNic->rxCqcRspFifo.pop();
     assert(cqcRsp->coreID != INVALID_CORE);
     if (rcvCqcRdRspQueVec[cqcRsp->coreID].size() < 10)
     {
@@ -3848,28 +3915,28 @@ HanGuRnic::QpcModule::qpcAccess() {
     for (uint8_t cnt = 0; cnt < CHNL_NUM; ++cnt) {
         if (isEmpty[this->chnlIdx] == false) {
             switch (this->chnlIdx) {
-              case 0:
-                qpcReq = txQpAddrRreqFifo.front();
-                txQpAddrRreqFifo.pop();
-                assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_SQ);
-                
-                break;
-              case 1:
-                qpcReq = txQpcRreqFifo.front();
-                txQpcRreqFifo.pop();
-                assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_QP);
-                
-                break;
-              case 2:
-                qpcReq = rxQpcRreqFifo.front();
-                rxQpcRreqFifo.pop();
-                assert(qpcReq->chnl == CXT_CHNL_RX && qpcReq->type == CXT_RREQ_QP);
-                
-                break;
-              default:
-                panic("[QpcModule.qpcReqProc.qpcAccess] chnlIdx error! %d", this->chnlIdx);
-                
-                break;
+                case 0:
+                    qpcReq = txQpAddrRreqFifo.front();
+                    txQpAddrRreqFifo.pop();
+                    assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_SQ);
+                    
+                    break;
+                case 1:
+                    qpcReq = txQpcRreqFifo.front();
+                    txQpcRreqFifo.pop();
+                    assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_QP);
+                    
+                    break;
+                case 2:
+                    qpcReq = rxQpcRreqFifo.front();
+                    rxQpcRreqFifo.pop();
+                    assert(qpcReq->chnl == CXT_CHNL_RX && qpcReq->type == CXT_RREQ_QP);
+                    
+                    break;
+                default:
+                    panic("[QpcModule.qpcReqProc.qpcAccess] chnlIdx error! %d", this->chnlIdx);
+                    
+                    break;
             }
 
             HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.qpcAccess: qpn: %d, chnlIdx %d, idx %d rtnCnt %d\n", 

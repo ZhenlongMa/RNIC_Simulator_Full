@@ -69,7 +69,7 @@ class HanGuRnic : public RdmaNic {
 
         /* --------------------CCU <-> RDMA Engine {begin}-------------------- */
         std::vector<DoorbellPtr> doorbellVector;
-        std::queue<uint8_t> df2ccuIdxFifo;
+        // std::queue<uint8_t> df2ccuIdxFifo;
         /* --------------------CCU <-> RDMA Engine {end}-------------------- */
 
         /* --------------------TPT <-> RDMA Engine {begin}-------------------- */
@@ -132,8 +132,6 @@ class HanGuRnic : public RdmaNic {
         EventFunctionWrapper mboxEvent;
 
         uint8_t* mboxBuf;
-        
-        uint8_t coreNum;
 
         // std::vector<uint32_t> coreQpn;
 
@@ -261,8 +259,8 @@ class HanGuRnic : public RdmaNic {
                     rpuEvent ([this]{ rpuProcessing(); }, n),
                     rcvRpuEvent  ([this]{rcvRpuProcessing();  }, n),
                     rdCplRpuEvent([this]{rdCplRpuProcessing();}, n),
-                    rcuEvent([this]{ rcuProcessing();}, n),
-                    curQpn(INVALID_QPN)
+                    rcuEvent([this]{ rcuProcessing();}, n)
+                    // curQpn(INVALID_QPN)
                     { 
                         for (uint32_t x = 0; x < elemCap; ++x) {
                             dp2ddIdxFifo.push(x);
@@ -311,7 +309,7 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper rcuEvent;
 
 
-                uint32_t curQpn;
+                // uint32_t curQpn;
         };
 
         // RdmaEngine rdmaEngine;
@@ -321,7 +319,6 @@ class HanGuRnic : public RdmaNic {
         /* -----------------------RDMA Array Relevant{begin}---------------------- */
         class RdmaArray{
             private:
-                uint8_t coreNum;
                 HanGuRnic *rNic;
                 std::string _name;
             public:
@@ -393,6 +390,8 @@ class HanGuRnic : public RdmaNic {
                 void rdRpuDataRdRspAlloc();
                 void rcvCqcRdRspAlloc();
                 void rcvCqDescWrReqSch();
+                uint8_t coreNum;
+
                 uint8_t AllocCore(uint32_t qpn);
                 std::string name() { return _name; }
         };
@@ -1020,6 +1019,8 @@ class HanGuRnic : public RdmaNic {
 
         DrainState drain() override;
         void drainResume() override;
+
+        uint8_t coreNum;
 
 };
 

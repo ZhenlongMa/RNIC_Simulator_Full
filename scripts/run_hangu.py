@@ -4,7 +4,7 @@ import sys
 
 SERVER_LID  = 10
 
-NUM_CPUS  = 10
+NUM_CPUS  = 1
 CPU_CLK   = "2GHz"
 EN_SPEED  = "100Gbps"
 PCI_SPEED = "128Gbps"
@@ -69,8 +69,9 @@ def main():
     svr_lid = SERVER_LID
 
     debug = ""
-    # debug = "PioEngine,CcuEngine,MrResc,HanGuDriver,RescCache,Ethernet,RdmaEngine,"
-    debug +="HanGuRnic,CxtResc,DmaEngine,RdmaArray"
+    debug = "PioEngine,CcuEngine,MrResc,HanGuDriver,RescCache,Ethernet,RdmaEngine,"
+    debug +="HanGuRnic,CxtResc,DmaEngine,"
+    debug +="RdmaArray"
 
     test_prog = "'tests/test-progs/hangu-rnic/bin/server"
     opt = "'-s " + str(svr_lid) + " -t " + str(num_nodes - 1) + " -m " + str(params.op_mode)
