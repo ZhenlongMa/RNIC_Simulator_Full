@@ -155,10 +155,12 @@ const uint8_t MPT_FLAG_REMOTE = (1 << 3);
 
 // WRITE_QP
 struct QpcResc {
-    uint8_t flag; // QP state, not useed now
+    uint8_t flag; // QP state, not used now
     uint8_t qpType;
     uint8_t sqSizeLog; /* The size of SQ in log (It is now fixed at 4KB, which is 12) */
     uint8_t rqSizeLog; /* The size of RQ in log (It is now fixed at 4KB, which is 12) */
+    uint8_t perfShare; /* Performance share of this QP */
+    uint8_t perfIndicator; /* Performance indicator of this QP, throughput/message rate/latency */
     uint16_t sndWqeOffset;
     uint16_t rcvWqeOffset;
     uint16_t lLid; // Local LID
@@ -178,6 +180,11 @@ const uint8_t QP_TYPE_RC = 0x00;
 const uint8_t QP_TYPE_UC = 0x01;
 const uint8_t QP_TYPE_RD = 0x02;
 const uint8_t QP_TYPE_UD = 0x03;
+
+const uint8_t PERF_TH = 0x01;
+const uint8_t PERF_MR = 0x02;
+const uint8_t PERF_LA = 0x03;
+
 
 // WRITE_CQ
 struct CqcResc {
