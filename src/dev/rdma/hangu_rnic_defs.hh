@@ -297,7 +297,8 @@ typedef std::shared_ptr<CqDesc> CqDescPtr;
 struct MrReqRsp {
     
     MrReqRsp(uint8_t type, uint8_t chnl, uint32_t lkey, 
-            uint32_t len, uint32_t vaddr, uint8_t coreID = INVALID_CORE) {
+            uint32_t len, uint32_t vaddr, uint8_t coreID = INVALID_CORE) 
+    {
         this->type = type;
         this->chnl = chnl;
         this->lkey = lkey;
@@ -318,11 +319,15 @@ struct MrReqRsp {
     uint8_t coreID;
     uint32_t lkey  ;
     uint32_t length; /* in Bytes */
-    uint32_t offset; /* Accessed VAddr, used to compared with vaddr in MPT, 
+    uint32_t offset; /* Accessed VAddr, used to compare with vaddr in MPT, 
                       * and calculate MTT Index, Besides, this field also provides
                       * access offset to the actual paddr. 
                       * !TODO: Now we only support lower 16 bit comparasion with Vaddr, 
-                      * which means support maximum 16KB for one MR. */
+                      * which means only maximum 16KB for one MR is supported. */
+    uint32_t mttNum;
+    uint32_t mttRspNum;
+    uint32_t dmaRspNum;
+    struct MptResc *mpt;
     union {
         TxDesc  *txDescRsp;
         RxDesc  *rxDescRsp;

@@ -508,7 +508,7 @@ class HanGuRnic : public RdmaNic {
                 
                 /* Temp store dma read request pkt until read rsp is back */
                 std::queue<std::pair<MrReqRspPtr, DmaReqPtr> > dmaReq2RspFifo;
-                void dmaReqProcess(uint64_t pAddr, MrReqRspPtr tptReq);
+                void dmaReqProcess(uint64_t pAddr, MrReqRspPtr tptReq, uint32_t offset, uint32_t length);
                 /**
                  * tx descriptor (read rsp) -(schedule to)-> rdmaEngine.ddu
                  * rx descriptor (read rsp) -(schedule to)-> rdmaEngine.rcvrpu
