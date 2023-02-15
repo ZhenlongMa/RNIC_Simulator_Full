@@ -235,6 +235,8 @@ class HanGuRnic : public RdmaNic {
                 // rpu -> rcu
                 std::queue<CqDescPtr> rp2rcFifo;
 
+                void setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* pkt, uint8_t &needAck);
+                void copyEthData(EthPacketPtr rawPkt, EthPacketPtr newPkt, MrReqRspPtr rspData);
 
             public:
 

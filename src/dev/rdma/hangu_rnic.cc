@@ -696,7 +696,7 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
     }
 
     /* Generate request packet (RDMA read/write, send) */
-    EthPacketPtr txPkt = std::make_shared<EthPacketData>(16384);
+    EthPacketPtr txPkt = std::make_shared<EthPacketData>(16384); //TODO: modify size here
     txPkt->length = ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, dpuQpc->txQpcRsp->qpType); /* ETH_ADDR_LEN * 2 means length of 2 MAC addr */
 
     /* Post Descriptor & QPC & request packet pointer to RdmaEngine.rguProcessing */
@@ -966,23 +966,44 @@ HanGuRnic::RdmaEngine::rguProcessing () {
     TxDescPtr desc = tmp->desc;
     QpcResc *qpc = tmp->qpc;
     EthPacketPtr txPkt = tmp->txPkt;
-    dp2rgFifo.pop();
-    
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: qpType %d, qpn %d sndPsn %d sndWqeOffset %d\n", 
-            qpc->qpType, qpc->srcQpn, qpc->sndPsn, qpc->sndWqeOffset);
-
     /* Get Request Data (send & RDMA write) 
      * from MrRescModule.dmaRrspProcessing. */
     MrReqRspPtr rspData; /* I have already gotten the address in txPkt, 
                            * so it is useless for me. */
+    // dp2rgFifo.pop();
+    /* Generate request packet (RDMA read/write, send) */
+    EthPacketPtr txPktToSend = std::make_shared<EthPacketData>(16384); //TODO: modify size here
+    txPktToSend->length = ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, qpc->qpType); /* ETH_ADDR_LEN * 2 means length of 2 MAC addr */
+
+    /* if all MR request pages are responded, pop dp2rgFifo */
+    if (desc->opcode == OPCODE_SEND || desc->opcode == OPCODE_RDMA_WRITE)
+    {
+        assert(rnic->rdmaArray.txDataRdRspQueVec[coreID].size());
+        rspData = rnic->rdmaArray.txDataRdRspQueVec[coreID].front();
+        assert(rspData->sentPktNum < rspData->mttNum);
+        // rnic->rdmaArray.txDataRdRspQueVec[coreID].pop();
+        if (rspData->sentPktNum + 1 == rspData->mttNum)
+        {
+            rnic->rdmaArray.txDataRdRspQueVec[coreID].pop();
+            dp2rgFifo.pop();
+        }
+    }
+    else
+    {
+        dp2rgFifo.pop();
+    }
+    
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: qpType %d, qpn %d sndPsn %d sndWqeOffset %d\n", 
+            qpc->qpType, qpc->srcQpn, qpc->sndPsn, qpc->sndWqeOffset);
+
     if (desc->opcode == OPCODE_SEND || desc->opcode == OPCODE_RDMA_WRITE) {
         // assert(rnic->txdataRspFifo.size());
         // rspData = rnic->txdataRspFifo.front();
         // rnic->txdataRspFifo.pop();
 
-        assert(rnic->rdmaArray.txDataRdRspQueVec[coreID].size());
-        rspData = rnic->rdmaArray.txDataRdRspQueVec[coreID].front();
-        rnic->rdmaArray.txDataRdRspQueVec[coreID].pop();
+        // assert(rnic->rdmaArray.txDataRdRspQueVec[coreID].size());
+        // rspData = rnic->rdmaArray.txDataRdRspQueVec[coreID].front();
+        // rnic->rdmaArray.txDataRdRspQueVec[coreID].pop();
 
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: "
                 "Get Request Data: 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n", 
@@ -996,8 +1017,126 @@ HanGuRnic::RdmaEngine::rguProcessing () {
 
     /* Generate Request packet Header
      * We don't implement multi-packet message now. */
-    uint8_t *pktPtr = txPkt->data + ETH_ADDR_LEN * 2;
-    uint8_t needAck = 0x01;
+    uint8_t *pktPtr = txPktToSend->data + ETH_ADDR_LEN * 2;
+    uint8_t needAck;
+    uint32_t bthOp;
+
+    setRdmaHead(desc, qpc, pktPtr, needAck);
+
+    if (desc->opcode == OPCODE_SEND || desc->opcode == OPCODE_RDMA_WRITE)
+    {
+        copyEthData(txPkt, txPktToSend, rspData);
+    }
+
+    // Set MAC address
+    uint64_t dmac, lmac;
+    if (qpc->qpType == QP_TYPE_RC) {
+        dmac = qpc->dLid;
+        lmac = qpc->lLid;
+    } else if (qpc->qpType == QP_TYPE_UD) {
+        dmac = desc->sendType.dlid;
+        lmac = qpc->lLid;
+    } else {
+        panic("Unsupported QP type, opcode: %d, type: %d\n", desc->opcode, qpc->qpType);
+    }
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: dmac 0x%lx, smac 0x%lx\n", dmac, lmac);
+    // setMacAddr(txPkt->data, dmac);
+    // setMacAddr(txPkt->data + ETH_ADDR_LEN, lmac);
+
+    // /* set packet length */
+    // txPkt->length    += desc->len;
+    // txPkt->simLength += desc->len;
+
+    setMacAddr(txPktToSend->data, dmac);
+    setMacAddr(txPktToSend->data + ETH_ADDR_LEN, lmac);
+
+    // for (int i = 0; i < txPkt->length; ++i) {
+    //     HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: data[%d] 0x%x\n", i, (txPkt->data)[i]);
+    // }
+
+    /* if the packet need ack, post pkt info into send window */
+    if (needAck) {
+
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: Need ACK (RC type)!\n");
+
+        /* Post Packet to send window */
+        WindowElemPtr winElem = make_shared<WindowElem>(txPkt, qpc->srcQpn, 
+                qpc->sndPsn, desc);
+        if (sndWindowList.find(qpc->srcQpn) == sndWindowList.end()) { // sndWindowList[qpc->srcQpn] == nullptr
+            sndWindowList[qpc->srcQpn] = new WinMapElem;
+            sndWindowList[qpc->srcQpn]->list = new WinList;
+            sndWindowList[qpc->srcQpn]->cqn = qpc->cqn;
+        }
+        if (sndWindowList[qpc->srcQpn]->list->size() == 0) {
+            sndWindowList[qpc->srcQpn]->firstPsn = qpc->sndPsn;
+        }
+        sndWindowList[qpc->srcQpn]->lastPsn = qpc->sndPsn;
+        sndWindowList[qpc->srcQpn]->list->push_back(winElem);
+
+        // for (auto &item : sndWindowList) {
+        //     uint32_t key = item.first;
+        //     WinMapElem* val = item.second;
+        //     if (val->list->size()) {
+        //         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: key %d firstPsn %d lastPsn %d, size %d\n\n", 
+        //                 key, val->firstPsn, val->lastPsn, val->list->size());
+        //     }
+        // }
+        assert(sndWindowList[qpc->srcQpn]->firstPsn <= sndWindowList[qpc->srcQpn]->lastPsn);
+
+        /* Update the state of send window.  
+         * If window is full, block RC transmission */
+        ++windowSize;
+        windowFull = (windowSize >= windowCap);
+
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: windowSize %d\n", windowSize);
+    }
+    
+    /* Post Send Packet. Schedule RdmaEngine.sauProcessing 
+     * to Send Packet through Ethernet Interface. */
+    txsauFifo.push(txPktToSend);
+    if (!sauEvent.scheduled()) {
+        rnic->schedule(sauEvent, curTick() + rnic->clockPeriod());
+    }
+    messageEnd = true; /* Just ignore it now. */
+
+    /* Update QPC */
+    if (qpc->qpType == QP_TYPE_RC) {
+        ++qpc->sndPsn;
+    }
+
+    /* Same as in userspace drivers */
+    qpc->sndWqeOffset += sizeof(TxDesc);
+    if (qpc->sndWqeOffset + sizeof(TxDesc) > (1 << qpc->sqSizeLog)) {
+        qpc->sndWqeOffset = 0;  /* qpc->sqSizeLog */ 
+    }
+    
+    /* Post CQ if no need to acks. */
+    if (!needAck && messageEnd) {
+        postTxCpl(qpc->qpType, qpc->srcQpn, qpc->cqn, desc);
+    }
+
+    /* !TODO: we may need to implement timer here. */
+
+    /* If next pkt does not belong to this qp or 
+     * there's no pkt, Post QPC back to QpcModule.
+     * Note that we uses short circuit logic in "||", and 
+     * the sequence of two condition cannot change. 
+     * !FIXME: We don't use it now, cause we update qpc when read it. */
+    // if (dp2rgFifo.empty() || /* No packet to send */
+    //         dp2rgFifo.front()->qpc->srcQpn != qpc->srcQpn) { /* next qpc != current qpc */
+        
+    //     /* post qpc wreq to qpcModule */
+    //     CxtReqRspPtr qpcWrReq = make_shared<CxtReqRsp>(CXT_WREQ_QP, CXT_CHNL_TX, qpc->srcQpn);
+    //     qpcWrReq->txQpcReq = qpc;
+    //     rnic->qpcModule.postQpcReq(qpcWrReq);
+    // }
+    delete qpc; /* qpc is useless */
+    
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: out!\n");
+}
+
+void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* pktPtr, uint8_t &needAck)
+{
     uint32_t bthOp;
     if (desc->opcode == OPCODE_SEND && 
             qpc->qpType == QP_TYPE_RC) { /* RC Send */
@@ -1094,109 +1233,25 @@ HanGuRnic::RdmaEngine::rguProcessing () {
         panic("Unsupported opcode and QP type combination, "
                 "opcode: %d, type: %d\n", desc->opcode, qpc->qpType);
     }
+}
 
-    // Set MAC address
-    uint64_t dmac, lmac;
-    if (qpc->qpType == QP_TYPE_RC) {
-        dmac = qpc->dLid;
-        lmac = qpc->lLid;
-    } else if (qpc->qpType == QP_TYPE_UD) {
-        dmac = desc->sendType.dlid;
-        lmac = qpc->lLid;
-    } else {
-        panic("Unsupported QP type, opcode: %d, type: %d\n", desc->opcode, qpc->qpType);
-    }
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: dmac 0x%lx, smac 0x%lx\n", dmac, lmac);
-    setMacAddr(txPkt->data, dmac);
-    setMacAddr(txPkt->data + ETH_ADDR_LEN, lmac);
+/**
+ * @note
+ * copy data from raw packet to new packet to be sent
+ * @param rawPkt: packet containing the whole MR response
+ * @param newPkt: packet to be sent, no larger than 4K
+ * 
+*/
+void HanGuRnic::RdmaEngine::copyEthData(EthPacketPtr rawPkt, EthPacketPtr newPkt, 
+                                        MrReqRspPtr rspData) // TO DO: not finished!
+{
+    assert(rspData->sentPktNum < rspData->mttNum);
+    if (rspData->mttNum == 1)
+    // /* set packet length */
+    newPkt->length    += desc->len;
+    newPkt->simLength += desc->len;
 
-    txPkt->length    += desc->len;
-    txPkt->simLength += desc->len;
-
-    // for (int i = 0; i < txPkt->length; ++i) {
-    //     HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: data[%d] 0x%x\n", i, (txPkt->data)[i]);
-    // }
-
-    /* if the packet need ack, post pkt 
-     * info into send window */
-    if (needAck) {
-
-        HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: Need ACK (RC type)!\n");
-
-        /* Post Packet to send window */
-        WindowElemPtr winElem = make_shared<WindowElem>(txPkt, qpc->srcQpn, 
-                qpc->sndPsn, desc);
-        if (sndWindowList.find(qpc->srcQpn) == sndWindowList.end()) { // sndWindowList[qpc->srcQpn] == nullptr
-            sndWindowList[qpc->srcQpn] = new WinMapElem;
-            sndWindowList[qpc->srcQpn]->list = new WinList;
-            sndWindowList[qpc->srcQpn]->cqn = qpc->cqn;
-        }
-        if (sndWindowList[qpc->srcQpn]->list->size() == 0) {
-            sndWindowList[qpc->srcQpn]->firstPsn = qpc->sndPsn;
-        }
-        sndWindowList[qpc->srcQpn]->lastPsn = qpc->sndPsn;
-        sndWindowList[qpc->srcQpn]->list->push_back(winElem);
-
-        // for (auto &item : sndWindowList) {
-        //     uint32_t key = item.first;
-        //     WinMapElem* val = item.second;
-        //     if (val->list->size()) {
-        //         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: key %d firstPsn %d lastPsn %d, size %d\n\n", 
-        //                 key, val->firstPsn, val->lastPsn, val->list->size());
-        //     }
-        // }
-        assert(sndWindowList[qpc->srcQpn]->firstPsn <= sndWindowList[qpc->srcQpn]->lastPsn);
-
-        /* Update the state of send window.  
-         * If window is full, block RC transmission */
-        ++windowSize;
-        windowFull = (windowSize >= windowCap);
-
-        HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: windowSize %d\n", windowSize);
-    }
-    
-    /* Post Send Packet. Schedule RdmaEngine.sauProcessing 
-     * to Send Packet through Ethernet Interface. */
-    txsauFifo.push(txPkt);
-    if (!sauEvent.scheduled()) {
-        rnic->schedule(sauEvent, curTick() + rnic->clockPeriod());
-    }
-    messageEnd = true; /* Just ignore it now. */
-
-    /* Update QPC */
-    if (qpc->qpType == QP_TYPE_RC) {
-        ++qpc->sndPsn;
-    }
-
-    /* Same as in userspace drivers */
-    qpc->sndWqeOffset += sizeof(TxDesc);
-    if (qpc->sndWqeOffset + sizeof(TxDesc) > (1 << qpc->sqSizeLog)) {
-        qpc->sndWqeOffset = 0;  /* qpc->sqSizeLog */ 
-    }
-    
-    /* Post CQ if no need to acks. */
-    if (!needAck && messageEnd) {
-        postTxCpl(qpc->qpType, qpc->srcQpn, qpc->cqn, desc);
-    }
-
-    /* !TODO: we may need to implement timer here. */
-
-    /* If next pkt does not belong to this qp or 
-     * there's no pkt, Post QPC back to QpcModule.
-     * Note that we uses short circuit logic in "||", and 
-     * the sequence of two condition cannot change. 
-     * !FIXME: We don't use it now, cause we update qpc when read it. */
-    // if (dp2rgFifo.empty() || /* No packet to send */
-    //         dp2rgFifo.front()->qpc->srcQpn != qpc->srcQpn) { /* next qpc != current qpc */
-        
-    //     /* post qpc wreq to qpcModule */
-    //     CxtReqRspPtr qpcWrReq = make_shared<CxtReqRsp>(CXT_WREQ_QP, CXT_CHNL_TX, qpc->srcQpn);
-    //     qpcWrReq->txQpcReq = qpc;
-    //     rnic->qpcModule.postQpcReq(qpcWrReq);
-    // }
-    delete qpc; /* qpc is useless */
-    
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: out!\n");
+    rspData->sentPktNum++;
 }
 
 bool

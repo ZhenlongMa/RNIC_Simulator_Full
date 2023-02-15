@@ -324,9 +324,10 @@ struct MrReqRsp {
                       * access offset to the actual paddr. 
                       * !TODO: Now we only support lower 16 bit comparasion with Vaddr, 
                       * which means only maximum 16KB for one MR is supported. */
-    uint32_t mttNum;
-    uint32_t mttRspNum;
-    uint32_t dmaRspNum;
+    uint32_t mttNum; /* MTT item number corresponding to this MR request, equals to DMA request number */
+    uint32_t mttRspNum; /* number of responsed MTT items */ 
+    uint32_t dmaRspNum; /* number of responsed DMA requests */ 
+    uint32_t sentPktNum; /* number of Ethernet packet that has finished */
     struct MptResc *mpt;
     union {
         TxDesc  *txDescRsp;
