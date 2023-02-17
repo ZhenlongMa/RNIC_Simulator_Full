@@ -1240,6 +1240,7 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
  * copy data from raw packet to new packet to be sent
  * @param rawPkt: packet containing the whole MR response
  * @param newPkt: packet to be sent, no larger than 4K
+ * @param rspData: MR response
  * 
 */
 void HanGuRnic::RdmaEngine::copyEthData(EthPacketPtr rawPkt, EthPacketPtr newPkt, 
@@ -1247,6 +1248,12 @@ void HanGuRnic::RdmaEngine::copyEthData(EthPacketPtr rawPkt, EthPacketPtr newPkt
 {
     assert(rspData->sentPktNum < rspData->mttNum);
     if (rspData->mttNum == 1)
+    {
+        memcpy(newPkt->data + ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, qpc->qpType),
+            rawPkt->data + ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, qpc->qpType),
+            4096);
+    }
+    else 
     // /* set packet length */
     newPkt->length    += desc->len;
     newPkt->simLength += desc->len;
