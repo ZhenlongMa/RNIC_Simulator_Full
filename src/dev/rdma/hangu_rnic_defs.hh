@@ -230,6 +230,9 @@ struct TxDesc {
     uint32_t lkey;
     uint64_t lVaddr;
 
+    // added by mazhenlong
+    uint32_t qpn;
+
     union {
         struct {        
             uint32_t dlid;

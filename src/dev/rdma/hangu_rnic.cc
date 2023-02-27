@@ -401,11 +401,8 @@ HanGuRnic::doorbellProc () {
 
     /* read doorbell info */
     assert(pio2ccuDbFifo.size());
-    // HANGU_PRINT(CcuEngine, "before pio2ccuDbFifo front!\n");
     DoorbellPtr dbell = pio2ccuDbFifo.front();
     assert(dbell != nullptr);
-    // HANGU_PRINT(CcuEngine, "RDMA Array name: %s!\n", rdmaArray.name());
-    // HANGU_PRINT(CcuEngine, "after pio2ccuDbFifo front!\n");
 
     uint8_t CoreID;
 
@@ -421,13 +418,11 @@ HanGuRnic::doorbellProc () {
 
     /* If there's no valid idx, exit the schedule */
     if (rdmaArray.df2ccuIdxFifoVec[CoreID].size() == 0) {
-        HANGU_PRINT(CcuEngine, "CCU.doorbellProc, If there's no valid idx, exit the schedule\n");
+        HANGU_PRINT(CcuEngine, "CCU.doorbellProc, There's no valid idx, exit the schedule\n");
         return;
     }
 
-    // HANGU_PRINT(CcuEngine, " before pio2ccuDbFifo pop!\n");
     pio2ccuDbFifo.pop();
-    // HANGU_PRINT(CcuEngine, " pio2ccuDbFifo pop!\n");
 
     /* Push doorbell to doorbell fifo */
     uint8_t idx = rdmaArray.df2ccuIdxFifoVec[CoreID].front();
@@ -435,21 +430,13 @@ HanGuRnic::doorbellProc () {
     HANGU_PRINT(CcuEngine, "index got by ccu! rdmaArray.df2ccuIdxFifoVec[%d].size: %d\n", 
         CoreID, rdmaArray.df2ccuIdxFifoVec[CoreID].size());
     rdmaArray.doorbellVectorVec[CoreID][idx] = dbell;
-    /* We don't schedule it here, cause it should be 
-     * scheduled by Context Module. */
-    // if (!rdmaEngine.dfuEvent.scheduled()) { /* Schedule RdmaEngine.dfuProcessing */
-    //     schedule(rdmaEngine.dfuEvent, curTick() + clockPeriod());
-    // }
 
     /* Post QP addr request to QpcModule */
     CxtReqRspPtr qpAddrReq = make_shared<CxtReqRsp>(CXT_RREQ_SQ, 
             CXT_CHNL_TX, dbell->qpn, 1, idx, CoreID);
     qpAddrReq->txQpcRsp = new QpcResc;
-    // qpcModule.postQpcReq(qpAddrReq); // add core information
-    rdmaArray.postQpcReq(qpAddrReq);
-
-    // HANGU_PRINT(CcuEngine, " CCU.doorbellProc: db.qpn %d df2ccuIdxFifo.size %d idx %d\n", 
-    //         dbell->qpn, df2ccuIdxFifo.size(), idx);
+    // rdmaArray.postQpcReq(qpAddrReq);
+    qpcModule.postQpcReq(qpAddrReq);
 
     /* If there still has elem in fifo, schedule myself again */
     // if (df2ccuIdxFifo.size() && pio2ccuDbFifo.size()) {

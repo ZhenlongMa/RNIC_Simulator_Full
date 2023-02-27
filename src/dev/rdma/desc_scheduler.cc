@@ -40,5 +40,13 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name)
 */
 void HanGuRnic::DescScheduler::qpcRspProc()
 {
+    assert(rNic->qpcModule.txQpAddrRspFifo.size());
+    CxtReqRspPtr txQpAddrRsp = rNic->qpcModule.txQpAddrRspFifo.front();
+    // get doorbell
+    DoorbellPtr dbell;
 
+    // request for QP status
+
+    // deliver QP context
+    
 }

@@ -202,10 +202,10 @@ void HanGuRnic::RdmaArray::txQpAddrRspSch()
     }
 }
 
-void HanGuRnic::RdmaArray::postQpcReq(CxtReqRspPtr Req)
-{
-    rNic->qpcModule.postQpcReq(Req);
-}
+// void HanGuRnic::RdmaArray::postQpcReq(CxtReqRspPtr Req)
+// {
+//     rNic->qpcModule.postQpcReq(Req);
+// }
 
 // Process tx WQE read request
 void HanGuRnic::RdmaArray::txDescReqProc()

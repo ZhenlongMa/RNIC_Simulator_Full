@@ -47,10 +47,6 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing!\n");
 
     /* read qpc sq addr */
-    // assert(rnic->qpcModule.txQpAddrRspFifo.size());
-    // CxtReqRspPtr qpcRsp = rnic->qpcModule.txQpAddrRspFifo.front();
-    // uint8_t idx = qpcRsp->idx;
-    // rnic->qpcModule.txQpAddrRspFifo.pop();
     assert(rnic->rdmaArray.txQpAddrRspCoreQueVec[coreID].size());
     CxtReqRspPtr qpcRsp = rnic->rdmaArray.txQpAddrRspCoreQueVec[coreID].front();
     uint8_t idx = qpcRsp->idx;
@@ -73,11 +69,6 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
 
     /* Post doorbell to DDU */
     df2ddDBFifo.push(dbell);
-    /* We don't schedule it here, cause it should be 
-     * scheduled by Memory Region Module, dmaRrspProcessing */
-    // if (!dduEvent.scheduled()) { /* Schedule RdmaEngine.dduProcessing */
-    //     rnic->schedule(dduEvent, curTick() + rnic->clockPeriod());
-    // }
 
     assert(qpcRsp->txQpcRsp->srcQpn == dbell->qpn);
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing:"
@@ -90,10 +81,6 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
             txDescLenSel(dbell->num) << 5, dbell->offset, coreID);
     descReq->txDescRsp = new TxDesc[dbell->num];
 
-    // rnic->descReqFifo.push(descReq);
-    // if (!rnic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
-    //     rnic->schedule(rnic->mrRescModule.transReqEvent, curTick() + rnic->clockPeriod());
-    // }
     rnic->rdmaArray.descReqFifoVec[coreID].push(descReq);
     if (!rnic->rdmaArray.txDescRdReqEvent.scheduled())
     {
