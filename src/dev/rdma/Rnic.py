@@ -59,6 +59,7 @@ class HanGuRnic(RdmaNic):
         "Number of qpc cache enteries")
     cqc_cache_num = Param.Int(2000,
         "Number of cqc cache enteries")
+    proc_num = Param.Int(8, "Number of RDMA processors")
     
     VendorID = 0x8086
     DeviceID = 0x1075
@@ -90,4 +91,3 @@ class HanGuRnic(RdmaNic):
 
     link_delay = Param.Latency('1us', "ethernet link delay")
     cpu_num    = Param.Int(10, "Number of CPUs in this node")
-    rdma_core_num = Param.Int(8, "Number of RDMA Processing Core")

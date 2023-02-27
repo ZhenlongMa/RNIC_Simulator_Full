@@ -48,14 +48,13 @@
 
 #endif
 
-#define QPN_NUM   (1 * 1)
+#define QPN_NUM   (512 * 3)
 
 
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
 
-#define INVALID_QPN 0xffffffff
-#define INVALID_CORE 0xff
+#define PROC_NUM 16
 
 namespace HanGuRnicDef {
 
@@ -155,12 +154,10 @@ const uint8_t MPT_FLAG_REMOTE = (1 << 3);
 
 // WRITE_QP
 struct QpcResc {
-    uint8_t flag; // QP state, not used now
+    uint8_t flag; // QP state, not useed now
     uint8_t qpType;
     uint8_t sqSizeLog; /* The size of SQ in log (It is now fixed at 4KB, which is 12) */
     uint8_t rqSizeLog; /* The size of RQ in log (It is now fixed at 4KB, which is 12) */
-    uint8_t perfShare; /* Performance share of this QP */
-    uint8_t perfIndicator; /* Performance indicator of this QP, throughput/message rate/latency */
     uint16_t sndWqeOffset;
     uint16_t rcvWqeOffset;
     uint16_t lLid; // Local LID
@@ -180,11 +177,6 @@ const uint8_t QP_TYPE_RC = 0x00;
 const uint8_t QP_TYPE_UC = 0x01;
 const uint8_t QP_TYPE_RD = 0x02;
 const uint8_t QP_TYPE_UD = 0x03;
-
-const uint8_t PERF_TH = 0x01;
-const uint8_t PERF_MR = 0x02;
-const uint8_t PERF_LA = 0x03;
-
 
 // WRITE_CQ
 struct CqcResc {
@@ -229,9 +221,6 @@ struct TxDesc {
     uint32_t len;
     uint32_t lkey;
     uint64_t lVaddr;
-
-    // added by mazhenlong
-    uint32_t qpn;
 
     union {
         struct {        
@@ -300,7 +289,7 @@ typedef std::shared_ptr<CqDesc> CqDescPtr;
 struct MrReqRsp {
     
     MrReqRsp(uint8_t type, uint8_t chnl, uint32_t lkey, 
-            uint32_t len, uint32_t vaddr, uint8_t coreID = INVALID_CORE) {
+            uint32_t len, uint32_t vaddr) {
         this->type = type;
         this->chnl = chnl;
         this->lkey = lkey;
@@ -308,17 +297,11 @@ struct MrReqRsp {
         this->offset = vaddr;
         
         this->wrDataReq = nullptr;
-        this->coreID = coreID;
-    }
-    MrReqRsp()
-    {
-        this->coreID = INVALID_CORE;
     }
 
     uint8_t  type  ; /* 1 - wreq; 2 - rreq, 3 - rrsp; */
     uint8_t  chnl  ; /* 1 - wreq TX cq; 2 - wreq RX cq; 3 - wreq TX data; 4 - wreq RX data;
                       * 5 - rreq TX Desc; 6 - rreq RX Desc; 7 - rreq TX Data; 8 - rreq RX Data */
-    uint8_t coreID;
     uint32_t lkey  ;
     uint32_t length; /* in Bytes */
     uint32_t offset; /* Accessed VAddr, used to compared with vaddr in MPT, 
@@ -351,21 +334,19 @@ const uint8_t MR_RCHNL_RX_DATA = 0x08;
 
 
 struct CxtReqRsp {
-    CxtReqRsp (uint8_t type, uint8_t chnl, uint32_t num, uint32_t sz = 1, uint8_t idx = 0, uint8_t core = INVALID_CORE) {
+    CxtReqRsp (uint8_t type, uint8_t chnl, uint32_t num, uint32_t sz = 1, uint8_t idx = 0) {
         this->type = type;
         this->chnl = chnl;
         this->num  = num;
         this->sz   = sz;
         this->idx  = idx;
         this->txCqcRsp = nullptr;
-        this->coreID = core;
     }
     uint8_t type; // 1: qp wreq; 2: qp rreq; 3: qp rrsp; 4: cq rreq; 5: cq rrsp; 6: sq addr req
     uint8_t chnl; // 1: tx Channel; 2: rx Channel
     uint32_t num; // Resource num (QPN or CQN).
     uint32_t sz; // request number of the resources, used in qpc read (TX)
     uint8_t  idx; // used to uniquely identify the req pkt */
-    uint8_t  coreID; // indicate the source or destination RDMA core
     union {
         QpcResc  *txQpcRsp;
         QpcResc  *rxQpcRsp;

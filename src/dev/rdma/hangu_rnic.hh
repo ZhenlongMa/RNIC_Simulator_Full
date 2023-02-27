@@ -32,6 +32,7 @@
 #include <string>
 #include <list>
 #include <unordered_map>
+// #include <memory>
 
 #include "dev/rdma/hangu_rnic_defs.hh"
 
@@ -68,16 +69,15 @@ class HanGuRnic : public RdmaNic {
         /* --------------------PIO <-> CCU {end}-------------------- */
 
         /* --------------------CCU <-> RDMA Engine {begin}-------------------- */
-        std::vector<DoorbellPtr> doorbellVector;
-        // std::queue<uint8_t> df2ccuIdxFifo;
+        // std::vector<DoorbellPtr> doorbellVector;
+        std::queue<uint8_t> df2ccuIdxFifo;
         /* --------------------CCU <-> RDMA Engine {end}-------------------- */
 
         /* --------------------TPT <-> RDMA Engine {begin}-------------------- */
         // Descriptor relevant
         std::queue<MrReqRspPtr>descReqFifo; // tx(DFU) & rx(RPU) descriptor req post to this fifo.
-        std::queue<MrReqRspPtr> txdescRspFifo; /* Store descriptor, **not list** */
-        // std::queue<RxDescPtr> rxdescRspFifo;
-        std::queue<MrReqRspPtr> rxdescRspFifo;
+        std::queue<TxDescPtr> txdescRspFifo; /* Store descriptor, **not list** */
+        std::queue<RxDescPtr> rxdescRspFifo;
 
         // CQ write req fifo, SCU and RCU post the request
         std::queue<MrReqRspPtr> cqWreqFifo;
@@ -132,9 +132,8 @@ class HanGuRnic : public RdmaNic {
         EventFunctionWrapper mboxEvent;
 
         uint8_t* mboxBuf;
-
-        // std::vector<uint32_t> coreQpn;
-
+        uint8_t coreNum;
+        
         /* -----------------------CCU Relevant {end}----------------------- */
 
         /* -----------------------RDMA Engine Relevant{begin}----------------------- */
@@ -150,7 +149,7 @@ class HanGuRnic : public RdmaNic {
 
 
                 /* dfu -> ddu */
-                std::queue<DoorbellPtr> df2ddDBFifo;
+                std::queue<DoorbellPtr> df2ddFifo;
                 uint32_t txDescLenSel(uint8_t num);/* Return number of descriptors to prefetch */
 
                 /* DDU owns */
@@ -235,12 +234,12 @@ class HanGuRnic : public RdmaNic {
                 // rpu -> rcu
                 std::queue<CqDescPtr> rp2rcFifo;
 
-
             public:
 
-                RdmaEngine (HanGuRnic *rnic, const std::string n, uint32_t elemCap, uint8_t coreid)
+                RdmaEngine (HanGuRnic *rnic, const std::string n, uint32_t elemCap, uint8_t id)
                 : rnic(rnic),
                     _name(n),
+                    coreID(id),
                     allowNewDb(true),
                     dd2dpVector(elemCap),
                     windowSize(0),
@@ -248,7 +247,6 @@ class HanGuRnic : public RdmaNic {
                     windowFull(false),
                     messageEnd(true),
                     rs2rpVector(elemCap),
-                    coreID(coreid),
                     dfuEvent ([this]{ dfuProcessing(); }, n),
                     dduEvent ([this]{ dduProcessing(); }, n),
                     dpuEvent ([this]{ dpuProcessing(); }, n),
@@ -259,16 +257,13 @@ class HanGuRnic : public RdmaNic {
                     rpuEvent ([this]{ rpuProcessing(); }, n),
                     rcvRpuEvent  ([this]{rcvRpuProcessing();  }, n),
                     rdCplRpuEvent([this]{rdCplRpuProcessing();}, n),
-                    rcuEvent([this]{ rcuProcessing();}, n)
-                    // curQpn(INVALID_QPN)
-                    { 
+                    rcuEvent([this]{ rcuProcessing();}, n) { 
                         for (uint32_t x = 0; x < elemCap; ++x) {
                             dp2ddIdxFifo.push(x);
                             rp2raIdxFifo.push(x);
                         }
                         assert(rp2raIdxFifo.size() == elemCap);
                     }
-                uint8_t coreID;
 
                 std::string name() { return _name; }
 
@@ -308,122 +303,81 @@ class HanGuRnic : public RdmaNic {
                 void rcuProcessing(); // Receive Completion Unit
                 EventFunctionWrapper rcuEvent;
 
+                std::vector<DoorbellPtr> doorbellVector;
 
-                // uint32_t curQpn;
+                uint8_t coreID;
         };
 
         // RdmaEngine rdmaEngine;
         
         /* -----------------------RDMA Engine Relevant{end}----------------------- */
 
-        /* -----------------------RDMA Array Relevant{begin}---------------------- */
-        class RdmaArray{
+        /* ------------------------RDMA Processor{begin}--------------------------- */
+        class RDMAProcessor
+        {
             private:
                 HanGuRnic *rNic;
-                std::string _name;
-            public:
-                RdmaArray(HanGuRnic *rnic, uint8_t corenum, uint32_t reorderCap, const std::string n);
-
-                EventFunctionWrapper txQpAddrRspEvent;
-                EventFunctionWrapper txQpcRspEvent;
-                // EventFunctionWrapper rxQpcRspEvent;
-                EventFunctionWrapper txDescRdReqEvent;
-                EventFunctionWrapper txdduDescRspEvent;
-                EventFunctionWrapper txDataRdReqEvent;
-                EventFunctionWrapper txDataRdRspEvent;
-                // EventFunctionWrapper txPktEvent;
-                EventFunctionWrapper txSendToLinkLayerEvent;
-                EventFunctionWrapper sendCqcRspEvent;
-                EventFunctionWrapper rxPktEvent;
-                EventFunctionWrapper recvQpcRspEvent;
-                EventFunctionWrapper rxDescRdReqEvent;
-                EventFunctionWrapper rxDescRdRspEvent;
-                EventFunctionWrapper rcvDataRdReqEvent;
-                EventFunctionWrapper wrRpuDataWrReqEvent;
-                EventFunctionWrapper rdRpuDataRdReqEvent;
-                EventFunctionWrapper rdRpuDataRdRspEvent;
-                EventFunctionWrapper rcvCqcRdRspEvent;
-                EventFunctionWrapper rcvCqDescWrReqEvent;
-
-                std::vector<std::vector<DoorbellPtr>> doorbellVectorVec;
-                std::vector<std::queue<uint8_t>> df2ccuIdxFifoVec;
-                std::vector<std::shared_ptr<RdmaEngine>> rdmaEngineVec; 
-                std::vector<std::queue<CxtReqRspPtr>> txQpAddrRspCoreQueVec;
-                std::vector<std::queue<MrReqRspPtr>> descReqFifoVec;
-                std::vector<std::queue<TxDescPtr>> txdescRspFifoVec;
-                std::vector<std::queue<CxtReqRspPtr>> txQpcRspQueVec;
-                std::vector<std::queue<MrReqRspPtr>> txDataRdReqQueVec;
-                std::vector<std::queue<MrReqRspPtr>> txDataRdRspQueVec;
-                std::vector<std::queue<EthPacketPtr>> txPktArbQueVec;
-                std::vector<std::queue<CxtReqRspPtr>> sqCqcRspQueVec;
-                std::vector<std::queue<EthPacketPtr>> rxPktQueVec;
-                std::vector<std::queue<CxtReqRspPtr>> rxQpcRspQueVec;
-                std::vector<std::queue<MrReqRspPtr>> rxDescRdReqQueVec;
-                std::vector<std::queue<RxDescPtr>> rxdescRdRspQueVec;
-                std::vector<std::queue<MrReqRspPtr>> rcvDataRdReqQueVec;
-                std::vector<std::queue<MrReqRspPtr>> wrRpuDataWrReqQueVec;
-                std::vector<std::queue<MrReqRspPtr>> rdRpuDataRdReqQueVec;
-                std::vector<std::queue<MrReqRspPtr>> rdRpuDataRdRspQueVec;
-                std::vector<std::queue<CxtReqRspPtr>> rcvCqcRdRspQueVec;
-                std::vector<std::queue<MrReqRspPtr>> rcvCqDescWrReqQueVec;
                 
-                // std::vector<uint32_t> coreQpn;
-
-                void postQpcReq(CxtReqRspPtr Req);
-                void txQpAddrRspSch();
-                void txDescReqProc();
-                void txDescRspSch();
-                // void descReqProc();
-                void txDataRdReqProc();
-                void txDataRdRspProc();
-                void txQpCtxRspSch();
-                void txSendToLinkLayerProc();
-                void postCqcReq(CxtReqRspPtr Req);
-                void sendCqcRspSch();
-                void recvPktSch();
-                void recvQpcRspSch();
-                void rxDescRdReqSch();
-                void rxDescRdRspAlloc();
-                void rcvDataRdReqSch();
-                void wrRpuDataWrReqSch();
-                void rdRpuDataRdReqSch();
-                void rdRpuDataRdRspAlloc();
-                void rcvCqcRdRspAlloc();
-                void rcvCqDescWrReqSch();
-                uint8_t coreNum;
-
-                uint8_t AllocCore(uint32_t qpn);
-                std::string name() { return _name; }
-        };
-        RdmaArray rdmaArray;
-        /* -----------------------RDMA Array Relevant{end}------------------------ */
-
-        /* -------------------WQE Scheduler Relevant{begin}---------------------- */
-        class DescScheduler{
-            private:
-                void qpcRspProc();
-                HanGuRnic *rNic;
             public:
-                DescScheduler(HanGuRnic *rNic, std::string name);
-                EventFunctionWrapper qpcRspEvent;
-                EventFunctionWrapper qpStatusRspEvent;
-                EventFunctionWrapper wqeRspEvent;
-                EventFunctionWrapper rxUpdateEvent;
+                RDMAProcessor(HanGuRnic *rnic, uint8_t procNum, uint32_t elemCap);
+                std::vector<std::shared_ptr<RdmaEngine>> engineVec;
+
+                // packet fifos, interact with Ethernet Link
+                std::vector<std::queue<EthPacketPtr>> rxFifoVec;
+                std::vector<std::queue<EthPacketPtr>> txFifoVec;
+
+                /* --------------------CCU <-> RDMA Engine {begin}-------------------- */
+                std::vector<std::vector<DoorbellPtr>> DBVecVec;
+                std::vector<std::queue<uint8_t>> df2ccuIdxFifoVec;
+                /* --------------------CCU <-> RDMA Engine {end}-------------------- */
+
+                /* --------------------TPT <-> RDMA Engine {begin}-------------------- */
+                // Descriptor relevant
+                std::vector<std::queue<MrReqRspPtr>> descReqFifoVec; // tx(DFU) & rx(RPU) descriptor req post to this fifo.
+                std::vector<std::queue<TxDescPtr>> txdescRspFifoVec; /* Store descriptor, **not list** */
+                std::vector<std::queue<RxDescPtr>> rxdescRspFifoVec;
+
+                // CQ write req fifo, SCU and RCU post the request
+                std::vector<std::queue<MrReqRspPtr>> cqWreqFifoVec;
+
+                // Data processing fifo
+                std::vector<std::queue<MrReqRspPtr>> dataReqFifoVec;   // DPU, rgrru, rpu -> TPT
+                std::vector<std::queue<MrReqRspPtr>> txdataRspFifoVec; // TPT -> rgrru
+                std::vector<std::queue<MrReqRspPtr>> rxdataRspFifoVec; // TPT -> RPCPLU
+                /* --------------------TPT <-> RDMA Engine {end}-------------------- */
+
+                /* --------------------CqcModule <-> RDMA Engine {begin}-------------------- */
+                /** 
+                 * Cqc read&update req post to this fifo. (
+                 * scu -(update req)-> CqcModule; 
+                 * rcu -(update req)-> CqcModule )
+                 */
+                std::vector<std::queue<CxtReqRspPtr>> txCqcReqFifoVec;
+                std::vector<std::queue<CxtReqRspPtr>> rxCqcReqFifoVec;
+
+                std::vector<std::queue<CxtReqRspPtr>> txCqcRspFifoVec; /* CqcModule -(update rsp)-> scu */
+                std::vector<std::queue<CxtReqRspPtr>> rxCqcRspFifoVec; /* CqcModule -(update rsp)-> rcu */
+                /* --------------------CqcModule <-> RDMA Engine {end}-------------------- */
+
+                // txQpAddrRspFifoVec
+
+                std::vector<uint32_t> coreMap;
+
+                uint8_t procNum;
         };
-        DescScheduler descScheduler;
-        /* -------------------WQE Scheduler Relevant{end}------------------------ */
+        RDMAProcessor rdmaProcessor;
 
-        /* -------------------WQE Buffer Relevant{begin}---------------------- */
-        class DescBuffer{
+        /* ------------------------RDMA Processor{end}--------------------------- */
+
+        /* ------------------------Descriptor Buffer{end}--------------------------- */
+        class DescBuffer
+        {
             private:
-
             public:
                 DescBuffer();
-                uint64_t byteSize;
-                uint32_t totalWeight;
         };
-        DescBuffer wqeBuffer;
-        /* -------------------WQE Buffer Relevant{end}------------------------ */
+        DescBuffer descBuffer;
+        /* ------------------------Descriptor Buffer{end}--------------------------- */
 
         /* -----------------------Cache {begin}------------------------ */
         template <class T, class S>
@@ -1046,8 +1000,6 @@ class HanGuRnic : public RdmaNic {
 
         DrainState drain() override;
         void drainResume() override;
-
-        uint8_t coreNum;
 
 };
 

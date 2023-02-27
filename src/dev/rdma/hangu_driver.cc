@@ -382,7 +382,7 @@ HanGuDriver::allocIcm(Process *process, RescMeta &rescMeta, Addr index) {
         ++icmVPage;
     }
     HANGU_PRINT(HanGuDriver, " rescMeta.start: 0x%lx, index 0x%x, entrySize %d icmVPage 0x%lx\n", rescMeta.start, index, rescMeta.entrySize, icmVPage);
-    for (uint32_t i = 0; i < ICM_ALLOC_PAGE_NUM; ++i) {
+    for (uint32_t i =  0; i < ICM_ALLOC_PAGE_NUM; ++i) {
         if (i == 0) {
             icmAddrmap[icmVPage] = process->system->allocPhysPages(ICM_ALLOC_PAGE_NUM);
         } else {
