@@ -96,7 +96,8 @@ HanGuRnic::QpcModule::hitProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
     if (chnlNum == 0) { // txQpAddrRspFifo
         txQpAddrRspFifo.push(qpcReq);
         // e = &rnic->rdmaEngine.dfuEvent;
-        e = &rnic->rdmaArray.txQpAddrRspEvent;
+        // e = &rnic->rdmaArray.txQpAddrRspEvent;
+        e = &rnic->descScheduler.qpcRspEvent;
     } else if (chnlNum == 1) { // txQpcRspFifo
         /* update after read */
         uint32_t sz = qpcReq->sz;

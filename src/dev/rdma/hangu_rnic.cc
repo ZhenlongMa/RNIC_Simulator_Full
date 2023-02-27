@@ -56,6 +56,7 @@ HanGuRnic::HanGuRnic(const Params *p)
     mboxEvent([this]{ mboxFetchCpl();    }, name()),
     //rdmaEngine  (this, name() + ".RdmaEngine", p->reorder_cap),
     rdmaArray(this, p->rdma_core_num, p->reorder_cap, name() + ".RdmaArray"),
+    descScheduler(this, ),
     mrRescModule(this, name() + ".MrRescModule", p->mpt_cache_num, p->mtt_cache_num),
     cqcModule   (this, name() + ".CqcModule", p->cqc_cache_num),
     qpcModule   (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
@@ -278,6 +279,7 @@ HanGuRnic::mboxFetchCpl () {
           case ICMTYPE_QPC:
             HANGU_PRINT(CcuEngine, " CcuEngine.CEU.mboxFetchCpl: ICMTYPE_QPC command!\n");
             qpcModule.icmStore((IcmResc *)mboxBuf, regs.modifier);
+            // set QP weight
             break;
           case ICMTYPE_CQC:
             HANGU_PRINT(CcuEngine, " CcuEngine.CEU.mboxFetchCpl: ICMTYPE_CQC command!\n");

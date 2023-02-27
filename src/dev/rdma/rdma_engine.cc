@@ -57,22 +57,9 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
     rnic->rdmaArray.txQpAddrRspCoreQueVec[coreID].pop();
 
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing: idx %d\n", idx);
-    // for (int i = 0; i < rnic->doorbellVector.size(); ++i) {
-    //     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing:doorbellVec %d\n", (rnic->doorbellVector[i] != nullptr));
-    // }
 
     /* Get doorbell rrelated to the qpc
      * If the index fifo is empty, reschedule ccu.dfu event */
-    // assert(rnic->doorbellVector[idx] != nullptr);
-    // DoorbellPtr dbell = rnic->doorbellVector[idx];
-    // rnic->doorbellVector[idx] = nullptr;
-    // rnic->df2ccuIdxFifo.push(idx);
-    // if ((rnic->df2ccuIdxFifo.size() == 1) && rnic->pio2ccuDbFifo.size()) 
-    // { 
-    //     if (!rnic->doorbellProcEvent.scheduled()) {
-    //         rnic->schedule(rnic->doorbellProcEvent, curTick() + rnic->clockPeriod());
-    //     }
-    // }
     assert(rnic->rdmaArray.doorbellVectorVec[coreID][idx] != nullptr);
     DoorbellPtr dbell = rnic->rdmaArray.doorbellVectorVec[coreID][idx];
     rnic->rdmaArray.doorbellVectorVec[coreID][idx] = nullptr;
