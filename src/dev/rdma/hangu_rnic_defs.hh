@@ -54,8 +54,6 @@
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
 
-#define PROC_NUM 16
-
 namespace HanGuRnicDef {
 
 struct QpcResc;

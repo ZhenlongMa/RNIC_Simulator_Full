@@ -32,7 +32,6 @@
 #include <string>
 #include <list>
 #include <unordered_map>
-// #include <memory>
 
 #include "dev/rdma/hangu_rnic_defs.hh"
 
@@ -69,7 +68,7 @@ class HanGuRnic : public RdmaNic {
         /* --------------------PIO <-> CCU {end}-------------------- */
 
         /* --------------------CCU <-> RDMA Engine {begin}-------------------- */
-        // std::vector<DoorbellPtr> doorbellVector;
+        std::vector<DoorbellPtr> doorbellVector;
         std::queue<uint8_t> df2ccuIdxFifo;
         /* --------------------CCU <-> RDMA Engine {end}-------------------- */
 
@@ -132,7 +131,6 @@ class HanGuRnic : public RdmaNic {
         EventFunctionWrapper mboxEvent;
 
         uint8_t* mboxBuf;
-        uint8_t coreNum;
         
         /* -----------------------CCU Relevant {end}----------------------- */
 
@@ -236,10 +234,9 @@ class HanGuRnic : public RdmaNic {
 
             public:
 
-                RdmaEngine (HanGuRnic *rnic, const std::string n, uint32_t elemCap, uint8_t id)
+                RdmaEngine (HanGuRnic *rnic, const std::string n, uint32_t elemCap)
                 : rnic(rnic),
                     _name(n),
-                    coreID(id),
                     allowNewDb(true),
                     dd2dpVector(elemCap),
                     windowSize(0),
@@ -303,81 +300,11 @@ class HanGuRnic : public RdmaNic {
                 void rcuProcessing(); // Receive Completion Unit
                 EventFunctionWrapper rcuEvent;
 
-                std::vector<DoorbellPtr> doorbellVector;
-
-                uint8_t coreID;
         };
 
-        // RdmaEngine rdmaEngine;
+        RdmaEngine rdmaEngine;
         
         /* -----------------------RDMA Engine Relevant{end}----------------------- */
-
-        /* ------------------------RDMA Processor{begin}--------------------------- */
-        class RDMAProcessor
-        {
-            private:
-                HanGuRnic *rNic;
-                
-            public:
-                RDMAProcessor(HanGuRnic *rnic, uint8_t procNum, uint32_t elemCap);
-                std::vector<std::shared_ptr<RdmaEngine>> engineVec;
-
-                // packet fifos, interact with Ethernet Link
-                std::vector<std::queue<EthPacketPtr>> rxFifoVec;
-                std::vector<std::queue<EthPacketPtr>> txFifoVec;
-
-                /* --------------------CCU <-> RDMA Engine {begin}-------------------- */
-                std::vector<std::vector<DoorbellPtr>> DBVecVec;
-                std::vector<std::queue<uint8_t>> df2ccuIdxFifoVec;
-                /* --------------------CCU <-> RDMA Engine {end}-------------------- */
-
-                /* --------------------TPT <-> RDMA Engine {begin}-------------------- */
-                // Descriptor relevant
-                std::vector<std::queue<MrReqRspPtr>> descReqFifoVec; // tx(DFU) & rx(RPU) descriptor req post to this fifo.
-                std::vector<std::queue<TxDescPtr>> txdescRspFifoVec; /* Store descriptor, **not list** */
-                std::vector<std::queue<RxDescPtr>> rxdescRspFifoVec;
-
-                // CQ write req fifo, SCU and RCU post the request
-                std::vector<std::queue<MrReqRspPtr>> cqWreqFifoVec;
-
-                // Data processing fifo
-                std::vector<std::queue<MrReqRspPtr>> dataReqFifoVec;   // DPU, rgrru, rpu -> TPT
-                std::vector<std::queue<MrReqRspPtr>> txdataRspFifoVec; // TPT -> rgrru
-                std::vector<std::queue<MrReqRspPtr>> rxdataRspFifoVec; // TPT -> RPCPLU
-                /* --------------------TPT <-> RDMA Engine {end}-------------------- */
-
-                /* --------------------CqcModule <-> RDMA Engine {begin}-------------------- */
-                /** 
-                 * Cqc read&update req post to this fifo. (
-                 * scu -(update req)-> CqcModule; 
-                 * rcu -(update req)-> CqcModule )
-                 */
-                std::vector<std::queue<CxtReqRspPtr>> txCqcReqFifoVec;
-                std::vector<std::queue<CxtReqRspPtr>> rxCqcReqFifoVec;
-
-                std::vector<std::queue<CxtReqRspPtr>> txCqcRspFifoVec; /* CqcModule -(update rsp)-> scu */
-                std::vector<std::queue<CxtReqRspPtr>> rxCqcRspFifoVec; /* CqcModule -(update rsp)-> rcu */
-                /* --------------------CqcModule <-> RDMA Engine {end}-------------------- */
-
-                // txQpAddrRspFifoVec
-
-                std::vector<uint32_t> coreMap;
-
-                uint8_t procNum;
-        };
-        RDMAProcessor rdmaProcessor;
-
-        /* ------------------------RDMA Processor{end}--------------------------- */
-
-        /* ------------------------Descriptor Buffer{end}--------------------------- */
-        class DescBuffer
-        {
-            private:
-            public:
-                DescBuffer();
-        };
-        DescBuffer descBuffer;
-        /* ------------------------Descriptor Buffer{end}--------------------------- */
 
         /* -----------------------Cache {begin}------------------------ */
         template <class T, class S>

@@ -49,14 +49,11 @@ using namespace std;
 
 HanGuRnic::HanGuRnic(const Params *p)
   : RdmaNic(p), etherInt(NULL),
-    // doorbellVector(p->reorder_cap),
+    doorbellVector(p->reorder_cap),
     ceuProcEvent      ([this]{ ceuProc();      }, name()),
     doorbellProcEvent ([this]{ doorbellProc(); }, name()),
     mboxEvent([this]{ mboxFetchCpl();    }, name()),
-
-    rdmaProcessor(this, p->proc_num, p->reorder_cap),
-
-    // rdmaEngine  (this, name() + ".RdmaEngine", p->reorder_cap),
+    rdmaEngine  (this, name() + ".RdmaEngine", p->reorder_cap),
     mrRescModule(this, name() + ".MrRescModule", p->mpt_cache_num, p->mtt_cache_num),
     cqcModule   (this, name() + ".CqcModule", p->cqc_cache_num),
     qpcModule   (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
@@ -191,7 +188,7 @@ HanGuRnic::write(PacketPtr pkt) {
             schedule(ceuProcEvent, curTick() + clockPeriod());
         }
 
-    } else if (daddr == 0x18 && pkt->getSize() == sizeof(uint64_t)) { // doorbell
+    } else if (daddr == 0x18 && pkt->getSize() == sizeof(uint64_t)) {
 
         /*  Used to Record start of time */
         HANGU_PRINT(HanGuRnic, " PioEngine.write: Doorbell, value %#X pio interval %ld\n", pkt->getLE<uint64_t>(), curTick() - this->tick); 
@@ -388,7 +385,6 @@ HanGuRnic::ceuProc () {
 
 /**
  * @brief Doorbell Forwarding Unit
- * Called by doorbellProcEvent.
  * Forwarding doorbell to RDMAEngine.DFU.
  * Post QPC read request to read relatived QPC information.
  */
@@ -411,19 +407,9 @@ HanGuRnic::doorbellProc () {
     /* Push doorbell to doorbell fifo */
     uint8_t idx = df2ccuIdxFifo.front();
     df2ccuIdxFifo.pop();
-    
-    std::vector<uint32_t>::iterator it = std::find(rdmaProcessor.coreMap.begin(), rdmaProcessor.coreMap.end(), dbell->qpn);
-    if (it == rdmaProcessor.coreMap.end()) // allocate new rdma engine
-    {
-        // allocate new rdma engine
-    }
-    else // point to current rdma engine
-    {
-        rdmaProcessor.DBVecVec[it][idx] = dbell;
-    }
-
-    // doorbellVector[idx] = dbell;
-    /* We don't schedule it here, cause it should be scheduled by Context Module. */
+    doorbellVector[idx] = dbell;
+    /* We don't schedule it here, cause it should be 
+     * scheduled by Context Module. */
     // if (!rdmaEngine.dfuEvent.scheduled()) { /* Schedule RdmaEngine.dfuProcessing */
     //     schedule(rdmaEngine.dfuEvent, curTick() + clockPeriod());
     // }
@@ -465,34 +451,25 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
 
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing!\n");
 
-    /* read qpc sq addr and get doorbell index*/
-    // assert(rnic->qpcModule.txQpAddrRspFifo.size());
-    // CxtReqRspPtr qpcRsp = rnic->qpcModule.txQpAddrRspFifo.front();
-    // uint8_t idx = qpcRsp->idx;
-    // rnic->qpcModule.txQpAddrRspFifo.pop();
-
-    assert(rnic->rdmaProcessor.txQpAddrRspFifoVec[coreID].size());
-    CxtReqRspPtr qpcRsp = rnic->rdmaProcessor.txQpAddrRspFifoVec[coreID].front();
+    /* read qpc sq addr */
+    assert(rnic->qpcModule.txQpAddrRspFifo.size());
+    CxtReqRspPtr qpcRsp = rnic->qpcModule.txQpAddrRspFifo.front();
     uint8_t idx = qpcRsp->idx;
-    rnic->rdmaProcessor.txQpAddrRspFifoVec[coreID].pop();
+    rnic->qpcModule.txQpAddrRspFifo.pop();
 
-    HANGU_PRINT(RdmaEngine, " RdmaEngine[%d].dfuProcessing: idx %d\n", coreID, idx);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing: idx %d\n", idx);
     // for (int i = 0; i < rnic->doorbellVector.size(); ++i) {
     //     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing:doorbellVec %d\n", (rnic->doorbellVector[i] != nullptr));
     // }
 
-    /* Get doorbell related to the qpc
+    /* Get doorbell rrelated to the qpc
      * If the index fifo is empty, reschedule ccu.dfu event */
     assert(rnic->doorbellVector[idx] != nullptr);
     DoorbellPtr dbell = rnic->doorbellVector[idx];
     rnic->doorbellVector[idx] = nullptr;
-    rnic->rdmaProcessor.df2ccuIdxFifoVec[coreID].push(idx);
-
-    if ((rnic->rdmaProcessor.df2ccuIdxFifoVec[coreID].size() == 1) && 
-         rnic->pio2ccuDbFifo.size()) 
-    { 
-        if (!rnic->doorbellProcEvent.scheduled()) 
-        {
+    rnic->df2ccuIdxFifo.push(idx);
+    if ((rnic->df2ccuIdxFifo.size() == 1) && rnic->pio2ccuDbFifo.size()) { 
+        if (!rnic->doorbellProcEvent.scheduled()) {
             rnic->schedule(rnic->doorbellProcEvent, curTick() + rnic->clockPeriod());
         }
     }
@@ -515,12 +492,12 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
             qpcRsp->txQpcRsp->sndWqeBaseLkey, 
             txDescLenSel(dbell->num) << 5, dbell->offset);
     descReq->txDescRsp = new TxDesc[dbell->num];
-    rnic->rdmaProcessor.descReqFifo[coreID].push(descReq);
+    rnic->descReqFifo.push(descReq);
     if (!rnic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
         rnic->schedule(rnic->mrRescModule.transReqEvent, curTick() + rnic->clockPeriod());
     }
     
-    /* If doorbell fifo & addr fifo has content, schedule myself again. */
+    /* If doorbell fifo & addr fifo has event, schedule myself again. */
     if (rnic->qpcModule.txQpAddrRspFifo.size()) {
         if (!dfuEvent.scheduled()) { /* Schedule DfuProcessing */
             rnic->schedule(dfuEvent, curTick() + rnic->clockPeriod());
@@ -2226,10 +2203,7 @@ HanGuRnic::MrRescModule::MrRescModule (HanGuRnic *i, const std::string n,
     mttRspEvent  ([this]{ mttRspProcessing();  }, n),
     transReqEvent([this]{ transReqProcessing();}, n),
     mptCache(i, mptCacheNum, n),
-    mttCache(i, mttCacheNum, n) 
-{ 
-
-}
+    mttCache(i, mttCacheNum, n) { }
 
 
 bool 
@@ -3811,60 +3785,3 @@ HanGuRnic *
 HanGuRnicParams::create() {
     return new HanGuRnic(this);
 }
-
-HanGuRnic::RDMAProcessor::RDMAProcessor(HanGuRnic *rnic, uint8_t procNum, uint32_t elemCap):
-    rNic(rnic),
-    procNum(procNum)
-{
-    for (uint8_t i = 0; i < procNum; i++)
-    {
-        std::shared_ptr<RdmaEngine> rdmaEngine = make_shared<RdmaEngine>(rNic, name + to_string(i), elemCap, i);
-        std::queue<EthPacketPtr> rx;
-        std::queue<EthPacketPtr> tx;
-        std::vector<DoorbellPtr> db;
-        std::queue<uint8_t> df2ccuIdxFifo;
-        std::queue<MrReqRspPtr> descReqFifo;
-
-        std::queue<TxDescPtr> txdescRspFifo; /* Store descriptor, **not list** */
-        std::queue<RxDescPtr> rxdescRspFifo;
-
-        // CQ write req fifo, SCU and RCU post the request
-        std::queue<MrReqRspPtr> cqWreqFifo;
-
-        // Data processing fifo
-        std::queue<MrReqRspPtr> dataReqFifo;   // DPU, rgrru, rpu -> TPT
-        std::queue<MrReqRspPtr> txdataRspFifo; // TPT -> rgrru
-        std::queue<MrReqRspPtr> rxdataRspFifo; // TPT -> RPCPLU
-        /* --------------------TPT <-> RDMA Engine {end}-------------------- */
-
-        /* --------------------CqcModule <-> RDMA Engine {begin}-------------------- */
-        /** 
-         * Cqc read&update req post to this fifo. (
-         * scu -(update req)-> CqcModule; 
-         * rcu -(update req)-> CqcModule )
-         */
-        std::queue<CxtReqRspPtr> txCqcReqFifo;
-        std::queue<CxtReqRspPtr> rxCqcReqFifo;
-
-        std::queue<CxtReqRspPtr> txCqcRspFifo; /* CqcModule -(update rsp)-> scu */
-        std::queue<CxtReqRspPtr> rxCqcRspFifo;
-
-        engineVec.push_back(rdmaEngine);
-        rxFifoVec.push_back(rx);
-        txFifoVec.push_back(tx);
-        DBVecVec.push_back(db);
-        df2ccuIdxFifoVec.push_back(df2ccuIdxFifo);
-        descReqFifoVec.push_back(descReqFifo);
-        txdescRspFifoVec.push_back(txdescRspFifo);
-        rxdescRspFifoVec.push_back(rxdescRspFifo);
-        cqWreqFifoVec.push_back(cqWreqFifo);
-        dataReqFifoVec.push_back(dataReqFifo);
-        txdataRspFifoVec.push_back(txdataRspFifo);
-        rxdataRspFifoVec.push_back(rxdataRspFifo);
-        txCqcReqFifoVec.push_back(txCqcReqFifo);
-        rxCqcReqFifoVec.push_back(rxCqcReqFifo);
-        txCqcRspFifoVec.push_back(txCqcRspFifo);
-        rxCqcRspFifoVec.push_back(rxCqcRspFifo);
-    }
-}
-
