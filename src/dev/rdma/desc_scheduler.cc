@@ -23,7 +23,8 @@ using namespace std;
 
 HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, std::string name):
     rNic(rNic),
-    qpcRspEvent([this]{qpcRspProc();}, name)
+    qpcRspEvent([this]{qpcRspProc();}, name),
+    qpStatusRspEvent([this]{qpStatusProc();}, name)
 {
 
 }
@@ -64,9 +65,213 @@ void HanGuRnic::DescScheduler::qpcRspProc()
                 qpc->txQpcRsp->sndWqeBaseLkey, ((uint32_t)db->num) << 5, db->offset);
         }
     }
+    dbProcQpStatusRReqQue.push(db);
+    if (!qpStatusReqEvent.scheduled())
+    {
+        rNic->schedule(qpStatusReqEvent, curTick() + rNic->clockPeriod());
+    }
+    if (rNic->qpcModule.txQpAddrRspFifo.size())
+    {
+        if (!qpcRspEvent.scheduled())
+        {
+            rNic->schedule(qpcRspEvent, curTick() + rNic->clockPeriod());
+        }
+    }
 }
 
+void HanGuRnic::DescScheduler::qpStatusReqProc()
+{
+    assert(dbProcQpStatusRReqQue.size());
+    DoorbellPtr db = dbProcQpStatusRReqQue.front();
+    dbProcQpStatusRReqQue.pop();
+    QPStatusPtr qpStatus;
+    if (qpStatusTable.find(db->qpn) == qpStatusTable.end())
+    {
+        panic("Cannot find qpn: %d\n", db->qpn);
+    }
+    qpStatus = qpStatusTable[db->qpn];
+    std::pair<DoorbellPtr, QPStatusPtr> qpStatusDbPair(db, qpStatus);
+    dbQpStatusRspQue.push(qpStatusDbPair);
+    if (!qpStatusRspEvent.scheduled())
+    {
+        rNic->schedule(qpStatusRspEvent, curTick() + rNic->clockPeriod());
+    }
+    if (dbProcQpStatusRReqQue.size())
+    {
+        if (!qpStatusReqEvent.scheduled())
+        {
+            rNic->schedule(qpStatusReqEvent, curTick() + rNic->clockPeriod());
+        }
+    }
+}
+
+/**
+ * @note
+ * This method checks QP status and push WQE prefetch request into prefetch queue.
+*/
 void HanGuRnic::DescScheduler::qpStatusProc()
 {
-    
+    assert(dbQpStatusRspQue.size());
+    DoorbellPtr db = dbQpStatusRspQue.front().first;
+    QPStatusPtr qpStatus = dbQpStatusRspQue.front().second;
+    dbQpStatusRspQue.pop();
+    if (qpStatus->head_ptr == qpStatus->tail_ptr)
+    {
+        // If head pointer equals to tail pointer, this QP is absent in the prefetch queue
+        lowPriorityQpnQue.push(db->qpn);
+    }
+    qpStatus->head_ptr += db->num;
+
+    // schedule WQE prefetch event
+    if (!getPrefetchQpnEvent.scheduled())
+    {
+        rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+    }
+
+    // update QP status
+    // WARNING: QP status update could lead to QP death
+    qpStatusTable[db->num]->head_ptr = qpStatus->head_ptr;
+
+    if (dbQpStatusRspQue.size())
+    {
+        if (!qpStatusRspEvent.scheduled())
+        {
+            rNic->schedule(qpStatusRspEvent, curTick() + rNic->clockPeriod());
+        }
+    }
+}
+
+/**
+ * @note
+ * This method sends QP status read request to prefetch WQE. Scheduling policy is FIFO.
+*/
+void HanGuRnic::DescScheduler::wqePrefetchSchedule()
+{
+    bool allowNewWQE;
+    bool allowNewHWQE;
+    bool allowNewLWQE;
+    assert(highPriorityQpnQue.size() || lowPriorityQpnQue.size());
+    // assert(highPriorityQpnQue.size() <= WQE_BUFFER_CAPACITY && lowPriorityQpnQue.size() <= WQE_BUFFER_CAPACITY);
+    allowNewHWQE = highPriorityDescQue.size() > 0;
+    allowNewLWQE = lowPriorityDescQue.size() < WQE_PREFETCH_THRESHOLD;
+    allowNewWQE = (allowNewHWQE && highPriorityQpnQue.size()) || (allowNewLWQE && lowPriorityQpnQue.size());
+    if (!allowNewWQE)
+    {
+        return;
+    }
+    if (highPriorityQpnQue.size() < WQE_PREFETCH_THRESHOLD)
+    {
+        uint32_t qpn = highPriorityQpnQue.front();
+        highPriorityQpnQue.pop();
+        // QPStatusPtr = 
+        wqePrefetchQpStatusRReqQue.push(qpn);
+    }
+    else if (lowPriorityQpnQue.size() < WQE_PREFETCH_THRESHOLD)
+    {
+        uint32_t qpn = lowPriorityQpnQue.front();
+        lowPriorityQpnQue.pop();
+        wqePrefetchQpStatusRReqQue.push(qpn);
+    }
+    if (!wqePrefetchEvent.scheduled())
+    {
+        rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
+    }
+    if (highPriorityQpnQue.size() || lowPriorityQpnQue.size())
+    {
+        if (!getPrefetchQpnEvent.scheduled())
+        {
+            rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+        }
+    }
+}
+
+/**
+ * @note
+ * Get QP status response and request for descriptors.
+*/
+void HanGuRnic::DescScheduler::wqePrefetch()
+{
+    assert(wqePrefetchQpStatusRReqQue.size());
+    uint32_t qpn = wqePrefetchQpStatusRReqQue.front();
+    wqePrefetchQpStatusRReqQue.pop();
+    QPStatusPtr qpStatus = qpStatusTable[qpn];
+
+    uint32_t descNum;
+    if (qpStatus->head_ptr - qpStatus->fetch_ptr > MAX_PREFETCH_NUM)
+    {
+        descNum = MAX_PREFETCH_NUM;
+    }
+    else 
+    {
+        descNum = qpStatus->head_ptr - qpStatus->fetch_ptr;
+    }
+
+    MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
+            qpStatus->key, descNum << 5, qpStatus->fetch_ptr);
+
+    descReq->txDescRsp = new TxDesc[descNum];
+    rNic->descReqFifo.push(descReq);
+    std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
+    wqeFetchInfoQue.push(wqeFetchInfoPair);
+
+    if (!rNic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
+        rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
+    }
+
+    if (wqePrefetchQpStatusRReqQue.size())
+    {
+        if (!wqePrefetchEvent.scheduled())
+        {
+            rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
+        }
+    }
+}
+
+/**
+ * @note
+ * Process WQE responses and produce sub WQEs.
+*/
+void HanGuRnic::DescScheduler::wqeProc()
+{
+    assert(rNic->txdescRspFifo.size());
+    uint32_t descNum = wqeFetchInfoQue.front().first;
+    QPStatusPtr qpStatus = wqeFetchInfoQue.front().second;
+    wqeFetchInfoQue.pop();
+
+    // check QP type
+    if (qpStatus->type == LAT_QP)
+    {
+        commitWQE(descNum, highPriorityDescQue);
+        qpStatus->fetch_ptr += descNum;
+    }
+    else if (qpStatus->type == RATE_QP)
+    {
+        commitWQE(descNum, lowPriorityDescQue);
+        qpStatus->fetch_ptr += descNum;
+    }
+    else if (qpStatus->type == BW_QP)
+    {
+        assert(descNum == 1);
+        // set wnd_end to the size of the whole message
+        if (qpStatus->wnd_start == 0)
+        {
+            qpStatus->wnd_end = rNic->txdescRspFifo.front()->len;
+        }
+        
+    }
+    else
+    {
+        panic("Illegal QP type!\n");
+    }
+}
+
+void HanGuRnic::DescScheduler::commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue)
+{
+    TxDescPtr desc;
+    for (int i = 0; i < descNum; i++)
+    {
+        desc = rNic->txdescRspFifo.front();
+        rNic->txdescRspFifo.pop();
+        descQue.push(desc);
+    }
 }

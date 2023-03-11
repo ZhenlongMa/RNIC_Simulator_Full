@@ -51,6 +51,13 @@
 #define QPN_NUM   (512 * 3)
 
 #define MAX_PREFETCH_NUM 8
+#define MAX_COMMIT_SZ 4096
+#define WQE_BUFFER_CAPACITY 120
+#define WQE_PREFETCH_THRESHOLD 100
+#define LAT_QP 1
+#define BW_QP 2
+#define RATE_QP 3
+
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
 
@@ -223,6 +230,7 @@ struct TxDesc {
     uint32_t len;
     uint32_t lkey;
     uint64_t lVaddr;
+    
     uint32_t qpn;
 
     union {
@@ -245,7 +253,6 @@ struct TxDesc {
     };
 };
 typedef std::shared_ptr<TxDesc> TxDescPtr;
-
 
 
 // Receive Descriptor struct
@@ -622,6 +629,21 @@ struct Regs : public Serializable {
         paramIn(cp, "cqcNumLog", cqcNumLog);
     }
 };
+
+// WQE Scheduler relevant
+struct QPStatusItem
+{
+    uint32_t head_ptr;
+    uint32_t fetch_ptr;
+    uint32_t tail_ptr;
+    uint32_t wnd_start;
+    uint32_t wnd_end;
+    uint32_t key;
+    uint8_t weight;
+    uint8_t type;
+};
+typedef std::shared_ptr<QPStatusItem> QPStatusPtr;
+
 
 } // namespace HanGuRnicDef
 

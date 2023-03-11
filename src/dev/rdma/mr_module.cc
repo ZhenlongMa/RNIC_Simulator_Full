@@ -176,7 +176,8 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
     TxDescPtr txDesc;
     switch (tptRsp->chnl) {
       case MR_RCHNL_TX_DESC:
-        event = &rnic->rdmaEngine.dduEvent;
+        // event = &rnic->rdmaEngine.dduEvent;
+        event = &rnic->descScheduler.wqeRspEvent;
 
         for (uint32_t i = 0; (i * sizeof(TxDesc)) < tptRsp->length; ++i) {
             txDesc = make_shared<TxDesc>(tptRsp->txDescRsp + i);

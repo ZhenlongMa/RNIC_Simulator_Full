@@ -310,15 +310,30 @@ class HanGuRnic : public RdmaNic {
             private:
                 void qpcRspProc();
                 void qpStatusProc();
+                void qpStatusReqProc();
+                void wqePrefetchSchedule();
+                void wqePrefetch();
+                void wqeProc();
+                void commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue);
+                std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
                 HanGuRnic *rNic;
-                std::queue<uint32_t> highPriorityQue;
-                std::queue<uint32_t> lowPriorityQue;
+                std::queue<uint32_t> highPriorityQpnQue;
+                std::queue<uint32_t> lowPriorityQpnQue;
+                std::queue<TxDescPtr> highPriorityDescQue;
+                std::queue<TxDescPtr> lowPriorityDescQue;
+                std::queue<DoorbellPtr> dbProcQpStatusRReqQue;
+                std::queue<std::pair<DoorbellPtr, QPStatusPtr>> dbQpStatusRspQue;
+                std::queue<uint32_t> wqePrefetchQpStatusRReqQue;
+                std::queue<std::pair<uint32_t, QPStatusPtr>> wqeFetchInfoQue;
             public:
                 DescScheduler(HanGuRnic *rNic, std::string name);
                 EventFunctionWrapper qpcRspEvent;
                 EventFunctionWrapper qpStatusRspEvent;
                 EventFunctionWrapper wqeRspEvent;
                 EventFunctionWrapper rxUpdateEvent;
+                EventFunctionWrapper qpStatusReqEvent;
+                EventFunctionWrapper wqePrefetchEvent;
+                EventFunctionWrapper getPrefetchQpnEvent;
         };
         DescScheduler descScheduler;
         /* -------------------WQE Scheduler Relevant{end}------------------------ */
