@@ -46,9 +46,6 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
     rnic->qpcModule.txQpAddrRspFifo.pop();
 
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing: idx %d\n", idx);
-    // for (int i = 0; i < rnic->doorbellVector.size(); ++i) {
-    //     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing:doorbellVec %d\n", (rnic->doorbellVector[i] != nullptr));
-    // }
 
     /* Get doorbell rrelated to the qpc
      * If the index fifo is empty, reschedule ccu.dfu event */
@@ -64,11 +61,6 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
 
     /* Post doorbell to DDU */
     df2ddFifo.push(dbell);
-    /* We don't schedule it here, cause it should be 
-     * scheduled by Memory Region Module, dmaRrspProcessing */
-    // if (!dduEvent.scheduled()) { /* Schedule RdmaEngine.dduProcessing */
-    //     rnic->schedule(dduEvent, curTick() + rnic->clockPeriod());
-    // }
 
     assert(qpcRsp->txQpcRsp->srcQpn == dbell->qpn);
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing:"

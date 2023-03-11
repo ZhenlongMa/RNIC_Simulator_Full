@@ -50,7 +50,7 @@
 
 #define QPN_NUM   (512 * 3)
 
-
+#define MAX_PREFETCH_NUM 8
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
 
@@ -170,7 +170,11 @@ struct QpcResc {
     uint32_t rcvWqeBaseLkey; // receive wqe base lkey
     uint32_t qkey;
     uint32_t reserved[52];
+
+    uint8_t  indicator; // 1: latency-sensitive; 2: bandwidth-sensitive; 3: message rate sensitive
+    uint8_t  perfWeight;
 };
+
 const uint8_t QP_TYPE_RC = 0x00;
 const uint8_t QP_TYPE_UC = 0x01;
 const uint8_t QP_TYPE_RD = 0x02;
@@ -219,6 +223,7 @@ struct TxDesc {
     uint32_t len;
     uint32_t lkey;
     uint64_t lVaddr;
+    uint32_t qpn;
 
     union {
         struct {        

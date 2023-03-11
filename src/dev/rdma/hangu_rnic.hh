@@ -303,14 +303,16 @@ class HanGuRnic : public RdmaNic {
         };
 
         RdmaEngine rdmaEngine;
-        
         /* -----------------------RDMA Engine Relevant{end}----------------------- */
 
         /* -------------------WQE Scheduler Relevant{begin}---------------------- */
         class DescScheduler{
             private:
                 void qpcRspProc();
+                void qpStatusProc();
                 HanGuRnic *rNic;
+                std::queue<uint32_t> highPriorityQue;
+                std::queue<uint32_t> lowPriorityQue;
             public:
                 DescScheduler(HanGuRnic *rNic, std::string name);
                 EventFunctionWrapper qpcRspEvent;
@@ -332,6 +334,16 @@ class HanGuRnic : public RdmaNic {
         };
         DescBuffer wqeBuffer;
         /* -------------------WQE Buffer Relevant{end}------------------------ */
+
+        /* -------------------QP Status Relevant{begin}---------------------- */
+        class QPStatus{
+            private:
+
+            public:
+                QPStatus();
+        };
+        QPStatus qpStatus;
+        /* -------------------QP Status Relevant{end}------------------------ */
 
         /* -----------------------Cache {begin}------------------------ */
         template <class T, class S>
