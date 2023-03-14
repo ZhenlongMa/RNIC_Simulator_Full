@@ -308,6 +308,7 @@ class HanGuRnic : public RdmaNic {
         /* -------------------WQE Scheduler Relevant{begin}---------------------- */
         class DescScheduler{
             private:
+                uint32_t totalWeight;
                 void qpcRspProc();
                 void qpStatusProc();
                 void qpStatusReqProc();

@@ -31,8 +31,8 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, std::string name):
 
 /**
  * @note
- * Process QPC response triggered by doorbell processing. This function 1) check and update
- * QP status, judge if it is needed to push QPN to prefetch queue.
+ * Process QPC response triggered by doorbell processing. 
+ * This function checks and updates QP status, judges if it is needed to push QPN to prefetch queue.
 */
 void HanGuRnic::DescScheduler::qpcRspProc()
 {
@@ -45,8 +45,7 @@ void HanGuRnic::DescScheduler::qpcRspProc()
     rNic->doorbellVector[qpc->idx] = nullptr;
     assert(db->qpn == qpc->txQpcRsp->srcQpn);
     MrReqRspPtr descReq;
-    // label QP status
-    // judge pre-fetch
+    
     if (qpc->txQpcRsp->indicator == 1) // In case of latency-sensitive QP, fetch all descriptors
     {
         descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
@@ -117,8 +116,10 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     dbQpStatusRspQue.pop();
     if (qpStatus->head_ptr == qpStatus->tail_ptr)
     {
-        // If head pointer equals to tail pointer, this QP is absent in the prefetch queue
+        // If head pointer equals to tail pointer, this QP is absent in the prefetch queue,
+        // so it should be pushed into prefetch queue and totoal weight should be updated.
         lowPriorityQpnQue.push(db->qpn);
+        totalWeight += qpStatus->weight;
     }
     qpStatus->head_ptr += db->num;
 
@@ -241,6 +242,7 @@ void HanGuRnic::DescScheduler::wqeProc()
     // check QP type
     if (qpStatus->type == LAT_QP)
     {
+        // For latency sensitive QP, commit all WQEs
         commitWQE(descNum, highPriorityDescQue);
         qpStatus->fetch_ptr += descNum;
     }
@@ -252,17 +254,31 @@ void HanGuRnic::DescScheduler::wqeProc()
     else if (qpStatus->type == BW_QP)
     {
         assert(descNum == 1);
+        assert(qpStatus->wnd_start <= qpStatus->wnd_fetch);
+        assert(qpStatus->wnd_fetch < qpStatus->wnd_end);
         // set wnd_end to the size of the whole message
         if (qpStatus->wnd_start == 0)
         {
             qpStatus->wnd_end = rNic->txdescRspFifo.front()->len;
         }
-        
+        TxDescPtr desc = rNic->txdescRspFifo.front();
+        TxDescPtr subDesc = make_shared<TxDesc>(desc);
+        subDesc->opcode = desc->opcode;
+
+        // WARNING: SEND/RECV are currently not supported!
+        subDesc->lVaddr = desc->lVaddr + qpStatus->wnd_start;
+        subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->wnd_start;
+        subDesc->len = qpStatus->wnd_end - qpStatus->wnd_fetch > MAX_COMMIT_SZ ? 
+            MAX_COMMIT_SZ : qpStatus->wnd_end - qpStatus->wnd_fetch;
+        lowPriorityDescQue.push(subDesc);
+        qpStatus->wnd_fetch += subDesc->len;
     }
     else
     {
         panic("Illegal QP type!\n");
     }
+
+    
 }
 
 void HanGuRnic::DescScheduler::commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue)

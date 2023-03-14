@@ -204,23 +204,25 @@ const uint32_t WR_FLAG_SIGNALED = (1 << 31);
 struct TxDesc {
 
     TxDesc(TxDesc * tx) {
-        this->len    = tx->len;
-        this->lkey   = tx->lkey;
-        this->lVaddr = tx->lVaddr;
-        this->flags  = tx->flags;
-        this->sendType.destQpn = tx->sendType.destQpn;
-        this->sendType.dlid    = tx->sendType.dlid;
-        this->sendType.qkey    = tx->sendType.qkey;
+        this->len               = tx->len;
+        this->lkey              = tx->lkey;
+        this->lVaddr            = tx->lVaddr;
+        this->flags             = tx->flags;
+        this->sendType.destQpn  = tx->sendType.destQpn;
+        this->sendType.dlid     = tx->sendType.dlid;
+        this->sendType.qkey     = tx->sendType.qkey;
+        this->qpn               = tx->qpn;
     }
 
     TxDesc() {
-        this->len    = 0;
-        this->lkey   = 0;
-        this->lVaddr = 0;
-        this->flags  = 0;
-        this->sendType.destQpn = 0;
-        this->sendType.dlid    = 0;
-        this->sendType.qkey    = 0;
+        this->len               = 0;
+        this->lkey              = 0;
+        this->lVaddr            = 0;
+        this->flags             = 0;
+        this->sendType.destQpn  = 0;
+        this->sendType.dlid     = 0;
+        this->sendType.qkey     = 0;
+        this->qpn               = 0;
     }
 
     bool isSignaled () {
@@ -637,6 +639,7 @@ struct QPStatusItem
     uint32_t fetch_ptr;
     uint32_t tail_ptr;
     uint32_t wnd_start;
+    uint32_t wnd_fetch;
     uint32_t wnd_end;
     uint32_t key;
     uint8_t weight;
