@@ -24,7 +24,12 @@ using namespace std;
 HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, std::string name):
     rNic(rNic),
     qpcRspEvent([this]{qpcRspProc();}, name),
-    qpStatusRspEvent([this]{qpStatusProc();}, name)
+    qpStatusRspEvent([this]{qpStatusProc();}, name),
+    wqeRspEvent([this]{wqeProc();}, name),
+    rxUpdateEvent([this]{rxUpdate();}, name),
+    qpStatusReqEvent([this]{qpStatusReqProc();}, name),
+    wqePrefetchEvent([this]{wqePrefetch();}, name),
+    getPrefetchQpnEvent([this]{wqePrefetchSchedule();}, name)
 {
 
 }
@@ -277,6 +282,7 @@ void HanGuRnic::DescScheduler::wqeProc()
     {
         panic("Illegal QP type!\n");
     }
+    
 
     
 }
@@ -290,4 +296,9 @@ void HanGuRnic::DescScheduler::commitWQE(uint32_t descNum, std::queue<TxDescPtr>
         rNic->txdescRspFifo.pop();
         descQue.push(desc);
     }
+}
+
+void HanGuRnic::DescScheduler::rxUpdate()
+{
+
 }

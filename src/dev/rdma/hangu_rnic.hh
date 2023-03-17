@@ -315,6 +315,7 @@ class HanGuRnic : public RdmaNic {
                 void wqePrefetchSchedule();
                 void wqePrefetch();
                 void wqeProc();
+                void rxUpdate();
                 void commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue);
                 std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
                 HanGuRnic *rNic;
