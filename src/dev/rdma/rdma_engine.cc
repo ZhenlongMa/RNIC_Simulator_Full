@@ -120,10 +120,13 @@ HanGuRnic::RdmaEngine::dduProcessing () {
     }
 
     /* Fetch one descriptor from tx descriptor fifo */
-    assert(rnic->txdescRspFifo.size()); /* TPT calls this function, so 
-                                         * txDescFifo should have items */
-    TxDescPtr txDesc = rnic->txdescRspFifo.front();
-    rnic->txdescRspFifo.pop();
+    // assert(rnic->txdescRspFifo.size()); /* TPT calls this function, so 
+    //                                      * txDescFifo should have items */
+    // TxDescPtr txDesc = rnic->txdescRspFifo.front();
+    // rnic->txdescRspFifo.pop();
+    assert(rnic->txDescLaunchQue.size());
+    TxDescPtr txDesc = rnic->txDescLaunchQue.front();
+    rnic->txDescLaunchQue.pop();
 
     /* Put one descriptor to waiting Memory */
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: desc->len 0x%x, desc->lkey 0x%x, desc->lvaddr 0x%x, desc->opcode 0x%x, desc->flags 0x%x, dduDbell->qpn 0x%x\n", 

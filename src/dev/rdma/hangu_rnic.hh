@@ -101,6 +101,10 @@ class HanGuRnic : public RdmaNic {
         std::queue<CxtReqRspPtr> rxCqcRspFifo; /* CqcModule -(update rsp)-> rcu */
         /* --------------------CqcModule <-> RDMA Engine {end}-------------------- */
 
+        /* --------------------DescScheduler <-> RDMA Engint {begin}---------------------------*/
+        std::queue<TxDescPtr> txDescLaunchQue;
+        /* --------------------DescScheduler <-> RDMA Engint {end}-----------------------------*/
+
         /* --------------------Cache(in TPT & CxtM) <-> DMA Engine {begin}-------------------- */
         // std::queue<DmaReqPtr> cacheDmaReadFifo;
         // std::queue<DmaReqPtr> cacheDmaWriteFifo;
@@ -317,18 +321,18 @@ class HanGuRnic : public RdmaNic {
                 void wqeProc();
                 void rxUpdate();
                 void commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue);
+                void launchWQE();
                 std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
                 HanGuRnic *rNic;
                 std::queue<uint32_t> highPriorityQpnQue;
                 std::queue<uint32_t> lowPriorityQpnQue;
+                // std::queue<uint32_t> leastPriorityQpnQue;
                 std::queue<TxDescPtr> highPriorityDescQue;
                 std::queue<TxDescPtr> lowPriorityDescQue;
                 std::queue<DoorbellPtr> dbProcQpStatusRReqQue;
                 std::queue<std::pair<DoorbellPtr, QPStatusPtr>> dbQpStatusRspQue;
                 std::queue<uint32_t> wqePrefetchQpStatusRReqQue;
                 std::queue<std::pair<uint32_t, QPStatusPtr>> wqeFetchInfoQue;
-            public:
-                DescScheduler(HanGuRnic *rNic, std::string name);
                 EventFunctionWrapper qpcRspEvent;
                 EventFunctionWrapper qpStatusRspEvent;
                 EventFunctionWrapper wqeRspEvent;
@@ -336,6 +340,9 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper qpStatusReqEvent;
                 EventFunctionWrapper wqePrefetchEvent;
                 EventFunctionWrapper getPrefetchQpnEvent;
+                EventFunctionWrapper launchWqeEvent;
+            public:
+                DescScheduler(HanGuRnic *rNic, std::string name);
         };
         DescScheduler descScheduler;
         /* -------------------WQE Scheduler Relevant{end}------------------------ */

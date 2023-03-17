@@ -283,6 +283,17 @@ void HanGuRnic::DescScheduler::wqeProc()
         panic("Illegal QP type!\n");
     }
     
+    if (!launchWqeEvent.scheduled())
+    {
+        rNic->schedule(launchWqeEvent, curTick() + rNic->clockPeriod());
+    }
+    if (rNic->txdescRspFifo.size())
+    {
+        if (!wqeRspEvent.scheduled())
+        {
+            rNic->schedule(wqeRspEvent, curTick() + rNic->clockPeriod());
+        }
+    }
 
     
 }
@@ -295,6 +306,29 @@ void HanGuRnic::DescScheduler::commitWQE(uint32_t descNum, std::queue<TxDescPtr>
         desc = rNic->txdescRspFifo.front();
         rNic->txdescRspFifo.pop();
         descQue.push(desc);
+    }
+}
+
+void HanGuRnic::DescScheduler::launchWQE()
+{
+    assert(lowPriorityDescQue.size() || highPriorityDescQue.size());
+    if (highPriorityDescQue.size())
+    {
+        rNic->txDescLaunchQue.push(highPriorityDescQue.front());
+        highPriorityDescQue.pop();
+    }
+    else
+    {
+        rNic->txDescLaunchQue.push(lowPriorityDescQue.front());
+        lowPriorityDescQue.pop();
+    }
+    if (!rNic->rdmaEngine.dduEvent.scheduled())
+    {
+        rNic->schedule(rNic->rdmaEngine.dduEvent, curTick() + rNic->clockPeriod());
+    }
+    if (!launchWqeEvent.scheduled())
+    {
+        rNic->schedule(launchWqeEvent, curTick() + rNic->clockPeriod());
     }
 }
 
