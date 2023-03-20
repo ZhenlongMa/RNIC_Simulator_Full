@@ -115,7 +115,7 @@ HanGuRnic::RdmaEngine::dduProcessing () {
         assert(this->dduDbell == nullptr);
         this->dduDbell = df2ddFifo.front();
         df2ddFifo.pop();
-        this->allowNewDb = false;
+        // this->allowNewDb = false;
         HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: Get one Doorbell!\n");
     }
 
@@ -147,11 +147,11 @@ HanGuRnic::RdmaEngine::dduProcessing () {
     rnic->qpcModule.postQpcReq(qpcRdReq);
 
     /* update allowNewDb */
-    --this->dduDbell->num;
-    if (this->dduDbell->num == 0) {
-        this->allowNewDb = true;
-        this->dduDbell = nullptr;
-    }
+    // --this->dduDbell->num;
+    // if (this->dduDbell->num == 0) {
+    //     this->allowNewDb = true;
+    //     this->dduDbell = nullptr;
+    // }
 
     /* Schedule myself again if there's new descriptor
      * or there remains descriptors to post */
