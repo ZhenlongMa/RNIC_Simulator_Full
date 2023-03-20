@@ -467,7 +467,6 @@ struct WindowElem {
     uint32_t qpn;
     uint32_t psn;
 
-    // used for RDMA read only
     TxDescPtr txDesc;
 };
 typedef std::shared_ptr<WindowElem> WindowElemPtr;
@@ -646,6 +645,7 @@ struct QPStatusItem
     uint32_t key;
     uint8_t weight;
     uint8_t type;
+    uint32_t qpn;
 };
 typedef std::shared_ptr<QPStatusItem> QPStatusPtr;
 
