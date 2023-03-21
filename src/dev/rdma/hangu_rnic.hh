@@ -101,9 +101,10 @@ class HanGuRnic : public RdmaNic {
         std::queue<CxtReqRspPtr> rxCqcRspFifo; /* CqcModule -(update rsp)-> rcu */
         /* --------------------CqcModule <-> RDMA Engine {end}-------------------- */
 
-        /* --------------------DescScheduler <-> RDMA Engint {begin}---------------------------*/
+        /* --------------------DescScheduler <-> RDMA Engine {begin}---------------------------*/
         std::queue<TxDescPtr> txDescLaunchQue;
-        /* --------------------DescScheduler <-> RDMA Engint {end}-----------------------------*/
+        std::queue<std::pair<uint32_t, uint32_t>> updateQue;
+        /* --------------------DescScheduler <-> RDMA Engine {end}-----------------------------*/
 
         /* --------------------Cache(in TPT & CxtM) <-> DMA Engine {begin}-------------------- */
         // std::queue<DmaReqPtr> cacheDmaReadFifo;
@@ -320,7 +321,7 @@ class HanGuRnic : public RdmaNic {
                 void wqePrefetch();
                 void wqeProc();
                 void rxUpdate();
-                void commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue);
+                // void commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue);
                 void launchWQE();
                 std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
                 HanGuRnic *rNic;
@@ -343,6 +344,7 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper launchWqeEvent;
             public:
                 DescScheduler(HanGuRnic *rNic, std::string name);
+                EventFunctionWrapper updateEvent;
         };
         DescScheduler descScheduler;
         /* -------------------WQE Scheduler Relevant{end}------------------------ */

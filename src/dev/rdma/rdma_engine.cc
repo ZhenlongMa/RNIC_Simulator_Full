@@ -448,6 +448,15 @@ HanGuRnic::RdmaEngine::rruProcessing () {
             panic("reTrans!\n");
             break;
         }
+
+        // update QP Status in descriptor scheduler
+        std::pair<uint32_t, uint32_t> qpStatusUpdate(winElem->list->front()->txDesc->qpn, 
+                                                     winElem->list->front()->txDesc->len);
+        rnic->updateQue.push(qpStatusUpdate);
+        if (!rnic->descScheduler.updateEvent.scheduled())
+        {
+            rnic->schedule(rnic->descScheduler.updateEvent, curTick() + rnic->clockPeriod());
+        }
         
         /**
          * Update the send window

@@ -29,7 +29,8 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, std::string name):
     rxUpdateEvent([this]{rxUpdate();}, name),
     qpStatusReqEvent([this]{qpStatusReqProc();}, name),
     wqePrefetchEvent([this]{wqePrefetch();}, name),
-    getPrefetchQpnEvent([this]{wqePrefetchSchedule();}, name)
+    getPrefetchQpnEvent([this]{wqePrefetchSchedule();}, name),
+    updateEvent([this]{rxUpdate();}, name)
 {
 
 }
@@ -243,17 +244,38 @@ void HanGuRnic::DescScheduler::wqeProc()
     uint32_t descNum = wqeFetchInfoQue.front().first;
     QPStatusPtr qpStatus = wqeFetchInfoQue.front().second;
     wqeFetchInfoQue.pop();
+    TxDescPtr desc;
 
     // check QP type
     if (qpStatus->type == LAT_QP)
     {
         // For latency sensitive QP, commit all WQEs
-        commitWQE(descNum, highPriorityDescQue);
+        for (int i = 0; i < descNum; i++)
+        {
+            desc = rNic->txdescRspFifo.front();
+            rNic->txdescRspFifo.pop();
+            highPriorityDescQue.push(desc);
+        }
         qpStatus->fetch_ptr += descNum;
     }
     else if (qpStatus->type == RATE_QP)
     {
-        commitWQE(descNum, lowPriorityDescQue);
+        // For message rate sensitive QP, commit up to 8 WQEs
+        int fetchNum;
+        if (descNum > MAX_PREFETCH_NUM)
+        {
+            fetchNum = MAX_PREFETCH_NUM;
+        }
+        else
+        {
+            fetchNum = descNum;
+        }
+        for (int i = 0; i < fetchNum; i++)
+        {
+            desc = rNic->txdescRspFifo.front();
+            rNic->txdescRspFifo.pop();
+            lowPriorityDescQue.push(desc);
+        }
         qpStatus->fetch_ptr += descNum;
     }
     else if (qpStatus->type == BW_QP)
@@ -275,6 +297,13 @@ void HanGuRnic::DescScheduler::wqeProc()
         subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->wnd_start;
         subDesc->len = qpStatus->wnd_end - qpStatus->wnd_fetch > MAX_COMMIT_SZ ? 
             MAX_COMMIT_SZ : qpStatus->wnd_end - qpStatus->wnd_fetch;
+        subDesc->qpn = qpStatus->qpn;
+        
+        // If this subDesc doesn't finish the whole message, don't generate CQE
+        if (qpStatus->wnd_fetch + subDesc->len >= qpStatus->wnd_end)
+        {
+            subDesc->flags = 0;
+        }
         lowPriorityDescQue.push(subDesc);
         qpStatus->wnd_fetch += subDesc->len;
     }
@@ -296,17 +325,6 @@ void HanGuRnic::DescScheduler::wqeProc()
     }
 
     
-}
-
-void HanGuRnic::DescScheduler::commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue)
-{
-    TxDescPtr desc;
-    for (int i = 0; i < descNum; i++)
-    {
-        desc = rNic->txdescRspFifo.front();
-        rNic->txdescRspFifo.pop();
-        descQue.push(desc);
-    }
 }
 
 void HanGuRnic::DescScheduler::launchWQE()
@@ -332,7 +350,32 @@ void HanGuRnic::DescScheduler::launchWQE()
     }
 }
 
+/**
+ * @note
+ * Update win_fetch and tail_ptr in QP status. Maybe tail_ptr updating should be implemented in 
+ * CQ processing.
+*/
 void HanGuRnic::DescScheduler::rxUpdate()
 {
-
+    assert(rNic->updateQue.size());
+    uint32_t qpn = rNic->updateQue.front().first;
+    uint32_t len = rNic->updateQue.front().second;
+    rNic->updateQue.pop();
+    QPStatusPtr status = qpStatusTable[qpn];
+    assert(status->wnd_fetch + len <= status->wnd_end);
+    status->wnd_fetch += len;
+    if (status->wnd_fetch >= status->wnd_end)
+    {
+        if (status->tail_ptr != status->head_ptr)
+        {
+            status->tail_ptr++;
+        }
+    }
+    if (rNic->updateQue.size())
+    {
+        if (!updateEvent.scheduled())
+        {
+            rNic->schedule(updateEvent, curTick() + rNic->clockPeriod());
+        }
+    }
 }
