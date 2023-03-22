@@ -307,6 +307,19 @@ HanGuRnic::mboxFetchCpl () {
                     i, qpcReq->txQpcReq->srcQpn, qpcReq->txQpcReq->srcQpn&QPN_MASK, (uintptr_t)qpcReq->txQpcReq);
             qpcReq->num = qpcReq->txQpcReq->srcQpn;
             qpcModule.postQpcReq(qpcReq); /* post create request to qpcModule */
+            // write QP status
+
+            QPStatusPtr qpStatus = make_shared<QPStatusItem>(
+                qpcReq->txQpcReq->sndWqeBaseLkey, 
+                qpcReq->txQpcReq->perfWeight,
+                qpcReq->txQpcReq->indicator,
+                qpcReq->txQpcReq->srcQpn);
+            // descScheduler.qpStatusTable.emplace(qpStatus->qpn, qpStatus);
+            createQue.push(qpStatus);
+            if (!descScheduler.createQpStatusEvent.scheduled())
+            {
+                schedule(descScheduler.createQpStatusEvent, curTick() + clockPeriod());
+            }
         }
         delete[] mboxBuf;
         break;

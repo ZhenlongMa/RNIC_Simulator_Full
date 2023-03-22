@@ -636,6 +636,19 @@ struct Regs : public Serializable {
 // WQE Scheduler relevant
 struct QPStatusItem
 {
+    QPStatusItem(uint32_t key, uint8_t weight, uint8_t type, uint32_t qpn)
+    {
+        this->key = key;
+        this->weight = weight;
+        this->type = type;
+        this->qpn = qpn;
+        this->head_ptr    = 0;
+        this->fetch_ptr   = 0;
+        this->tail_ptr    = 0;
+        this->wnd_start   = 0;
+        this->wnd_fetch   = 0;
+        this->wnd_end     = 0;
+    }
     uint32_t head_ptr;
     uint32_t fetch_ptr;
     uint32_t tail_ptr;

@@ -26,11 +26,13 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, std::string name):
     qpcRspEvent([this]{qpcRspProc();}, name),
     qpStatusRspEvent([this]{qpStatusProc();}, name),
     wqeRspEvent([this]{wqeProc();}, name),
-    rxUpdateEvent([this]{rxUpdate();}, name),
-    qpStatusReqEvent([this]{qpStatusReqProc();}, name),
+    // rxUpdateEvent([this]{rxUpdate();}, name),
+    // qpStatusReqEvent([this]{qpStatusReqProc();}, name),
     wqePrefetchEvent([this]{wqePrefetch();}, name),
     getPrefetchQpnEvent([this]{wqePrefetchSchedule();}, name),
-    updateEvent([this]{rxUpdate();}, name)
+    launchWqeEvent([this]{launchWQE();}, name),
+    updateEvent([this]{rxUpdate();}, name),
+    createQpStatusEvent([this]{createQpStatus();}, name)
 {
 
 }
@@ -38,7 +40,7 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, std::string name):
 /**
  * @note
  * Process QPC response triggered by doorbell processing. 
- * This function checks and updates QP status, judges if it is needed to push QPN to prefetch queue.
+ * This function requests for QP status.
 */
 void HanGuRnic::DescScheduler::qpcRspProc()
 {
@@ -50,45 +52,7 @@ void HanGuRnic::DescScheduler::qpcRspProc()
     rNic->df2ccuIdxFifo.push(qpc->idx);
     rNic->doorbellVector[qpc->idx] = nullptr;
     assert(db->qpn == qpc->txQpcRsp->srcQpn);
-    MrReqRspPtr descReq;
-    
-    if (qpc->txQpcRsp->indicator == 1) // In case of latency-sensitive QP, fetch all descriptors
-    {
-        descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-            qpc->txQpcRsp->sndWqeBaseLkey, db->num << 5, db->offset);
-    }
-    else
-    {
-        if (db->num > MAX_PREFETCH_NUM)
-        {
-            descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-                qpc->txQpcRsp->sndWqeBaseLkey, ((uint32_t)MAX_PREFETCH_NUM) << 5, db->offset);
-        }
-        else
-        {
-            descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-                qpc->txQpcRsp->sndWqeBaseLkey, ((uint32_t)db->num) << 5, db->offset);
-        }
-    }
-    dbProcQpStatusRReqQue.push(db);
-    if (!qpStatusReqEvent.scheduled())
-    {
-        rNic->schedule(qpStatusReqEvent, curTick() + rNic->clockPeriod());
-    }
-    if (rNic->qpcModule.txQpAddrRspFifo.size())
-    {
-        if (!qpcRspEvent.scheduled())
-        {
-            rNic->schedule(qpcRspEvent, curTick() + rNic->clockPeriod());
-        }
-    }
-}
 
-void HanGuRnic::DescScheduler::qpStatusReqProc()
-{
-    assert(dbProcQpStatusRReqQue.size());
-    DoorbellPtr db = dbProcQpStatusRReqQue.front();
-    dbProcQpStatusRReqQue.pop();
     QPStatusPtr qpStatus;
     if (qpStatusTable.find(db->qpn) == qpStatusTable.end())
     {
@@ -101,11 +65,11 @@ void HanGuRnic::DescScheduler::qpStatusReqProc()
     {
         rNic->schedule(qpStatusRspEvent, curTick() + rNic->clockPeriod());
     }
-    if (dbProcQpStatusRReqQue.size())
+    if (rNic->qpcModule.txQpAddrRspFifo.size())
     {
-        if (!qpStatusReqEvent.scheduled())
+        if (!qpcRspEvent.scheduled())
         {
-            rNic->schedule(qpStatusReqEvent, curTick() + rNic->clockPeriod());
+            rNic->schedule(qpcRspEvent, curTick() + rNic->clockPeriod());
         }
     }
 }
@@ -377,5 +341,17 @@ void HanGuRnic::DescScheduler::rxUpdate()
         {
             rNic->schedule(updateEvent, curTick() + rNic->clockPeriod());
         }
+    }
+}
+
+void HanGuRnic::DescScheduler::createQpStatus()
+{
+    assert(rNic->createQue.size());
+    QPStatusPtr status = rNic->createQue.front();
+    rNic->createQue.pop();
+    qpStatusTable.emplace(status->qpn, status);
+    if (rNic->createQue.size())
+    {
+        rNic->schedule(createQpStatusEvent, cutTick() + rNic->clockPeriod());
     }
 }

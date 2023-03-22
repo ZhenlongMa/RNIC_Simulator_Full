@@ -106,6 +106,10 @@ class HanGuRnic : public RdmaNic {
         std::queue<std::pair<uint32_t, uint32_t>> updateQue;
         /* --------------------DescScheduler <-> RDMA Engine {end}-----------------------------*/
 
+        /* --------------------DescScheduler <-> CCU {begin}---------------------------*/
+        std::queue<QPStatusPtr> createQue;
+        /* --------------------DescScheduler <-> CCU {end}-----------------------------*/
+
         /* --------------------Cache(in TPT & CxtM) <-> DMA Engine {begin}-------------------- */
         // std::queue<DmaReqPtr> cacheDmaReadFifo;
         // std::queue<DmaReqPtr> cacheDmaWriteFifo;
@@ -316,13 +320,14 @@ class HanGuRnic : public RdmaNic {
                 uint32_t totalWeight;
                 void qpcRspProc();
                 void qpStatusProc();
-                void qpStatusReqProc();
+                // void qpStatusReqProc();
                 void wqePrefetchSchedule();
                 void wqePrefetch();
                 void wqeProc();
                 void rxUpdate();
                 // void commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue);
                 void launchWQE();
+                void createQpStatus();
                 std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
                 HanGuRnic *rNic;
                 std::queue<uint32_t> highPriorityQpnQue;
@@ -337,14 +342,15 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper qpcRspEvent;
                 EventFunctionWrapper qpStatusRspEvent;
                 EventFunctionWrapper wqeRspEvent;
-                EventFunctionWrapper rxUpdateEvent;
-                EventFunctionWrapper qpStatusReqEvent;
+                // EventFunctionWrapper rxUpdateEvent;
+                // EventFunctionWrapper qpStatusReqEvent;
                 EventFunctionWrapper wqePrefetchEvent;
                 EventFunctionWrapper getPrefetchQpnEvent;
                 EventFunctionWrapper launchWqeEvent;
             public:
                 DescScheduler(HanGuRnic *rNic, std::string name);
                 EventFunctionWrapper updateEvent;
+                EventFunctionWrapper createQpStatusEvent;
         };
         DescScheduler descScheduler;
         /* -------------------WQE Scheduler Relevant{end}------------------------ */
