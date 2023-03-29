@@ -168,7 +168,8 @@ struct kfd_ioctl_write_qpc_args {
     uint32_t snd_wqe_base_lkey[MAX_QPC_BATCH]; /* send wqe base lkey */
     uint32_t rcv_wqe_base_lkey[MAX_QPC_BATCH]; /* receive wqe base lkey */
     uint32_t qkey   [MAX_QPC_BATCH]; /* Queue key, used for UD incomming data validation */
-    
+    uint8_t  indicator [MAX_QPC_BATCH];
+    uint8_t  weight    [MAX_QPC_BATCH];
 };
 
 struct kfd_ioctl_get_time_args {
