@@ -216,6 +216,17 @@ struct TxDesc {
         this->qpn               = tx->qpn;
     }
 
+    TxDesc(std::shared_ptr<TxDesc> tx) {
+        this->len               = tx->len;
+        this->lkey              = tx->lkey;
+        this->lVaddr            = tx->lVaddr;
+        this->flags             = tx->flags;
+        this->sendType.destQpn  = tx->sendType.destQpn;
+        this->sendType.dlid     = tx->sendType.dlid;
+        this->sendType.qkey     = tx->sendType.qkey;
+        this->qpn               = tx->qpn;
+    }
+
     TxDesc() {
         this->len               = 0;
         this->lkey              = 0;

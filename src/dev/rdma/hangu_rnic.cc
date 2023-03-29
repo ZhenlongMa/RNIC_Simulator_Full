@@ -58,6 +58,7 @@ HanGuRnic::HanGuRnic(const Params *p)
     cqcModule   (this, name() + ".CqcModule", p->cqc_cache_num),
     qpcModule   (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
     dmaEngine   (this, name() + ".DmaEngine"),
+    descScheduler(this, name() + ".DescScheduler"),
 
     dmaReadDelay(p->dma_read_delay), dmaWriteDelay(p->dma_write_delay),
     pciBandwidth(p->pci_speed),
