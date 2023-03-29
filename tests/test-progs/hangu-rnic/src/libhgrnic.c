@@ -281,6 +281,10 @@ int ibv_modify_batch_qp(struct ibv_context *context, struct ibv_qp *qp, uint32_t
             qpc_args->sq_size_log[i] = PAGE_SIZE_LOG; // qp->snd_mr->length;
             qpc_args->rq_size_log[i] = PAGE_SIZE_LOG; // qp->rcv_mr->length;
 
+            // added by mazhenlong
+            qpc_args->indicator[i]  = qp[batch_cnt + i].indicator;
+            qpc_args->weight[i]     = qp[batch_cnt + i].weight;
+
             // HGRNIC_PRINT(" ibv_modify_batch_qp! qpn 0x%x\n", qp[batch_cnt + i].qp_num);
         }
         write_cmd(dvr->fd, HGKFD_IOC_WRITE_QPC, qpc_args);

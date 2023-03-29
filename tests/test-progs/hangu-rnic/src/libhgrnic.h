@@ -75,6 +75,13 @@ enum ibv_wqe_flags {
     WR_FLAG_SIGNALED  = (1 << 31),
 };
 
+enum perf_indicator
+{
+    LATENCY         = (uint8_t)0x01,
+    MSG_RATE        = (uint8_t)0x02,
+    BANDWIDTH       = (uint8_t)0x03,
+};
+
 
 struct Doorbell {
     uint8_t  opcode;
@@ -211,6 +218,9 @@ struct ibv_qp {
 
     // For UD type
     uint32_t qkey;
+
+    uint8_t weight;
+    enum perf_indicator indicator;
 };
 
 

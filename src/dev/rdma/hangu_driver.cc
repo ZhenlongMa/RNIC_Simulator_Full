@@ -233,6 +233,7 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
         {   
             HANGU_PRINT(HanGuDriver, " ioctl : HGKFD_IOC_WRITE_QPC\n");
 
+            // copy from user space to kernel space
             TypedBufferArg<kfd_ioctl_write_qpc_args> args(ioc_buf);
             args.copyIn(virt_proxy);
 

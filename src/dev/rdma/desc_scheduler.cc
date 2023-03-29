@@ -352,6 +352,6 @@ void HanGuRnic::DescScheduler::createQpStatus()
     qpStatusTable.emplace(status->qpn, status);
     if (rNic->createQue.size())
     {
-        rNic->schedule(createQpStatusEvent, cutTick() + rNic->clockPeriod());
+        rNic->schedule(createQpStatusEvent, curTick() + rNic->clockPeriod());
     }
 }
