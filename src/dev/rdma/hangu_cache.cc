@@ -1,4 +1,5 @@
-#include "dev/rdma/hangu_rnic_defs.hh"
+#include "dev/rdma/hangu_rnic.hh"
+// #include "dev/rdma/hangu_rnic_defs.hh"
 #include <algorithm>
 #include <memory>
 #include <queue>
@@ -19,52 +20,9 @@ using namespace HanGuRnicDef;
 using namespace Net;
 using namespace std;
 
-/* -----------------------QPC Cache {begin}---------------------- */
-template <class T>
-class Cache {
-    private:
-        /* Name of myself */
-        std::string _name;
-
-        /* Cache for resource T */
-        std::unordered_map<uint32_t, std::pair<T*, uint64_t> > cache; /* <entryNum, <entry, lru>> */
-        uint32_t capacity; /* number of cache entries this cache owns */
-        uint32_t cacheSz;
-
-        uint64_t seq_end;
-
-    public:
-        Cache (const std::string n, uint32_t qpcCacheNum)
-        : _name(n),
-            capacity(qpcCacheNum),
-            seq_end(0) { cacheSz = sizeof(T); }
-
-        /* Cache replace scheme, return key in cache */
-        uint32_t replaceEntry();
-
-        /* lookup entry in cache */
-        bool lookupHit(uint32_t entryNum); /* return true if really hit */
-        bool lookupFull(uint32_t entryNum); /* return true if cache is full */
-
-        /* read entry from cache */
-        bool readEntry(uint32_t entryNum, T* entry); /* use memcpy to get entry */
-
-        bool updateEntry(uint32_t entryNum, const std::function<bool(T&)> &update=nullptr);
-
-        /* write entry to cache */
-        bool writeEntry(uint32_t entryNum, T* entry); /* use memcpy to write entry */
-
-        /* delete entry in cache */
-        T* deleteEntry(uint32_t entryNum);
-
-        std::string name() { return _name; }
-};
-/* -----------------------QPC Cache {end}---------------------- */
-
-
 ///////////////////////////// HanGuRnic::Cache {begin}//////////////////////////////
 template<class T>
-uint32_t Cache<T>::replaceEntry() {
+uint32_t HanGuRnic::Cache<T>::replaceEntry() {
 
     uint64_t min = seq_end;
     uint32_t rescNum = cache.begin()->first;
@@ -89,7 +47,7 @@ uint32_t Cache<T>::replaceEntry() {
 }
 
 template<class T>
-bool Cache<T>::lookupHit(uint32_t entryNum) {
+bool HanGuRnic::Cache<T>::lookupHit(uint32_t entryNum) {
     bool res = (cache.find(entryNum) != cache.end());
     if (res) { /* if hit update the state of the entry */
         cache[entryNum].second = seq_end++;
@@ -98,12 +56,12 @@ bool Cache<T>::lookupHit(uint32_t entryNum) {
 }
 
 template<class T>
-bool Cache<T>::lookupFull(uint32_t entryNum) {
+bool HanGuRnic::Cache<T>::lookupFull(uint32_t entryNum) {
     return cache.size() == capacity;
 }
 
 template<class T>
-bool Cache<T>::readEntry(uint32_t entryNum, T* entry) {
+bool HanGuRnic::Cache<T>::readEntry(uint32_t entryNum, T* entry) {
     assert(cache.find(entryNum) != cache.end());
 
     memcpy(entry, cache[entryNum].first, sizeof(T));
@@ -111,7 +69,7 @@ bool Cache<T>::readEntry(uint32_t entryNum, T* entry) {
 }
 
 template<class T>
-bool Cache<T>::updateEntry(uint32_t entryNum, const std::function<bool(T&)> &update) {
+bool HanGuRnic::Cache<T>::updateEntry(uint32_t entryNum, const std::function<bool(T&)> &update) {
     assert(cache.find(entryNum) != cache.end());
     assert(update != nullptr);
 
@@ -119,7 +77,7 @@ bool Cache<T>::updateEntry(uint32_t entryNum, const std::function<bool(T&)> &upd
 }
 
 template<class T>
-bool Cache<T>::writeEntry(uint32_t entryNum, T* entry) {
+bool HanGuRnic::Cache<T>::writeEntry(uint32_t entryNum, T* entry) {
     assert(cache.find(entryNum) == cache.end()); /* could not find this entry in default */
 
     T *val = new T;
@@ -137,7 +95,7 @@ bool Cache<T>::writeEntry(uint32_t entryNum, T* entry) {
 
 /* delete entry in cache */
 template<class T>
-T* Cache<T>::deleteEntry(uint32_t entryNum) {
+T* HanGuRnic::Cache<T>::deleteEntry(uint32_t entryNum) {
     assert(cache.find(entryNum) != cache.end());
     
     T *rtnResc = cache[entryNum].first;
@@ -146,3 +104,4 @@ T* Cache<T>::deleteEntry(uint32_t entryNum) {
     return rtnResc;
 }
 ///////////////////////////// HanGuRnic::Cache {end}//////////////////////////////
+template class HanGuRnic::Cache<QpcResc>;

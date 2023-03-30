@@ -1,8 +1,8 @@
-// #include "dev/rdma/hangu_rnic.hh"
+#include "dev/rdma/hangu_rnic.hh"
 #include <algorithm>
 #include <memory>
 #include <queue>
-#include "dev/rdma/hangu_rnic_defs.hh"
+// #include "dev/rdma/hangu_rnic_defs.hh"
 
 #include "base/inet.hh"
 // #include "base/trace.hh"
@@ -20,105 +20,9 @@ using namespace HanGuRnicDef;
 using namespace Net;
 using namespace std;
 
-/* -----------------------Cache {begin}------------------------ */
-template <class T, class S>
-class RescCache {
-    private:
-
-        struct CacheRdPkt {
-            CacheRdPkt(Event *cplEvent, uint32_t rescIdx, 
-                    T *rescDma, S reqPkt, DmaReqPtr dmaReq, T *rspResc, const std::function<bool(T&)> &rescUpdate) 
-            : cplEvent(cplEvent), rescIdx(rescIdx), rescDma(rescDma), reqPkt(reqPkt), 
-                rspResc(rspResc), 
-                rescUpdate(rescUpdate) { this->dmaReq = dmaReq; }
-            Event   *cplEvent; /* event to be scheduled when resource fetched */
-            uint32_t rescIdx; /* resource index */
-            T       *rescDma; /* addr used to get resc through DMA read */
-            S        reqPkt ; /* temp store the request pkt */
-            DmaReqPtr dmaReq; /* DMA read request pkt, to fetch missed resource (cache), 
-                                we only use its isValid to fetch the rsp */
-            T       *rspResc; /* addr used to rsp the requester !TODO: delete it later */
-            const std::function<bool(T&)> rescUpdate;
-        };
-
-        /* Pointer to the device I am in. */
-        HanGuRnic *rnic;
-
-        /* Stores my name in string */
-        std::string _name;
-
-        /* Cache for resource T */
-        std::unordered_map<uint32_t, T> cache;
-        uint32_t capacity; /* number of cache entries this Resource cache owns */
-
-        /* used to process cache read */
-        void readProc();
-        EventFunctionWrapper readProcEvent;
-    
-        /* Request FIFO, Only used in Cache Read.
-        * Used to temp store request pkt in order */
-        std::queue<CacheRdPkt> reqFifo;
-        
-
-        // Base ICM address of resources in ICM space.
-        uint64_t baseAddr;
-        
-        // Storage for ICM
-        uint64_t *icmPage;
-        uint32_t rescSz; // size of one entry of resource
-
-        // Convert resource number into physical address.
-        uint64_t rescNum2phyAddr(uint32_t num);
-
-        /* Cache replace scheme, return key in cache */
-        uint32_t replaceScheme();
-
-        // Write evited elem back to memory
-        void storeReq(uint64_t addr, T *resc);
-
-        // Read wanted elem from memory
-        void fetchReq(uint64_t addr, Event *cplEvent, uint32_t rescNum, S reqPkt, T *resc, const std::function<bool(T&)> &rescUpdate=nullptr);
-
-        /* get fetched data from memory */
-        void fetchRsp();
-        EventFunctionWrapper fetchCplEvent;
-        
-        /* read req -> read rsp Fifo
-        * Used only in Read Cache miss. */
-        std::queue<CacheRdPkt> rreq2rrspFifo;
-
-    public:
-
-        RescCache (HanGuRnic *i, uint32_t cacheSize, const std::string n) 
-        : rnic(i),
-            _name(n),
-            capacity(cacheSize),
-            readProcEvent([this]{ readProc(); }, n),
-            fetchCplEvent([this]{ fetchRsp(); }, n) { icmPage = new uint64_t [ICM_MAX_PAGE_NUM]; rescSz = sizeof(T); }
-
-        /* Set base address of ICM space */
-        void setBase(uint64_t base);
-
-        /* ICM Write Request */
-        void icmStore(IcmResc *icmResc, uint32_t chunkNum);
-
-        /* Write resource back to Cache */
-        void rescWrite(uint32_t rescIdx, T *resc, const std::function<bool(T&, T&)> &rescUpdate=nullptr);
-
-        /* Read resource from Cache */
-        void rescRead(uint32_t rescIdx, Event *cplEvent, S reqPkt, T *rspResc=nullptr, const std::function<bool(T&)> &rescUpdate=nullptr);
-
-        /* Outer module uses to get cache entry (so don't delete the element) */
-        std::queue<std::pair<T *, S> > rrspFifo;
-
-        std::string name() { return _name; }
-};
-/* -----------------------Cache {end}------------------------ */
-
-
 ///////////////////////////// HanGuRnic::Resource Cache {begin}//////////////////////////////
 template <class T, class S>
-uint32_t RescCache<T, S>::replaceScheme() {
+uint32_t HanGuRnic::RescCache<T, S>::replaceScheme() {
     
     uint32_t cnt = random_mt.random(0, (int)cache.size() - 1);
     
@@ -134,7 +38,7 @@ uint32_t RescCache<T, S>::replaceScheme() {
 }
 
 template <class T, class S>
-void RescCache<T, S>::storeReq(uint64_t addr, T *resc) {
+void HanGuRnic::RescCache<T, S>::storeReq(uint64_t addr, T *resc) {
 
     HANGU_PRINT(RescCache, " storeReq enter\n");
     
@@ -149,7 +53,7 @@ void RescCache<T, S>::storeReq(uint64_t addr, T *resc) {
 }
 
 template <class T, class S>
-void RescCache<T, S>::fetchReq(uint64_t addr, Event *cplEvent, 
+void HanGuRnic::RescCache<T, S>::fetchReq(uint64_t addr, Event *cplEvent, 
         uint32_t rescIdx, S reqPkt, T *rspResc, const std::function<bool(T&)> &rescUpdate) {
     
     HANGU_PRINT(RescCache, "fetchReq enter\n");
@@ -171,7 +75,7 @@ void RescCache<T, S>::fetchReq(uint64_t addr, Event *cplEvent,
 }
 
 template <class T, class S>
-void RescCache<T, S>::fetchRsp() {
+void HanGuRnic::RescCache<T, S>::fetchRsp() {
 
     HANGU_PRINT(RescCache, " RescCache.fetchRsp! capacity: %d, size %d, rescSz %d\n", capacity, cache.size(), sizeof(T));
     
@@ -192,7 +96,7 @@ void RescCache<T, S>::fetchRsp() {
     if (cache.find(rrsp.rescIdx) != cache.end()) { /* It has already been fetched */
         
         /* Abandon fetched resource, and put cache resource 
-         * to FIFO. */ 
+        * to FIFO. */ 
         memcpy((void *)rrsp.rescDma, (void *)(&(cache[rrsp.rescIdx])), sizeof(T));
         if (rrsp.rspResc) {
             memcpy((void *)rrsp.rspResc, (void *)(&(cache[rrsp.rescIdx])), sizeof(T));
@@ -252,8 +156,8 @@ void RescCache<T, S>::fetchRsp() {
     HANGU_PRINT(RescCache, " RescCache.fetchRsp: Push fetched resource to FIFO!\n");
 
     /* Update content in cache entry
-     * Note that this should be called last because 
-     * we hope get older resource, not updated resource */
+    * Note that this should be called last because 
+    * we hope get older resource, not updated resource */
     if (rrsp.rescUpdate == nullptr) {
         HANGU_PRINT(RescCache, " RescCache.fetchRsp: rescUpdate is null!\n");
     } else {
@@ -279,12 +183,12 @@ void RescCache<T, S>::fetchRsp() {
 }
 
 template <class T, class S>
-void RescCache<T, S>::setBase(uint64_t base) {
+void HanGuRnic::RescCache<T, S>::setBase(uint64_t base) {
     baseAddr = base;
 }
 
 template <class T, class S>
-void RescCache<T, S>::icmStore(IcmResc *icmResc, uint32_t chunkNum) {
+void HanGuRnic::RescCache<T, S>::icmStore(IcmResc *icmResc, uint32_t chunkNum) {
     HANGU_PRINT(RescCache, "icmStore enter\n");
 
     for (int i = 0; i < chunkNum; ++i) {
@@ -307,7 +211,7 @@ void RescCache<T, S>::icmStore(IcmResc *icmResc, uint32_t chunkNum) {
 }
 
 template <class T, class S>
-uint64_t RescCache<T, S>::rescNum2phyAddr(uint32_t num) {
+uint64_t HanGuRnic::RescCache<T, S>::rescNum2phyAddr(uint32_t num) {
     uint32_t vAddr = num * rescSz;
     uint32_t icmIdx = vAddr >> 12;
     uint32_t offset = vAddr & 0xfff;
@@ -325,7 +229,7 @@ uint64_t RescCache<T, S>::rescNum2phyAddr(uint32_t num) {
  * 
  */
 template <class T, class S>
-void RescCache<T, S>::rescWrite(uint32_t rescIdx, T *resc, const std::function<bool(T&, T&)> &rescUpdate) {
+void HanGuRnic::RescCache<T, S>::rescWrite(uint32_t rescIdx, T *resc, const std::function<bool(T&, T&)> &rescUpdate) {
 
     HANGU_PRINT(RescCache, " RescCache.rescWrite! capacity: %d, size: %d rescSz %d, rescIndex %d\n", 
             capacity, cache.size(), sizeof(T), rescIdx);
@@ -407,7 +311,7 @@ void RescCache<T, S>::rescWrite(uint32_t rescIdx, T *resc, const std::function<b
  * 
  */
 template <class T, class S>
-void RescCache<T, S>::rescRead(uint32_t rescIdx, Event *cplEvent, S reqPkt, T *rspResc, const std::function<bool(T&)> &rescUpdate) {
+void HanGuRnic::RescCache<T, S>::rescRead(uint32_t rescIdx, Event *cplEvent, S reqPkt, T *rspResc, const std::function<bool(T&)> &rescUpdate) {
 
     HANGU_PRINT(RescCache, " RescCache.rescRead! capacity: %d, rescIdx %d, is_write %d, rescSz: %d, size: %d\n", 
             capacity, rescIdx, (cplEvent == nullptr), sizeof(T), cache.size());
@@ -429,10 +333,10 @@ void RescCache<T, S>::rescRead(uint32_t rescIdx, Event *cplEvent, S reqPkt, T *r
  *      2. T *rspResc, this input is an optional, which may be "nullptr"
  */
 template <class T, class S>
-void RescCache<T, S>::readProc() {
+void HanGuRnic::RescCache<T, S>::readProc() {
 
     /* If there's pending read req or there's no req in reqFifo, 
-     * do not process next rquest */
+    * do not process next rquest */
     if (rreq2rrspFifo.size() || reqFifo.empty()) {
         return;
     }
@@ -472,7 +376,7 @@ void RescCache<T, S>::readProc() {
             HANGU_PRINT(RescCache, " RescCache.readProc: This is read request\n");
             
             T *rescBack = new T;
-             memcpy(rescBack, &cache[rescIdx], sizeof(T));
+            memcpy(rescBack, &cache[rescIdx], sizeof(T));
 
             /* Schedule read response event */
             if (!rreq.cplEvent->scheduled()) {
@@ -482,7 +386,7 @@ void RescCache<T, S>::readProc() {
         }
 
         /* Note that this should be called last because 
-         * we hope get older resource, not updated resource */
+        * we hope get older resource, not updated resource */
         if (rreq.rescUpdate) {
             rreq.rescUpdate(cache[rescIdx]);
         }
@@ -516,3 +420,7 @@ void RescCache<T, S>::readProc() {
 }
 
 ///////////////////////////// HanGuRnic::Resource Cache {end}//////////////////////////////
+
+template class HanGuRnic::RescCache<CqcResc, CxtReqRspPtr>;
+template class HanGuRnic::RescCache<MptResc, MrReqRspPtr>;
+template class HanGuRnic::RescCache<MttResc, MrReqRspPtr>;
