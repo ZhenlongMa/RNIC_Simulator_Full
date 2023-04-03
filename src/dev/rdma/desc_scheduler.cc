@@ -1,21 +1,7 @@
 
 #include "dev/rdma/hangu_rnic.hh"
 
-#include <algorithm>
-#include <memory>
-#include <queue>
-
-#include "base/inet.hh"
-#include "base/trace.hh"
-#include "base/random.hh"
-#include "debug/Drain.hh"
-#include "dev/net/etherpkt.hh"
-#include "debug/HanGu.hh"
-#include "mem/packet.hh"
-#include "mem/packet_access.hh"
-#include "params/HanGuRnic.hh"
-#include "sim/stats.hh"
-#include "sim/system.hh"
+#include "debug/DescScheduler.hh"
 
 using namespace HanGuRnicDef;
 using namespace Net;
@@ -244,9 +230,10 @@ void HanGuRnic::DescScheduler::wqeProc()
     }
     else if (qpStatus->type == BW_QP)
     {
-        assert(descNum == 1);
+        // assert(descNum == 1);
         assert(qpStatus->wnd_start <= qpStatus->wnd_fetch);
         assert(qpStatus->wnd_fetch < qpStatus->wnd_end);
+        
         // set wnd_end to the size of the whole message
         if (qpStatus->wnd_start == 0)
         {
@@ -287,8 +274,6 @@ void HanGuRnic::DescScheduler::wqeProc()
             rNic->schedule(wqeRspEvent, curTick() + rNic->clockPeriod());
         }
     }
-
-    
 }
 
 void HanGuRnic::DescScheduler::launchWQE()
@@ -326,15 +311,24 @@ void HanGuRnic::DescScheduler::rxUpdate()
     uint32_t len = rNic->updateQue.front().second;
     rNic->updateQue.pop();
     QPStatusPtr status = qpStatusTable[qpn];
-    assert(status->wnd_fetch + len <= status->wnd_end);
-    status->wnd_fetch += len;
-    if (status->wnd_fetch >= status->wnd_end)
+    DPRINTF(DescScheduler, "rx received! tail_ptr: 0x%x\n", status->tail_ptr);
+    if (status->type == LAT_QP || status->type == RATE_QP)
     {
-        if (status->tail_ptr != status->head_ptr)
+        status->tail_ptr++;
+    }
+    else if (status->type == BW_QP)
+    {
+        assert(status->wnd_fetch + len <= status->wnd_end);
+        status->wnd_fetch += len;
+        if (status->wnd_fetch >= status->wnd_end)
         {
-            status->tail_ptr++;
+            if (status->tail_ptr != status->head_ptr)
+            {
+                status->tail_ptr++;
+            }
         }
     }
+    
     if (rNic->updateQue.size())
     {
         if (!updateEvent.scheduled())
