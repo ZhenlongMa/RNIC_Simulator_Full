@@ -59,6 +59,7 @@
 #define LAT_QP 1
 #define BW_QP 2
 #define RATE_QP 3
+#define SCH_GRANULARITY 1024 // maximum submessage size
 
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
@@ -653,23 +654,26 @@ struct QPStatusItem
         this->weight = weight;
         this->type = type;
         this->qpn = qpn;
-        this->head_ptr    = 0;
-        this->fetch_ptr   = 0;
-        this->tail_ptr    = 0;
-        this->wnd_start   = 0;
-        this->wnd_fetch   = 0;
-        this->wnd_end     = 0;
+        this->head_ptr              = 0;
+        this->fetch_ptr             = 0;
+        this->tail_ptr              = 0;
+        this->wnd_start             = 0;
+        this->wnd_fetch             = 0;
+        this->wnd_end               = 0;
+        this->current_msg_offset    = 0;
     }
     uint32_t head_ptr;
     uint32_t fetch_ptr;
     uint32_t tail_ptr;
     uint32_t wnd_start;
-    uint32_t wnd_fetch;
+    uint32_t fetch_offset; // offset pointer in the current message
     uint32_t wnd_end;
+    // uint32_t current_msg_offset;
     uint32_t key;
     uint8_t weight;
     uint8_t type;
     uint32_t qpn;
+    uint8_t perf; // This segment indicates whether the performance exceeds or is lower than expected
 };
 typedef std::shared_ptr<QPStatusItem> QPStatusPtr;
 

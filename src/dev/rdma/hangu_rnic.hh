@@ -325,7 +325,7 @@ class HanGuRnic : public RdmaNic {
                 HanGuRnic *rNic;
                 std::queue<uint32_t> highPriorityQpnQue;
                 std::queue<uint32_t> lowPriorityQpnQue;
-                // std::queue<uint32_t> leastPriorityQpnQue;
+                std::queue<uint32_t> leastPriorityQpnQue;
                 std::queue<TxDescPtr> highPriorityDescQue;
                 std::queue<TxDescPtr> lowPriorityDescQue;
                 std::queue<DoorbellPtr> dbProcQpStatusRReqQue;

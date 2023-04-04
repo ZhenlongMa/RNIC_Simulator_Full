@@ -186,7 +186,7 @@ void HanGuRnic::DescScheduler::wqePrefetch()
 
 /**
  * @note
- * Process WQE responses and produce sub WQEs.
+ * Process WQE responses and produce sub WQEs. Do not use wnd_start after this stage.
 */
 void HanGuRnic::DescScheduler::wqeProc()
 {
@@ -230,7 +230,7 @@ void HanGuRnic::DescScheduler::wqeProc()
     }
     else if (qpStatus->type == BW_QP)
     {
-        // assert(descNum == 1);
+        assert(descNum >= 1);
         assert(qpStatus->wnd_start <= qpStatus->wnd_fetch);
         assert(qpStatus->wnd_fetch < qpStatus->wnd_end);
         
@@ -239,24 +239,53 @@ void HanGuRnic::DescScheduler::wqeProc()
         {
             qpStatus->wnd_end = rNic->txdescRspFifo.front()->len;
         }
-        TxDescPtr desc = rNic->txdescRspFifo.front();
-        TxDescPtr subDesc = make_shared<TxDesc>(desc);
-        subDesc->opcode = desc->opcode;
 
-        // WARNING: SEND/RECV are currently not supported!
-        subDesc->lVaddr = desc->lVaddr + qpStatus->wnd_start;
-        subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->wnd_start;
-        subDesc->len = qpStatus->wnd_end - qpStatus->wnd_fetch > MAX_COMMIT_SZ ? 
-            MAX_COMMIT_SZ : qpStatus->wnd_end - qpStatus->wnd_fetch;
-        subDesc->qpn = qpStatus->qpn;
-        
-        // If this subDesc doesn't finish the whole message, don't generate CQE
-        if (qpStatus->wnd_fetch + subDesc->len >= qpStatus->wnd_end)
+        TxDescPtr desc = rNic->txdescRspFifo.front();
+
+        uint32_t batchSize; // the size of data that should be transmitted in this period
+        batchSize = qpStatus->weight * MAX_COMMIT_SZ;
+        uint32_t procSize = 0;
+        uint32_t procDescNum = 0;
+
+        while(procSize < batchSize)
         {
-            subDesc->flags = 0;
+            TxDescPtr subDesc = make_shared<TxDesc>(desc);
+            subDesc->opcode = desc->opcode;
+            subDesc->qpn = qpStatus->qpn;
+            // WARNING: SEND/RECV are currently not supported!
+            subDesc->lVaddr = desc->lVaddr + qpStatus->fetch_offset;
+            subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->fetch_offset;
+            subDesc->len = desc->len - qpStatus->fetch_offset > MAX_COMMIT_SZ ? 
+                MAX_COMMIT_SZ : desc->len - qpStatus->fetch_offset;
+
+            // If this subDesc doesn't finish the whole message, don't generate CQE,
+            // or otherwise generate CQE, and switch to the next descriptor
+            if (qpStatus->fetch_offset + subDesc->len >= desc->len)
+            {
+                subDesc->flags = 1;
+                rNic->txdescRspFifo.pop();
+                qpStatus->fetch_offset = 0;
+                // If there are still descriptors left , switch to the next descriptor
+                if (procDescNum + 1 < descNum)
+                {
+                    desc = rNic->txdescRspFifo.front();
+                    lowPriorityDescQue.push(subDesc);
+                }
+                else 
+                {
+                    lowPriorityDescQue.push(subDesc);
+                    break;
+                }
+                procDescNum++;
+            }
+            else
+            {
+                subDesc->flags = 0;
+                qpStatus->fetch_offset += subDesc->len;
+                lowPriorityDescQue.push(subDesc);
+            }
+            procSize += subDesc->len;
         }
-        lowPriorityDescQue.push(subDesc);
-        qpStatus->wnd_fetch += subDesc->len;
     }
     else
     {
@@ -327,6 +356,8 @@ void HanGuRnic::DescScheduler::rxUpdate()
                 status->tail_ptr++;
             }
         }
+        // TO DO: push into prefetch queue
+        ...
     }
     
     if (rNic->updateQue.size())
