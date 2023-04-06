@@ -64,7 +64,7 @@ HanGuRnic::MrRescModule::mttReqProcess (uint64_t mttIdx, MrReqRspPtr mrReq) {
 }
 
 void 
-HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq) {
+HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq, uint32_t offset, uint32_t length) {
     
     HANGU_PRINT(MrResc, " MrRescModule.dmaReqProcess!\n");
     
@@ -76,7 +76,7 @@ HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq) {
           case TPT_WCHNL_TX_CQUE:
           case TPT_WCHNL_RX_CQUE:
             dmaWreq = make_shared<DmaReq>(rnic->pciToDma(pAddr), mrReq->length, 
-                    nullptr, mrReq->data, 0); /* last parameter is useless here */
+                    nullptr, mrReq->data + offset, 0); /* last parameter is useless here */
             rnic->cqDmaWriteFifo.push(dmaWreq);
 
             HANGU_PRINT(MrResc, " MrRescModule.dmaReqProcess: write CQ Request, dmaReq->paddr is 0x%lx, offset %d\n", 
@@ -89,10 +89,10 @@ HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq) {
             //     HANGU_PRINT(MrResc, " MrRescModule.dmaReqProcess: data[%d] 0x%x\n", i, mrReq->data[i]);
             // }
 
-            dmaWreq = make_shared<DmaReq>(rnic->pciToDma(pAddr), mrReq->length, 
-                    nullptr, mrReq->data, 0); /* last parameter is useless here */
+            dmaWreq = make_shared<DmaReq>(rnic->pciToDma(pAddr), length, 
+                    nullptr, mrReq->data + offset, 0); /* last parameter is useless here */
             HANGU_PRINT(MrResc, " MrRescModule.dmaReqProcess: write data Request, dmaReq->paddr is 0x%lx, offset %d, size %d\n", 
-                    dmaWreq->addr, mrReq->offset, mrReq->length);
+                    dmaWreq->addr, offset, length);
             rnic->dataDmaWriteFifo.push(dmaWreq);
 
             break;
@@ -117,7 +117,7 @@ HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq) {
 
             /* Post desc dma req to DMA engine */
             dmaRdReq = make_shared<DmaReq>(rnic->pciToDma(pAddr), mrReq->length, 
-                    &dmaRrspEvent, mrReq->data, 0); /* last parameter is useless here */
+                    &dmaRrspEvent, mrReq->data + offset, 0); /* last parameter is useless here */
             rnic->descDmaReadFifo.push(dmaRdReq);
             
             break;
@@ -127,8 +127,8 @@ HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq) {
             HANGU_PRINT(MrResc, " MrRescModule.dmaReqProcess: read data request\n");
 
             /* Post data dma req to DMA engine */
-            dmaRdReq = make_shared<DmaReq>(rnic->pciToDma(pAddr), mrReq->length, 
-                    &dmaRrspEvent, mrReq->data, 0); /* last parameter is useless here */
+            dmaRdReq = make_shared<DmaReq>(rnic->pciToDma(pAddr), length, 
+                    &dmaRrspEvent, mrReq->data + offset, 0); /* last parameter is useless here */
             rnic->dataDmaReadFifo.push(dmaRdReq);
 
             break;
@@ -162,6 +162,8 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
     MrReqRspPtr tptRsp = dmaReq2RspFifo.front().first;
     dmaReq2RspFifo.pop();
 
+    assert(tptRsp->dmaRspNum != tptRsp->mttNum);
+
     if (tptRsp->type == DMA_TYPE_WREQ) {
         panic("mrReq type error, write type req cannot put into dmaReq2RspFifo\n");
         return;
@@ -186,6 +188,7 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
         }
         // assert((tptRsp->txDescRsp->len != 0) && (tptRsp->txDescRsp->lVaddr != 0));
         // rnic->txdescRspFifo.push(tptRsp->txDescRsp);
+        // rnic->txdescRspFifo.push(tptRsp);
 
         HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: size is %d, desc total len is %d!\n", 
                 rnic->txdescRspFifo.size(), tptRsp->length);
@@ -198,6 +201,7 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
             assert((rxDesc->len != 0) && (rxDesc->lVaddr != 0));
             rnic->rxdescRspFifo.push(rxDesc);
         }
+        // rnic->rxdescRspFifo.push(tptRsp);
         delete tptRsp->rxDescRsp;
 
         HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: rnic->rxdescRspFifo.size() is %d!\n", 
@@ -245,6 +249,10 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     MrReqRspPtr reqPkt = mptCache.rrspFifo.front().second;
     mptCache.rrspFifo.pop();
 
+    reqPkt->mpt = mptResc;
+
+    assert(mptResc->startVAddr % PAGE_SIZE == 0);
+
     HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: mptResc->lkey 0x%x, len %d, chnl 0x%x, type 0x%x, offset %d\n", 
             mptResc->key, reqPkt->length, reqPkt->chnl, reqPkt->type, reqPkt->offset);
     if (reqPkt->type == 1) {
@@ -260,13 +268,39 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
 
     /* Calculate required MTT index */
     // uint64_t mttIdx = mptResc->mttSeg + ((reqPkt->offset - (mptResc->startVAddr & 0xFFFF)) >> PAGE_SIZE_LOG);
-    reqPkt->offset = reqPkt->offset & 0xFFF;
-    uint64_t mttIdx = mptResc->mttSeg;
+    // reqPkt->offset = reqPkt->offset & 0xFFF;
+    // uint64_t mttIdx = mptResc->mttSeg;
+    // HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: reqPkt->offset 0x%x, mptResc->startVAddr 0x%x, mptResc->mttSeg 0x%x, mttIdx 0x%x\n", 
+    //         reqPkt->offset, mptResc->startVAddr, mptResc->mttSeg, mttIdx);
+
+    // Calculate MTT index, modified by mazhenlong
+    // TO DO: change offset bitwidth
+    uint64_t mttIdx = mptResc->mttSeg + ((reqPkt->offset + (mptResc->startVAddr & 0xFFF)) >> PAGE_SIZE_LOG);
     HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: reqPkt->offset 0x%x, mptResc->startVAddr 0x%x, mptResc->mttSeg 0x%x, mttIdx 0x%x\n", 
             reqPkt->offset, mptResc->startVAddr, mptResc->mttSeg, mttIdx);
 
+    // Calculate mttNum
+    if ((reqPkt->length + (reqPkt->offset % PAGE_SIZE)) % PAGE_SIZE == 0)
+    {
+        reqPkt->mttNum = (reqPkt->length + (reqPkt->offset % PAGE_SIZE)) / PAGE_SIZE;
+    }
+    else
+    {
+        reqPkt->mttNum = (reqPkt->length + (reqPkt->offset % PAGE_SIZE)) / PAGE_SIZE + 1;
+    }
+    reqPkt->mttRspNum   = 0;
+    reqPkt->dmaRspNum   = 0;
+    reqPkt->sentPktNum  = 0;
+
     /* Post mtt req */
-    mttReqProcess(mttIdx, reqPkt);
+    // mttReqProcess(mttIdx, reqPkt);
+
+    /* Post mtt req */
+    // modified by mazhenlong
+    for (int i = 0; i < reqPkt->mttNum; i++)
+    {
+        mttReqProcess(mttIdx + i, reqPkt);
+    }
 
     /* Schedule myself */
     if (mptCache.rrspFifo.size()) {
@@ -290,7 +324,48 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
             mttResc->pAddr, reqPkt->length, mttCache.rrspFifo.size());
 
     /* Post dma req */
-    dmaReqProcess(mttResc->pAddr + reqPkt->offset, reqPkt);
+    // dmaReqProcess(mttResc->pAddr + reqPkt->offset, reqPkt);
+
+    /* Post dma req */
+    uint32_t offset; // relative to MR request
+    uint32_t length;
+    uint64_t dmaAddr;
+    if (reqPkt->mttRspNum == 0)
+    {
+        dmaAddr = mttResc->pAddr + reqPkt->offset % PAGE_SIZE; // warning: suppose MR is page-aligned
+    }
+    if (reqPkt->mttRspNum == 0)
+    {
+        offset = 0;
+    }
+    else
+    {
+        offset = (reqPkt->mttRspNum - 1) * PAGE_SIZE + (PAGE_SIZE - (reqPkt->offset % PAGE_SIZE));
+    }
+    if (reqPkt->mttRspNum == 0)
+    {
+        if (reqPkt->mttRspNum + 1 == reqPkt->mttNum)
+        {
+            length = reqPkt->length;
+        }
+        else
+        {
+            length = PAGE_SIZE - reqPkt->offset;
+        }
+    }
+    else if (reqPkt->mttRspNum + 1 == reqPkt->mttNum)
+    {
+        length = (reqPkt->length + reqPkt->offset) % PAGE_SIZE;
+    }
+    else
+    {
+        length = PAGE_SIZE;
+    }
+    // dmaReqProcess(mttResc->pAddr + reqPkt->offset, reqPkt);
+    dmaReqProcess(dmaAddr, reqPkt, offset, length);
+
+    assert(reqPkt->mttRspNum < reqPkt->mttNum);
+    reqPkt->mttRspNum++;
 
     /* Schedule myself */
     if (mttCache.rrspFifo.size()) {

@@ -78,6 +78,8 @@ class HanGuRnic : public RdmaNic {
         std::queue<MrReqRspPtr>descReqFifo; // tx(DFU) & rx(RPU) descriptor req post to this fifo.
         std::queue<TxDescPtr> txdescRspFifo; /* Store descriptor, **not list** */
         std::queue<RxDescPtr> rxdescRspFifo;
+        // std::queue<MrReqRspPtr> txdescRspFifo;
+        // std::queue<MrReqRspPtr> rxdescRspFifo;
 
         // CQ write req fifo, SCU and RCU post the request
         std::queue<MrReqRspPtr> cqWreqFifo;
@@ -184,6 +186,8 @@ class HanGuRnic : public RdmaNic {
                 bool messageEnd;
                 void rguProcessing(); /* Request Generation Unit */
                 void setMacAddr (uint8_t *dst, uint64_t src);
+                void setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* pktPtr, uint8_t &needAck);
+                void copyEthData(EthPacketPtr rawPkt, EthPacketPtr newPkt, MrReqRspPtr rspData);
 
                 /* rru owns */
                 void rruProcessing(); /* Response Receiving Unit */
@@ -577,7 +581,7 @@ class HanGuRnic : public RdmaNic {
                 
                 /* Temp store dma read request pkt until read rsp is back */
                 std::queue<std::pair<MrReqRspPtr, DmaReqPtr> > dmaReq2RspFifo;
-                void dmaReqProcess(uint64_t pAddr, MrReqRspPtr tptReq);
+                void dmaReqProcess(uint64_t pAddr, MrReqRspPtr tptReq, uint32_t offset, uint32_t length);
                 /**
                  * tx descriptor (read rsp) -(schedule to)-> rdmaEngine.ddu
                  * rx descriptor (read rsp) -(schedule to)-> rdmaEngine.rcvrpu
