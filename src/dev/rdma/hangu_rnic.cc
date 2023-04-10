@@ -328,6 +328,15 @@ HanGuRnic::mboxFetchCpl () {
         HANGU_PRINT(CcuEngine, " CcuEngine.CEU.mboxFetchCpl: WRITE_CQC command! regs_mod %d mb 0x%lx\n", regs.modifier,  (uintptr_t)mboxBuf);
         cqcModule.cqcCache.rescWrite(regs.modifier, (CqcResc *)mboxBuf);
         break;
+      case SET_GROUP:
+        HANGU_PRINT(CcuEngine, " CcuEngine.CEU.mboxFetchCpl: SET_GROUP command!\n");
+        GroupInfo* groupInfo;
+        for (int i = 0; i < regs.outParam._data; ++i) {
+            groupInfo = (GroupInfo *)mboxBuf + i;
+            descScheduler.groupTable[groupInfo->groupID] = groupInfo->granularity;
+        }
+        delete mboxBuf;
+        break;
       default:
         panic("Bad inputed command.\n");
     }
@@ -374,6 +383,11 @@ HanGuRnic::ceuProc () {
         HANGU_PRINT(CcuEngine, " CcuEngine.ceuProc: WRITE_CQC command!\n");
         size = sizeof(CqcResc); // MBOX_CQC_ENTRY_SZ;
         mboxBuf = (uint8_t *)new CqcResc;
+        break;
+      case SET_GROUP:
+        HANGU_PRINT(CcuEngine, " CcuEngine.ceuProc: SET_GROUP command!\n");
+        size = regs.outParam._data * sizeof(GroupInfo);
+        mboxBuf = (uint8_t *)new GroupInfo[regs.outParam._data];
         break;
       default:
         size = 0;

@@ -247,6 +247,14 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
             // HANGU_PRINT(HanGuDriver, " ioctl : HGKFD_IOC_CHECK_GO, `GO` is cleared.\n");
         }
         break;
+      case HGKFD_IOC_SET_GROUP:
+        {
+            HANGU_PRINT(HanGuDriver, "ioctl: HGKFD_IOC_SET_GROUP\n");
+            TypedBufferArg<kfd_ioctl_set_group_args> args(ioc_buf);
+            args.copyIn(virt_proxy);
+            setGroup(virt_proxy, args);
+            args.copyOut(virt_proxy);
+        }
       default:
         {
             fatal("%s: bad ioctl %d\n", req);
@@ -410,6 +418,24 @@ HanGuDriver::writeIcm(PortProxy& portProxy, uint8_t rescType, RescMeta &rescMeta
 
 /* -------------------------- ICM {end} ------------------------ */
 
+/* -------------------------- Group {begin}----------------------- */
+void HanGuDriver::setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args)
+{
+    HanGuRnicDef::GroupInfo groupInfo[MAX_GROUP_NUM];
+    for (int i = 0; i < args->group_num; i++)
+    {
+        groupInfo[i].groupID = args->group_id[i];
+        groupInfo[i].granularity = args->granularity[i];
+    }
+    portProxy.writeBlob(mailbox.vaddr, groupInfo, sizeof(HanGuRnicDef::GroupInfo) * args->group_num);
+    postHcr(portProxy, (uint64_t)mailbox.paddr, 1, args->group_num, HanGuRnicDef::SET_GROUP);
+}
+
+void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args)
+{
+    TODO...
+}
+/* --------------------------- Group {end}---------------------------- */
 
 /* -------------------------- Resc {begin} ------------------------ */
 uint32_t 
@@ -559,6 +585,9 @@ HanGuDriver::writeQpc(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_a
         qpcResc[i].qkey    = args->qkey[i];
 
         HANGU_PRINT(HanGuDriver, " writeQpc: qpn: 0x%x\n", qpcResc[i].srcQpn);
+
+        qpGroup[args->src_qpn[i]] = args->groupID[i];
+        qpWeight[args->src_qpn[i]] = args->weight[i];
     }
     HANGU_PRINT(HanGuDriver, " writeQpc: args->batch_size: %d\n", args->batch_size);
     portProxy.writeBlob(mailbox.vaddr, qpcResc, sizeof(HanGuRnicDef::QpcResc) * args->batch_size);

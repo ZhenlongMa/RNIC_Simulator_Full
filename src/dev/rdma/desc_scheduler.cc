@@ -255,8 +255,14 @@ void HanGuRnic::DescScheduler::wqeProc()
             // WARNING: SEND/RECV are currently not supported!
             subDesc->lVaddr = desc->lVaddr + qpStatus->fetch_offset;
             subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->fetch_offset;
-            subDesc->len = desc->len - qpStatus->fetch_offset > MAX_COMMIT_SZ ? 
-                MAX_COMMIT_SZ : desc->len - qpStatus->fetch_offset;
+            if (desc->len - qpStatus->fetch_offset > MAX_COMMIT_SZ)
+            {
+                subDesc->len = MAX_COMMIT_SZ;
+            }
+            else
+            {
+                subDesc->len = desc->len - qpStatus->fetch_offset;
+            }
 
             // If this subDesc doesn't finish the whole message, don't generate CQE,
             // or otherwise generate CQE, and switch to the next descriptor

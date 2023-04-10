@@ -348,6 +348,7 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper createQpStatusEvent;
                 EventFunctionWrapper qpcRspEvent;
                 EventFunctionWrapper wqeRspEvent;
+                std::unordered_map<uint8_t, uint16_t> groupTable;
         };
         DescScheduler descScheduler;
         /* -------------------WQE Scheduler Relevant{end}------------------------ */

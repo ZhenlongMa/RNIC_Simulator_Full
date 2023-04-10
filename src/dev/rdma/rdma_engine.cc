@@ -527,15 +527,15 @@ HanGuRnic::RdmaEngine::rguProcessing () {
 
     /* Generate Request packet Header
      * We don't implement multi-packet message now. */
-    uint8_t *pktPtr = txPktToSend->data + ETH_ADDR_LEN * 2;
-    uint8_t needAck = 0x01;
-    uint32_t bthOp;
+    // uint8_t *pktPtr = txPktToSend->data + ETH_ADDR_LEN * 2;
+    uint8_t *pktPtr = txPkt->data + ETH_ADDR_LEN * 2;
+    uint8_t needAck;
     setRdmaHead(desc, qpc, pktPtr, needAck);
 
-    if (desc->opcode == OPCODE_SEND || desc->opcode == OPCODE_RDMA_WRITE)
-    {
-        copyEthData(txPkt, txPktToSend, rspData);
-    }
+    // if (desc->opcode == OPCODE_SEND || desc->opcode == OPCODE_RDMA_WRITE)
+    // {
+    //     copyEthData(txPkt, txPktToSend, rspData);
+    // }
 
     // Set MAC address
     uint64_t dmac, lmac;
@@ -658,12 +658,14 @@ HanGuRnic::RdmaEngine::isWindowBlocked() {
             (dp2rgFifo.front()->qpc->qpType == QP_TYPE_RC);
 }
 
-
+/**
+ * @note set BTH and ETH header for PktPtr
+*/
 void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* pktPtr, uint8_t &needAck)
 {
     uint32_t bthOp;
-    if (desc->opcode == OPCODE_SEND && 
-            qpc->qpType == QP_TYPE_RC) { /* RC Send */
+    if (desc->opcode == OPCODE_SEND && qpc->qpType == QP_TYPE_RC) 
+    { /* RC Send */
         
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: RC send!\n");
 
@@ -671,14 +673,15 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
         bthOp = ((qpc->qpType << 5) | PKT_TRANS_SEND_ONLY) << 24;
         needAck = 0x01;
         ((BTH *) pktPtr)->op_destQpn = bthOp | qpc->destQpn;
-        ((BTH *) pktPtr)->needAck_psn = (needAck << 24) | qpc->sndPsn;
+        ((BTH *) pktPtr)->needAck_psn = (needAck << 24) | qpc->sndPsn; // TODO: change sndPsn
 
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: "
                 "BTH head: 0x%x 0x%x\n", 
                 ((BTH *) pktPtr)->op_destQpn, ((BTH *) pktPtr)->needAck_psn);
         
-    } else if (desc->opcode == OPCODE_SEND && 
-            qpc->qpType == QP_TYPE_UD) { /* UD Send */
+    } 
+    else if (desc->opcode == OPCODE_SEND && qpc->qpType == QP_TYPE_UD) 
+    { /* UD Send */
         
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: UD send!\n");
         
@@ -699,10 +702,9 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: "
                 "DETH head: 0x%x 0x%x\n", 
                 ((DETH *) pktPtr)->srcQpn, ((DETH *) pktPtr)->qKey);
-        
-        
-    } else if (qpc->qpType == QP_TYPE_RC && 
-            desc->opcode == OPCODE_RDMA_WRITE) { /* RC RDMA Write */
+    } 
+    else if (qpc->qpType == QP_TYPE_RC && desc->opcode == OPCODE_RDMA_WRITE) 
+    { /* RC RDMA Write */
 
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: RC RDMA Write!\n");
         
@@ -726,9 +728,9 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
                 "RETH head: 0x%x 0x%x 0x%x 0x%x\n", 
                 ((RETH *) pktPtr)->rVaddr_l, ((RETH *) pktPtr)->rVaddr_h, 
                 ((RETH *) pktPtr)->rKey, ((RETH *) pktPtr)->len);
-        
-    } else if (qpc->qpType == QP_TYPE_RC && 
-            desc->opcode == OPCODE_RDMA_READ) { /* RC RDMA Read */
+    } 
+    else if (qpc->qpType == QP_TYPE_RC && desc->opcode == OPCODE_RDMA_READ) 
+    { /* RC RDMA Read */
         
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: RC RDMA Write!\n");
         
@@ -752,8 +754,9 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
                 "RETH head: 0x%x 0x%x 0x%x 0x%x\n", 
                 ((RETH *) pktPtr)->rVaddr_l, ((RETH *) pktPtr)->rVaddr_h, 
                 ((RETH *) pktPtr)->rKey, ((RETH *) pktPtr)->len);
-
-    } else {
+    } 
+    else 
+    {
         panic("Unsupported opcode and QP type combination, "
                 "opcode: %d, type: %d\n", desc->opcode, qpc->qpType);
     }

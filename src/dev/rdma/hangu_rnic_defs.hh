@@ -85,6 +85,8 @@ const uint8_t WRITE_MPT = 0x03;
 const uint8_t WRITE_MTT = 0x04;
 const uint8_t WRITE_QPC = 0x05;
 const uint8_t WRITE_CQC = 0x06;
+const uint8_t SET_GROUP = 0x07;
+// const uint8_t SET_ALL_GROUP = 0x08;
 
 struct Doorbell {
     uint8_t  opcode;
@@ -183,6 +185,7 @@ struct QpcResc {
 
     uint8_t  indicator; // 1: latency-sensitive; 2: bandwidth-sensitive; 3: message rate sensitive
     uint8_t  perfWeight;
+    uint8_t  groupID;
 };
 
 const uint8_t QP_TYPE_RC = 0x00;
@@ -673,7 +676,8 @@ struct QPStatusItem
     uint32_t wnd_start;
     uint32_t fetch_offset; // offset pointer in the current message
     uint32_t wnd_end;
-    // uint32_t current_msg_offset;
+    uint32_t wnd_fetch;
+    uint32_t current_msg_offset;
     uint32_t key;
     uint8_t weight;
     uint8_t type;
@@ -681,6 +685,24 @@ struct QPStatusItem
     uint8_t perf; // This segment indicates whether the performance exceeds or is lower than expected
 };
 typedef std::shared_ptr<QPStatusItem> QPStatusPtr;
+
+struct GroupInfo
+{
+    uint8_t groupID;
+    uint16_t granularity;
+    // GroupInfo(uint8_t groupID, uint16_t granularity)
+    // {
+    //     this->groupID = groupID;
+    //     this->granularity = granularity;
+    // }
+    // GroupInfo()
+    // {}
+};
+
+// struct AllGroupInfo
+// {
+//     uint16_t granularity[MAX_GROUP_NUM];
+// };
 
 
 } // namespace HanGuRnicDef
