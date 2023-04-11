@@ -281,9 +281,10 @@ int ibv_modify_batch_qp(struct ibv_context *context, struct ibv_qp *qp, uint32_t
             qpc_args->sq_size_log[i] = PAGE_SIZE_LOG; // qp->snd_mr->length;
             qpc_args->rq_size_log[i] = PAGE_SIZE_LOG; // qp->rcv_mr->length;
 
-            // added by mazhenlong
+
             qpc_args->indicator[i]  = qp[batch_cnt + i].indicator;
             qpc_args->weight[i]     = qp[batch_cnt + i].weight;
+            qpc_args->groupID[i]    = qp[batch_cnt + i].group_id;
 
             // HGRNIC_PRINT(" ibv_modify_batch_qp! qpn 0x%x\n", qp[batch_cnt + i].qp_num);
         }
@@ -325,6 +326,11 @@ int ibv_modify_qp(struct ibv_context *context, struct ibv_qp *qp) {
     qpc_args->qkey       [0] = qp->qkey;
     qpc_args->sq_size_log[0] = PAGE_SIZE_LOG; // qp->snd_mr->length;
     qpc_args->rq_size_log[0] = PAGE_SIZE_LOG; // qp->rcv_mr->length;
+    
+    // added by mazhenlong
+    qpc_args->indicator[0]  = qp->indicator;
+    qpc_args->weight[0]     = qp->weight;
+    qpc_args->groupID[0]    = qp->group_id;
     write_cmd(dvr->fd, HGKFD_IOC_WRITE_QPC, qpc_args);
     free(qpc_args);
     return 0;
@@ -601,4 +607,32 @@ int ibv_poll_cpl(struct ibv_cq *cq, struct cpl_desc **desc, int max_num) {
     }
 
     return cnt;
+}
+
+struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight)
+{
+    context->group_num++;
+    struct hghca_context *dvr = (struct hghca_context *)context->dvr;
+    struct kfd_ioctl_alloc_group_args *args = (struct kfd_ioctl_alloc_group_args *)malloc(sizeof(struct kfd_ioctl_alloc_group_args));
+    args->group_num = 1;
+    // Allocate space for newly allocated group
+    context->qos_group = (struct ibv_qos_group *)realloc(context->qos_group, (context->group_num) * sizeof(struct ibv_qos_group));
+    write_cmd(dvr->fd, HGKFD_IOC_ALLOC_GROUP, args);
+    context->qos_group[context->group_num].weight = weight;
+    context->qos_group[context->group_num].id = args->group_id;
+    context->total_group_weight += weight;
+    return context->qos_group + context->group_num;
+}
+
+int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint16_t granularity)
+{
+    struct kfd_ioctl_set_group_args *args = (struct kfd_ioctl_set_group_args *)malloc(sizeof(struct kfd_ioctl_set_group_args));
+    struct hghca_context *dvr = (struct hghca_context *)context->dvr;
+    args->group_num = 1;
+    for (int i = 0; i < args->group_num; i++)
+    {
+        args->group_id[i] = group->id;
+        args->granularity[i] = granularity;
+    }
+    write_cmd(dvr->fd, HGKFD_IOC_SET_GROUP, args);
 }
