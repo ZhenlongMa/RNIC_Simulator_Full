@@ -425,24 +425,24 @@ HanGuRnic::RdmaEngine::rruProcessing () {
          */
         EthPacketPtr winPkt = winElem->list->front()->txPkt;
         switch (( ((BTH *)(winPkt->data + ETH_ADDR_LEN * 2))->op_destQpn >> 24 ) & 0x1F) {
-          case PKT_TRANS_SEND_ONLY:
-          case PKT_TRANS_RWRITE_ONLY:
-            postTxCpl(QP_TYPE_RC, destQpn, winElem->cqn, 
-                        winElem->list->front()->txDesc);
-            break;
-          case PKT_TRANS_RREAD_ONLY:
-            if (winElem->firstPsn < ackPsn) {
-                reTransPkt(winElem, ackPsn - winElem->firstPsn);
-                reTrans = true;
-            } else if (winElem->firstPsn == ackPsn) {
-                HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rruProcessing: Start RDMA read response receiving process\n");
-                rdmaReadRsp(rxPkt, winElem->list->front());
+            case PKT_TRANS_SEND_ONLY:
+            case PKT_TRANS_RWRITE_ONLY:
                 postTxCpl(QP_TYPE_RC, destQpn, winElem->cqn, 
-                        winElem->list->front()->txDesc);
-            }
-            break;
-          default:
-            panic("winPkt type wrong!\n");
+                            winElem->list->front()->txDesc);
+                break;
+            case PKT_TRANS_RREAD_ONLY:
+                if (winElem->firstPsn < ackPsn) {
+                    reTransPkt(winElem, ackPsn - winElem->firstPsn);
+                    reTrans = true;
+                } else if (winElem->firstPsn == ackPsn) {
+                    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rruProcessing: Start RDMA read response receiving process\n");
+                    rdmaReadRsp(rxPkt, winElem->list->front());
+                    postTxCpl(QP_TYPE_RC, destQpn, winElem->cqn, 
+                            winElem->list->front()->txDesc);
+                }
+                break;
+            default:
+                panic("winPkt type wrong!\n");
         }
         if (reTrans == true) {
             panic("reTrans!\n");
@@ -506,8 +506,8 @@ HanGuRnic::RdmaEngine::rguProcessing () {
     MrReqRspPtr rspData; /* I have already gotten the address in txPkt, 
                            * so it is useless for me. */
     /* Generate request packet (RDMA read/write, send) */
-    EthPacketPtr txPktToSend = std::make_shared<EthPacketData>(16384); //TODO: modify size here
-    txPktToSend->length = ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, qpc->qpType); /* ETH_ADDR_LEN * 2 means length of 2 MAC addr */
+    // EthPacketPtr txPktToSend = std::make_shared<EthPacketData>(16384); //TODO: modify size here
+    // txPktToSend->length = ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, qpc->qpType); /* ETH_ADDR_LEN * 2 means length of 2 MAC addr */
     
     if (desc->opcode == OPCODE_SEND || desc->opcode == OPCODE_RDMA_WRITE) {
         assert(rnic->txdataRspFifo.size());
@@ -549,8 +549,8 @@ HanGuRnic::RdmaEngine::rguProcessing () {
         panic("Unsupported QP type, opcode: %d, type: %d\n", desc->opcode, qpc->qpType);
     }
     HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: dmac 0x%lx, smac 0x%lx\n", dmac, lmac);
-    setMacAddr(txPktToSend->data, dmac);
-    setMacAddr(txPktToSend->data + ETH_ADDR_LEN, lmac);
+    setMacAddr(txPkt->data, dmac);
+    setMacAddr(txPkt->data + ETH_ADDR_LEN, lmac);
 
     txPkt->length    += desc->len;
     txPkt->simLength += desc->len;
@@ -770,23 +770,23 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
  * @param rspData: MR response
  * 
 */
-void HanGuRnic::RdmaEngine::copyEthData(EthPacketPtr rawPkt, EthPacketPtr newPkt, 
-                                        MrReqRspPtr rspData) // TO DO: not finished!
-{
-    assert(rspData->sentPktNum < rspData->mttNum);
-    if (rspData->mttNum == 1)
-    {
-        memcpy(newPkt->data + ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, qpc->qpType),
-            rawPkt->data + ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, qpc->qpType),
-            4096);
-    }
-    else 
-    // /* set packet length */
-    newPkt->length    += desc->len;
-    newPkt->simLength += desc->len;
+// void HanGuRnic::RdmaEngine::copyEthData(EthPacketPtr rawPkt, EthPacketPtr newPkt, 
+//                                         MrReqRspPtr rspData) // TO DO: not finished!
+// {
+//     assert(rspData->sentPktNum < rspData->mttNum);
+//     if (rspData->mttNum == 1)
+//     {
+//         memcpy(newPkt->data + ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, qpc->qpType),
+//             rawPkt->data + ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, qpc->qpType),
+//             4096);
+//     }
+//     else 
+//     // /* set packet length */
+//     newPkt->length    += desc->len;
+//     newPkt->simLength += desc->len;
 
-    rspData->sentPktNum++;
-}
+//     rspData->sentPktNum++;
+// }
 
 /**
  * @note Called by rgrrEvent, scheduled by rdmaEngine.dpuProcessing, 
