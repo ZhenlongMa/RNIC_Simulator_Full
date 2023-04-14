@@ -250,6 +250,10 @@ double throughput_test(struct rdma_resc *resc, uint8_t op_mode, uint32_t offset,
     uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
     int num_qp = resc->num_qp;
     int num_cq = resc->num_cq;
+
+    uint64_t *qp_data_cnt = (uint64_t *)malloc(sizeof(uint64_t) * num_qp * num_client);
+    uint64_t *qp_time = (uint64_t *)malloc(sizeof(uint64_t) * num_qp * num_client);
+    memset(qp_data_cnt, 0, sizeof(uint64_t) * num_qp * num_client);
     
     /* Start to post all the QPs */
     for (int i = 0; i < num_client; ++i) {
@@ -275,7 +279,7 @@ double throughput_test(struct rdma_resc *resc, uint8_t op_mode, uint32_t offset,
                 if (*start_time == 0) {
                     *start_time = get_time(resc->ctx);
                 }
-                for (int j  = 0; j < res; ++j) {
+                for (int j = 0; j < res; ++j) {
                     // RDMA_PRINT(Server, "desc[j]->trans_type is %d, cq offset %d\n", desc[j]->trans_type, resc->cq[i]->offset);
                     if (desc[j]->trans_type == ibv_type[op_mode]) {
                         *snd_cnt += (desc[j]->qp_num % TEST_WR_NUM) + 1;
@@ -287,23 +291,49 @@ double throughput_test(struct rdma_resc *resc, uint8_t op_mode, uint32_t offset,
                     }
                     // RDMA_PRINT(Server, "desc[j]->trans_type == IBV_TYPE_RDMA_WRITE one pass\n");
                 }
+
+                // uint64_t cur_time = get_time(resc->ctx);
+                // for (int j = 0; j < res; ++j)
+                // {
+                //     RDMA_PRINT(Server, "QP number: %d, current time: %d\n", desc[j]->qp_num, cur_time);
+                // }
+                for (int j = 0; j < res; j++)
+                {
+                    qp_data_cnt[desc[j]->qp_num] += desc[j]->byte_cnt;
+                }
             }
         }
         *end_time = get_time(resc->ctx);
         *con_time = *end_time - *start_time;
     } while ((*con_time < 40UL * MS) || (*start_time == 0));
 
+    for (int i = 0; i < num_client * num_qp; i++)
+    {
+        RDMA_PRINT(Server, "QP[%d] data count: %d\n", i, qp_data_cnt[i]);
+    }
+    RDMA_PRINT(Server, "time: %d\n", *con_time);
+
     return (*snd_cnt * 1000000.0) / *con_time; /* message rate */
 }
 
-void set_group_granularity(struct rdma_resc *grp_resc)
+struct rdma_resc *set_group_resource(int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem, int grp_weight)
 {
-    uint16_t N = grp_resc->ctx->N;
-    uint8_t group_weight = grp_resc->qos_group[0]->weight;
-    uint8_t total_group_weight = grp_resc->ctx->total_group_weight;
-    uint8_t group_total_qp_weight = grp_resc->qos_group[0]->total_qp_weight;
-    grp_resc->qos_group[0]->granularity = (double)group_weight / total_group_weight * N /group_total_qp_weight;
-    
+    uint8_t  op_mode = OPMODE_RDMA_WRITE; /* 0: RDMA Write; 1: RDMA Read */
+    uint32_t offset;
+    struct rdma_resc *resc = rdma_resc_init(num_mr, num_cq, num_qp, llid, num_client);
+    struct ibv_qos_group *group = create_qos_group(resc->ctx, grp_weight);
+    resc->qos_group[0] = group;
+
+    /* Connect QPs to client's QP */
+    svr_update_info(resc);
+
+    set_group_granularity(resc);
+
+    /* If this is RDMA WRITE, write data to mr, preparing for server writting */
+    if (op_mode == OPMODE_RDMA_WRITE) {
+        offset = 0;
+        svr_fill_mr(resc->mr[0], offset);
+    }
 }
 
 int main (int argc, char **argv) {
@@ -314,6 +344,55 @@ int main (int argc, char **argv) {
     num_client = 1;
     cpu_id     = 0;
     sprintf(id_name, "%d", svr_lid);
+
+    
+    while (1) {
+        int c;
+
+        static struct option long_options[] = {
+            { .name = "server-lid",   .has_arg = 1, .val = 's' },
+            { .name = "num-client",   .has_arg = 1, .val = 't' },
+            { .name = "cpu-id"    ,   .has_arg = 1, .val = 'c' },
+            { .name = "op-mode"   ,   .has_arg = 1, .val = 'm' },
+            { 0 }
+        };
+
+        c = getopt_long(argc, argv, "s:t:c:m:", long_options, NULL);
+        if (c == -1)
+            break;
+
+        switch (c) {
+          case 's':
+            if (!sscanf(optarg, "%hd", &svr_lid)) {
+                RDMA_PRINT(Server, "Error in svr_lid parser. Exit.\n");
+                exit(-1);
+            }
+            break;
+
+          case 't':
+            if (!sscanf(optarg, "%d", &num_client)) {
+                RDMA_PRINT(Server, "Error in num client parser. Exit.\n");
+                exit(-1);
+            }
+            break;
+          case 'c':
+            if (!sscanf(optarg, "%hhd", &cpu_id)) {
+                RDMA_PRINT(Server, "Error in cpu id parser. Exit.\n");
+                exit(-1);
+            }
+            break;
+          case 'm':
+            if (!sscanf(optarg, "%hhd", &op_mode)) {
+                RDMA_PRINT(Server, "Error in op mode parser. Exit.\n");
+                exit(-1);
+            }
+            break;
+
+          default:
+            usage(argv[0]);
+            return 1;
+        }
+    }
 
     uint64_t start_time, end_time, con_time;
     double latency, msg_rate, bandwidth;
@@ -330,49 +409,32 @@ int main (int argc, char **argv) {
     int grp1_weight = 3;
     int grp2_weight = 2;
     int group_num = 3;
-    RDMA_PRINT(Server, "grp1_num_qp %d num_cq %d\n", grp1_num_qp, num_cq);
-    struct rdma_resc *grp1_resc = rdma_resc_init(num_mr, num_cq, grp1_num_qp, svr_lid, num_client);
-    struct ibv_qos_group *group1 = create_qos_group(grp1_resc->ctx, grp1_weight);
-    grp1_resc->qos_group[0] = group1;
-
-    struct rdma_resc *grp2_resc = rdma_resc_init(num_mr, num_cq, grp2_num_qp, svr_lid, num_client);
-    struct ibv_qos_group *group2 = create_qos_group(grp2_resc->ctx, grp2_weight);
-    grp2_resc->qos_group[0] = group2;
-
-    /* Connect QPs to client's QP */
-    svr_update_info(grp1_resc);
-    svr_update_info(grp2_resc);
-    RDMA_PRINT(Server, "svr_connect_qps end\n");
-
-    /* Set group granularity */
-    set_group_granularity(grp1_resc);
-    set_group_granularity(grp2_resc);
-
-    /* If this is RDMA WRITE, write data to mr, preparing for server writting */
-    if (op_mode == OPMODE_RDMA_WRITE) {
-        offset = 0;
-        svr_fill_mr(resc->mr[0], offset);
-    }
+    struct ibv_context *ib_context;
+    // RDMA_PRINT(Server, "grp1_num_qp %d num_cq %d\n", grp1_num_qp, num_cq);
+    struct rdma_resc *grp1_resc = set_group_resource(num_mr, num_cq, grp1_num_qp, svr_lid, num_client, grp1_weight);
+    struct rdma_resc *grp2_resc = set_group_resource(num_mr, num_cq, grp2_num_qp, svr_lid, num_client, grp2_weight);
+    ib_context = grp1_resc->ctx;
 
     /* sync to make sure that we could get start */
-    rdma_recv_sync(resc);
+    rdma_recv_sync(grp1_resc);
 
     /* Inform other CPUs that we can start the latency test */
-    cpu_sync(resc->ctx);
+    // cpu_sync(ib_context);
 
     /* Start Latency test */
-    latency = latency_test(resc, num_qp, op_mode);
+    // latency = latency_test(resc, num_qp, op_mode);
     RDMA_PRINT(Server, "latency test end!\n");
 
     
     /* Inform other CPUs that we can start the message rate test */
-    cpu_sync(resc->ctx);
+    cpu_sync(ib_context);
     
     /* Start Post Send */
-    start_time = get_time(resc->ctx);
+    start_time = get_time(ib_context);
     RDMA_PRINT(Server, "start rdma_post_send0: %ld\n", start_time);
     start_time = 0;
-    msg_rate = throughput_test(resc, op_mode, offset, &start_time, &end_time, &con_time, &snd_cnt);
+    msg_rate = throughput_test(grp1_resc, op_mode, offset, &start_time, &end_time, &con_time, &snd_cnt);
+
     if (op_mode == OPMODE_RDMA_WRITE) {
         bandwidth = msg_rate * sizeof(TRANS_WRDMA_DATA);
     } else if (op_mode == OPMODE_RDMA_READ) {
@@ -382,22 +444,23 @@ int main (int argc, char **argv) {
             start_time, end_time, con_time, snd_cnt, bandwidth, msg_rate, latency);
 
     /* Inform Client that Transmission has completed */
-    rdma_recv_sync(resc);
+    rdma_recv_sync(grp1_resc);
 
     /* Inform other CPUs that we can exit */
-    cpu_sync(resc->ctx);
+    cpu_sync(ib_context);
 
-    if (op_mode == OPMODE_RDMA_READ) {
-        offset = 0;
-        // for (int i = 0; i < num_qp * num_client; ++i) {
-            // RDMA_PRINT(Client, "QP[%d], RDMA Read data is %s\n", i, (char *)(resc->mr[0]->addr + offset * i));
-        // }
-        RDMA_PRINT(Client, "QP, RDMA Read data is %s\n", (char *)(resc->mr[0]->addr + offset));
-    }
+    // if (op_mode == OPMODE_RDMA_READ) {
+    //     offset = 0;
+    //     // for (int i = 0; i < num_qp * num_client; ++i) {
+    //         // RDMA_PRINT(Client, "QP[%d], RDMA Read data is %s\n", i, (char *)(resc->mr[0]->addr + offset * i));
+    //     // }
+    //     RDMA_PRINT(Client, "QP, RDMA Read data is %s\n", (char *)(resc->mr[0]->addr + offset));
+    // }
 
     /* close the fd */
-    RDMA_PRINT(Server, "fd : %d\n", ((struct hghca_context*)resc->ctx->dvr)->fd);
-    close(((struct hghca_context*)resc->ctx->dvr)->fd);
+    RDMA_PRINT(Server, "fd : %d\n", ((struct hghca_context*)ib_context->dvr)->fd);
+    // close(((struct hghca_context*)resc->ctx->dvr)->fd);
+    close(((struct hghca_context*)ib_context->dvr)->fd);
     
     return 0;
     
