@@ -363,7 +363,17 @@ void HanGuRnic::DescScheduler::rxUpdate()
             }
         }
         // TO DO: push into prefetch queue
-        ...
+        if (status->tail_ptr < status->head_ptr)
+        {
+            lowPriorityQpnQue.push(status->qpn);
+        }
+        else if (status->tail_ptr == status->head_ptr)
+        {
+        }
+        else
+        {
+            panic("tail pointer exceeds head pointer! qpn: %d", status->qpn);
+        }
     }
     
     if (rNic->updateQue.size())
