@@ -103,6 +103,8 @@ struct rdma_resc {
     // uint8_t *sync_flag; 
 
     struct cpl_desc **desc;
+
+    struct ibv_qos_group **qos_group;
 };
 
 // struct rdma_cr_cpl_cnt {
@@ -139,7 +141,8 @@ int rdma_connect(struct rdma_resc *resc, struct rdma_cr *cr_info, uint16_t *dest
 int rdma_send_sync(struct rdma_resc *resc);
 int rdma_recv_sync(struct rdma_resc *resc);
 
-
+void set_group_granularity(struct rdma_resc *grp_resc);
+void set_qp_qos_group();
 
 
 
