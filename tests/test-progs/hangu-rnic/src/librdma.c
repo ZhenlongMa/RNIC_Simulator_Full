@@ -80,6 +80,9 @@ int cm_post_send(struct ibv_context *ctx, struct rdma_cr *cr_info, int wr_num, u
     return wr_num;
 }
 
+/**
+ * @note create RDMA communication resource in one QoS group
+*/
 struct rdma_resc *rdma_resc_init(int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem) {
     int i = 0;
 
@@ -94,6 +97,7 @@ struct rdma_resc *rdma_resc_init(int num_mr, int num_cq, int num_qp, uint16_t ll
     resc->cq = (struct ibv_cq **)malloc(sizeof(struct ibv_cq*) * num_cq);
     resc->qp = (struct ibv_qp **)malloc(sizeof(struct ibv_qp*) * num_qp * num_rem);
     resc->rinfo = (struct rem_info *)malloc(sizeof(struct rem_info) * num_rem);
+    resc->qos_group = (struct ibv_qos_group **)malloc(sizeof(struct ibv_qos_group *));
 
     /* device initialization */
     struct ibv_context *ctx = (struct ibv_context *)malloc(sizeof(struct ibv_context));
@@ -106,7 +110,8 @@ struct rdma_resc *rdma_resc_init(int num_mr, int num_cq, int num_qp, uint16_t ll
 
     /* Create MR */
     struct ibv_mr_init_attr mr_attr;
-    mr_attr.length = 1 << 12;
+    // mr_attr.length = 1 << 12;
+    mr_attr.length = 1 << 20;
     mr_attr.flag = MR_FLAG_RD | MR_FLAG_WR | MR_FLAG_LOCAL | MR_FLAG_REMOTE;
     for (i = 0; i < num_mr; ++i) {
         resc->mr[i] = ibv_reg_mr(ctx, &mr_attr);
@@ -423,6 +428,7 @@ int poll_sync(struct rdma_resc *resc) {
     return -1;
 }
 
+// 
 int rdma_recv_sync(struct rdma_resc *resc) {
 
     RDMA_PRINT(librdma, "rdma_recv_sync!\n");
@@ -454,4 +460,12 @@ int rdma_send_sync(struct rdma_resc *resc) {
     return 0;
 }
 
-
+void set_group_granularity(struct rdma_resc *grp_resc)
+{
+    uint16_t N = grp_resc->ctx->N;
+    uint8_t group_weight = grp_resc->qos_group[0]->weight;
+    uint8_t total_group_weight = grp_resc->ctx->total_group_weight;
+    uint8_t group_total_qp_weight = grp_resc->qos_group[0]->total_qp_weight;
+    grp_resc->qos_group[0]->granularity = (double)group_weight / total_group_weight * N /group_total_qp_weight;
+    set_qos_group(grp_resc->ctx, grp_resc->qos_group[0], grp_resc->qos_group[0]->granularity);
+}
