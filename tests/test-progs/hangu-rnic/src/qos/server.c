@@ -16,6 +16,9 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->ack_psn = 0;
         qp->exp_psn = 0;
         qp->dsubnet.dlid = (i % resc->num_rem) + resc->ctx->lid + 1;
+        qp->group_id = resc->qos_group[0]->id;
+        qp->indicator = BW_QP;
+        qp->weight = 2;
         RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d\n", 
                 qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num, i);
         // ibv_modify_qp(resc->ctx, qp);
