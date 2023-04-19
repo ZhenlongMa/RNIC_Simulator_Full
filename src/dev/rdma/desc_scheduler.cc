@@ -1,26 +1,28 @@
 
 #include "dev/rdma/hangu_rnic.hh"
 
-#include "debug/DescScheduler.hh"
+// #include "debug/DescScheduler.hh"
+#include "base/trace.hh"
+#include "debug/HanGu.hh"
 
 using namespace HanGuRnicDef;
 using namespace Net;
 using namespace std;
 
-HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, std::string name):
+HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name):
     rNic(rNic),
-    qpcRspEvent([this]{qpcRspProc();}, name),
+    _name(name),
+
     qpStatusRspEvent([this]{qpStatusProc();}, name),
-    wqeRspEvent([this]{wqeProc();}, name),
-    // rxUpdateEvent([this]{rxUpdate();}, name),
-    // qpStatusReqEvent([this]{qpStatusReqProc();}, name),
     wqePrefetchEvent([this]{wqePrefetch();}, name),
     getPrefetchQpnEvent([this]{wqePrefetchSchedule();}, name),
     launchWqeEvent([this]{launchWQE();}, name),
     updateEvent([this]{rxUpdate();}, name),
-    createQpStatusEvent([this]{createQpStatus();}, name)
+    createQpStatusEvent([this]{createQpStatus();}, name),
+    qpcRspEvent([this]{qpcRspProc();}, name),
+    wqeRspEvent([this]{wqeProc();}, name)
 {
-
+    // HANGU_PRINT(DescScheduler, "init\n");
 }
 
 /**
@@ -196,6 +198,8 @@ void HanGuRnic::DescScheduler::wqeProc()
     wqeFetchInfoQue.pop();
     TxDescPtr desc;
 
+    // HANGU_PRINT(DescScheduler, "hello\n");
+
     // check QP type
     if (qpStatus->type == LAT_QP)
     {
@@ -346,7 +350,7 @@ void HanGuRnic::DescScheduler::rxUpdate()
     uint32_t len = rNic->updateQue.front().second;
     rNic->updateQue.pop();
     QPStatusPtr status = qpStatusTable[qpn];
-    DPRINTF(DescScheduler, "rx received! tail_ptr: 0x%x\n", status->tail_ptr);
+    HANGU_PRINT(DescScheduler, "rx received! tail_ptr: 0x%x\n", status->tail_ptr);
     if (status->type == LAT_QP || status->type == RATE_QP)
     {
         status->tail_ptr++;
@@ -362,7 +366,6 @@ void HanGuRnic::DescScheduler::rxUpdate()
                 status->tail_ptr++;
             }
         }
-        // TO DO: push into prefetch queue
         if (status->tail_ptr < status->head_ptr)
         {
             lowPriorityQpnQue.push(status->qpn);

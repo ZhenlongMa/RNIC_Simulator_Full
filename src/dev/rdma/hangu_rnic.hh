@@ -314,6 +314,8 @@ class HanGuRnic : public RdmaNic {
         /* -------------------WQE Scheduler Relevant{begin}---------------------- */
         class DescScheduler{
             private:
+                HanGuRnic *rNic;
+                std::string _name;
                 uint32_t totalWeight;
                 void qpcRspProc();
                 void qpStatusProc();
@@ -326,7 +328,6 @@ class HanGuRnic : public RdmaNic {
                 void launchWQE();
                 void createQpStatus();
                 std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
-                HanGuRnic *rNic;
                 std::queue<uint32_t> highPriorityQpnQue;
                 std::queue<uint32_t> lowPriorityQpnQue;
                 std::queue<uint32_t> leastPriorityQpnQue;
@@ -349,6 +350,10 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper qpcRspEvent;
                 EventFunctionWrapper wqeRspEvent;
                 std::unordered_map<uint8_t, uint16_t> groupTable;
+                std::string name()
+                {
+                    return _name;
+                }
         };
         DescScheduler descScheduler;
         /* -------------------WQE Scheduler Relevant{end}------------------------ */

@@ -54,13 +54,12 @@ HanGuRnic::HanGuRnic(const Params *p)
     doorbellProcEvent ([this]{ doorbellProc(); }, name()),
     mboxEvent([this]{ mboxFetchCpl();    }, name()),
     rdmaEngine  (this, name() + ".RdmaEngine", p->reorder_cap),
+    descScheduler(this, name() + ".DescScheduler"),
     mrRescModule(this, name() + ".MrRescModule", p->mpt_cache_num, p->mtt_cache_num),
     cqcModule   (this, name() + ".CqcModule", p->cqc_cache_num),
     qpcModule   (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
-    dmaEngine   (this, name() + ".DmaEngine"),
-    descScheduler(this, name() + ".DescScheduler"),
-
     dmaReadDelay(p->dma_read_delay), dmaWriteDelay(p->dma_write_delay),
+    dmaEngine   (this, name() + ".DmaEngine"),
     pciBandwidth(p->pci_speed),
     etherBandwidth(p->ether_speed),
     LinkDelay     (p->link_delay),
@@ -388,6 +387,10 @@ HanGuRnic::ceuProc () {
         HANGU_PRINT(CcuEngine, " CcuEngine.ceuProc: SET_GROUP command!\n");
         size = regs.outParam._data * sizeof(GroupInfo);
         mboxBuf = (uint8_t *)new GroupInfo[regs.outParam._data];
+        break;
+      case ALLOC_GROUP:
+        HANGU_PRINT(CcuEngine, " CcuEngine.ceuProc: SET_GROUP command!\n");
+        size = regs.outParam._data * sizeof(uint8_t);
         break;
       default:
         size = 0;
