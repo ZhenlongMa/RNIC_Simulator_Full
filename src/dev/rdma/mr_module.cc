@@ -330,10 +330,18 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
     uint32_t offset; // relative to MR request
     uint32_t length;
     uint64_t dmaAddr;
+
+    // set DMA address
     if (reqPkt->mttRspNum == 0)
     {
         dmaAddr = mttResc->pAddr + reqPkt->offset % PAGE_SIZE; // warning: suppose MR is page-aligned
     }
+    else
+    {
+        dmaAddr = mttResc->pAddr;
+    }
+
+    // set offset
     if (reqPkt->mttRspNum == 0)
     {
         offset = 0;
@@ -342,6 +350,8 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
     {
         offset = (reqPkt->mttRspNum - 1) * PAGE_SIZE + (PAGE_SIZE - (reqPkt->offset % PAGE_SIZE));
     }
+
+    // set length
     if (reqPkt->mttRspNum == 0)
     {
         if (reqPkt->mttRspNum + 1 == reqPkt->mttNum)
@@ -362,7 +372,7 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
         length = PAGE_SIZE;
     }
     // dmaReqProcess(mttResc->pAddr + reqPkt->offset, reqPkt);
-    dmaReqProcess(dmaAddr, reqPkt, offset, length);
+    dmaReqProcess(dmaAddr, reqPkt, offset, length); TODO
 
     assert(reqPkt->mttRspNum < reqPkt->mttNum);
     reqPkt->mttRspNum++;
