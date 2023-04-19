@@ -372,7 +372,7 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
         length = PAGE_SIZE;
     }
     // dmaReqProcess(mttResc->pAddr + reqPkt->offset, reqPkt);
-    dmaReqProcess(dmaAddr, reqPkt, offset, length); TODO
+    dmaReqProcess(dmaAddr, reqPkt, offset, length);
 
     assert(reqPkt->mttRspNum < reqPkt->mttNum);
     reqPkt->mttRspNum++;
