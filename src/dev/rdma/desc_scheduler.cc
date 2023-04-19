@@ -35,6 +35,8 @@ void HanGuRnic::DescScheduler::qpcRspProc()
     CxtReqRspPtr qpc;
     assert(rNic->qpcModule.txQpAddrRspFifo.size());
     qpc = rNic->qpcModule.txQpAddrRspFifo.front();
+    rNic->qpcModule.txQpAddrRspFifo.pop();
+    HANGU_PRINT(DescScheduler, "QPC Response received by DescScheduler! QPN: %d, index: %d\n", qpc->num, qpc->idx);
     assert(rNic->doorbellVector[qpc->idx] != nullptr);
     DoorbellPtr db = rNic->doorbellVector[qpc->idx];
     rNic->df2ccuIdxFifo.push(qpc->idx);
@@ -49,6 +51,7 @@ void HanGuRnic::DescScheduler::qpcRspProc()
     qpStatus = qpStatusTable[db->qpn];
     std::pair<DoorbellPtr, QPStatusPtr> qpStatusDbPair(db, qpStatus);
     dbQpStatusRspQue.push(qpStatusDbPair);
+    HANGU_PRINT(DescScheduler, "QP status doorbell pair sent to QP status proc! QPn: %d\n", qpStatus->qpn);
     if (!qpStatusRspEvent.scheduled())
     {
         rNic->schedule(qpStatusRspEvent, curTick() + rNic->clockPeriod());
