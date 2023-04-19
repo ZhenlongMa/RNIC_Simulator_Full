@@ -101,6 +101,10 @@ class HanGuDriver final : public EmulatedDriver {
     uint32_t allocResc(uint8_t rescType, RescMeta &rescMeta);
     /* ------- Resc {end} ------- */
 
+    /* -------- Group {begin} ------------ */
+    uint8_t groupNum;
+    /* -------- Group {end} -------------- */
+
     /* -------ICM resources {begin}------- */
     /* we use one entry to store one page */
     std::unordered_map<Addr, Addr> icmAddrmap; // <icm vaddr page, icm paddr>

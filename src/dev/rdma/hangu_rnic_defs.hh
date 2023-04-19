@@ -87,6 +87,7 @@ const uint8_t WRITE_QPC = 0x05;
 const uint8_t WRITE_CQC = 0x06;
 const uint8_t SET_GROUP = 0x07;
 // const uint8_t SET_ALL_GROUP = 0x08;
+const uint8_t ALLOC_GROUP = 0x08;
 
 struct Doorbell {
     uint8_t  opcode;

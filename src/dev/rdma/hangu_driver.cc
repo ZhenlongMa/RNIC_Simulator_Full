@@ -247,13 +247,23 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
             // HANGU_PRINT(HanGuDriver, " ioctl : HGKFD_IOC_CHECK_GO, `GO` is cleared.\n");
         }
         break;
-      case HGKFD_IOC_SET_GROUP:
+        case HGKFD_IOC_SET_GROUP:
         {
             HANGU_PRINT(HanGuDriver, "ioctl: HGKFD_IOC_SET_GROUP\n");
             TypedBufferArg<kfd_ioctl_set_group_args> args(ioc_buf);
             args.copyIn(virt_proxy);
             setGroup(virt_proxy, args);
             args.copyOut(virt_proxy);
+            break;
+        }
+        case HGKFD_IOC_ALLOC_GROUP:
+        {
+            HANGU_PRINT(HanGuDriver, "ioctl: HGKFD_IOC_ALLOC_GROUP\n");
+            TypedBufferArg<kfd_ioctl_alloc_group_args> args(ioc_buf);
+            args.copyIn(virt_proxy);
+            allocGroup(virt_proxy, args);
+            args.copyOut(virt_proxy);
+            break;
         }
       default:
         {
@@ -433,7 +443,10 @@ void HanGuDriver::setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_gr
 
 void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args)
 {
-    TODO...
+    postHcr(portProxy, (uint64_t)mailbox.paddr, 1, args->group_num, HanGuRnicDef::ALLOC_GROUP);
+    assert(args->group_num == 1);
+    args->group_id[0] = groupNum;
+    groupNum += args->group_num;
 }
 /* --------------------------- Group {end}---------------------------- */
 

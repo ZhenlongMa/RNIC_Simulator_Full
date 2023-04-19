@@ -619,7 +619,7 @@ struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight)
     context->qos_group = (struct ibv_qos_group *)realloc(context->qos_group, (context->group_num) * sizeof(struct ibv_qos_group));
     write_cmd(dvr->fd, HGKFD_IOC_ALLOC_GROUP, args);
     context->qos_group[context->group_num].weight = weight;
-    context->qos_group[context->group_num].id = args->group_id;
+    context->qos_group[context->group_num].id = args->group_id[0];
     context->total_group_weight += weight;
     return context->qos_group + context->group_num;
 }
