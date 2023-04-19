@@ -20,7 +20,8 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name)
     updateEvent([this]{rxUpdate();}, name),
     createQpStatusEvent([this]{createQpStatus();}, name),
     qpcRspEvent([this]{qpcRspProc();}, name),
-    wqeRspEvent([this]{wqeProc();}, name)
+    wqeRspEvent([this]{wqeProc();}, name),
+    totalWeight(0)
 {
     // HANGU_PRINT(DescScheduler, "init\n");
 }
@@ -51,7 +52,7 @@ void HanGuRnic::DescScheduler::qpcRspProc()
     qpStatus = qpStatusTable[db->qpn];
     std::pair<DoorbellPtr, QPStatusPtr> qpStatusDbPair(db, qpStatus);
     dbQpStatusRspQue.push(qpStatusDbPair);
-    HANGU_PRINT(DescScheduler, "QP status doorbell pair sent to QP status proc! QPn: %d\n", qpStatus->qpn);
+    HANGU_PRINT(DescScheduler, "QP status doorbell pair sent to QP status proc! QP number: %d\n", qpStatus->qpn);
     if (!qpStatusRspEvent.scheduled())
     {
         rNic->schedule(qpStatusRspEvent, curTick() + rNic->clockPeriod());
@@ -75,12 +76,15 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     DoorbellPtr db = dbQpStatusRspQue.front().first;
     QPStatusPtr qpStatus = dbQpStatusRspQue.front().second;
     dbQpStatusRspQue.pop();
+    assert(db->qpn == qpStatus->qpn);
+    HANGU_PRINT(DescScheduler, "QP status doorbell pair received by QP status proc!\n");
     if (qpStatus->head_ptr == qpStatus->tail_ptr)
     {
         // If head pointer equals to tail pointer, this QP is absent in the prefetch queue,
         // so it should be pushed into prefetch queue and totoal weight should be updated.
         lowPriorityQpnQue.push(db->qpn);
         totalWeight += qpStatus->weight;
+        HANGU_PRINT(DescScheduler, "Unactive QP!\n");
     }
     qpStatus->head_ptr += db->num;
 
@@ -92,7 +96,8 @@ void HanGuRnic::DescScheduler::qpStatusProc()
 
     // update QP status
     // WARNING: QP status update could lead to QP death
-    qpStatusTable[db->num]->head_ptr = qpStatus->head_ptr;
+    qpStatusTable[qpStatus->qpn]->head_ptr = qpStatus->head_ptr;
+    HANGU_PRINT(DescScheduler, "QP[%d] status updated!\n", qpStatus->qpn);
 
     if (dbQpStatusRspQue.size())
     {
@@ -114,36 +119,40 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
     bool allowNewLWQE;
     assert(highPriorityQpnQue.size() || lowPriorityQpnQue.size());
     // assert(highPriorityQpnQue.size() <= WQE_BUFFER_CAPACITY && lowPriorityQpnQue.size() <= WQE_BUFFER_CAPACITY);
-    allowNewHWQE = highPriorityDescQue.size() > 0;
-    allowNewLWQE = lowPriorityDescQue.size() < WQE_PREFETCH_THRESHOLD;
+    allowNewHWQE = highPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
+    allowNewLWQE = lowPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
     allowNewWQE = (allowNewHWQE && highPriorityQpnQue.size()) || (allowNewLWQE && lowPriorityQpnQue.size());
+
     if (!allowNewWQE)
     {
+        HANGU_PRINT(DescScheduler, "New WQE not allowed!\n");
         return;
     }
-    if (highPriorityQpnQue.size() < WQE_PREFETCH_THRESHOLD)
+
+    if (highPriorityQpnQue.size() > 0)
     {
+        HANGU_PRINT(DescScheduler, "High priority QPN Queue size: %d!\n", highPriorityQpnQue.size());
         uint32_t qpn = highPriorityQpnQue.front();
         highPriorityQpnQue.pop();
-        // QPStatusPtr = 
         wqePrefetchQpStatusRReqQue.push(qpn);
+        HANGU_PRINT(DescScheduler, "High priority QPN fetched! qpn: %d\n", qpn);
     }
     else if (lowPriorityQpnQue.size() < WQE_PREFETCH_THRESHOLD)
     {
+        HANGU_PRINT(DescScheduler, "Low priority QPN Queue size: %d!\n", lowPriorityQpnQue.size());
         uint32_t qpn = lowPriorityQpnQue.front();
         lowPriorityQpnQue.pop();
         wqePrefetchQpStatusRReqQue.push(qpn);
+        HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: %d\n", qpn);
     }
+
     if (!wqePrefetchEvent.scheduled())
     {
         rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
     }
-    if (highPriorityQpnQue.size() || lowPriorityQpnQue.size())
+    if ((highPriorityQpnQue.size() || lowPriorityQpnQue.size()) && !getPrefetchQpnEvent.scheduled())
     {
-        if (!getPrefetchQpnEvent.scheduled())
-        {
-            rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
-        }
+        rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
     }
 }
 
