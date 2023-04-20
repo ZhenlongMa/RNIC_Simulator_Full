@@ -245,9 +245,9 @@ double throughput_test(struct rdma_resc *resc, uint8_t op_mode, uint32_t offset,
 
     for (int i = 0; i < num_client * num_qp; i++)
     {
-        RDMA_PRINT(Server, "QP[%d] data count: %d\n", i, qp_data_cnt[i]);
+        RDMA_PRINT(Server, "QP[%d] data count: %ld\n", i, qp_data_cnt[i]);
     }
-    RDMA_PRINT(Server, "time: %d\n", *con_time);
+    RDMA_PRINT(Server, "time: %ld\n", *con_time);
 
     return (*snd_cnt * 1000000.0) / *con_time; /* message rate */
 }

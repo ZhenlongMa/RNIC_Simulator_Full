@@ -633,7 +633,7 @@ struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight)
     new_group->weight = weight;
     new_group->id = args->group_id[0];
     context->total_group_weight += weight;
-    HGRNIC_PRINT("QoS group created! id: %d, weight: %d, total group weight: %d\n", args->group_id[0], weight, context->total_group_weight);
+    HGRNIC_PRINT("QoS group created! id: %d, weight: %d, total group weight: %ld\n", args->group_id[0], weight, context->total_group_weight);
     return context->qos_group + context->group_num;
 }
 
