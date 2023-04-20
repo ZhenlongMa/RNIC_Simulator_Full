@@ -92,6 +92,9 @@ def get_processes(options, system, rdma_driver, idx, node_num=0):
     process.cmd = [workloads[0]] + pargs.split() + ['-c', str(idx)]
     process.drivers = [rdma_driver]
 
+    print(process.executable)
+    print(process.cmd)
+
     if options.env:
         with open(options.env, 'r') as f:
             process.env = [line.rstrip() for line in f]

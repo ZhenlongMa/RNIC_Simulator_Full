@@ -44,7 +44,7 @@ def cmd_run_sim(debug, test_prog, option, params):
     cmd += " --qpc-cache-cap "  + str(params.qpc_cache_cap)
     cmd += " --reorder-cap "    + str(params.reorder_cap)
     cmd += " --mem-size 2048MB"
-    cmd += " > scripts/res_out/rnic_sys_test.txt"
+    cmd += " > scripts/res_out/qos_test.txt"
 
     return cmd
 
@@ -52,8 +52,8 @@ def execute_program(debug, test_prog, option, params):
 
     # compile Gem-5
     cmd_list = [
-        "cd ../tests/test-progs/hangu-rnic/src && make",
-        "cd ../ && scons build/X86/gem5.opt"
+        # "cd ../tests/test-progs/hangu-rnic/src && make",
+        # "cd ../ && scons build/X86/gem5.opt"
     ]
     # run simulation
     cmd_list.append(cmd_run_sim(debug, test_prog, option, params))
@@ -76,7 +76,6 @@ def main():
     debug = ""
     debug = "PioEngine,CcuEngine,MrResc,HanGuDriver,RescCache,Ethernet,RdmaEngine,"
     debug +="HanGuRnic,CxtResc,DmaEngine,"
-    debug +="RdmaArray,"
     debug +="DescScheduler"
 
     test_prog = "'tests/test-progs/hangu-rnic/src/qos/server"
