@@ -85,7 +85,11 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
     args->mtt_num_log = 19; /* useless here */
     write_cmd(dvr->fd, HGKFD_IOC_INIT_DEV, (void *)args);
     free(args);
-    
+
+    /* create group for CM */
+    struct ibv_qos_group *cm_group = create_qos_group(context, 10);
+    set_qos_group(context, cm_group, 1024);
+
     /* Init communication management */
     struct ibv_mr_init_attr mr_attr;
     mr_attr.length = PAGE_SIZE;
@@ -110,7 +114,13 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
     context->cm_qp->rcv_wqe_offset = 0;
     context->cm_qp->lsubnet.llid = context->lid;
     context->cm_qp->qkey = QKEY_CM;
+
+    context->cm_qp->indicator = BANDWIDTH;
+    context->cm_qp->weight = 1;
+    context->cm_qp->group_id = cm_group->id;
     ibv_modify_qp(context, context->cm_qp);
+
+    HGRNIC_PRINT("CM QP created! QPN: %d\n", context->cm_qp->qp_num);
 
     context->cm_rcv_posted_off = RCV_WR_BASE;
     context->cm_rcv_acked_off  = RCV_WR_BASE;
@@ -615,15 +625,21 @@ struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight)
     struct hghca_context *dvr = (struct hghca_context *)context->dvr;
     struct kfd_ioctl_alloc_group_args *args = (struct kfd_ioctl_alloc_group_args *)malloc(sizeof(struct kfd_ioctl_alloc_group_args));
     args->group_num = 1;
+    write_cmd(dvr->fd, HGKFD_IOC_ALLOC_GROUP, args);
+    
     // Allocate space for newly allocated group
     context->qos_group = (struct ibv_qos_group *)realloc(context->qos_group, (context->group_num) * sizeof(struct ibv_qos_group));
-    write_cmd(dvr->fd, HGKFD_IOC_ALLOC_GROUP, args);
-    context->qos_group[context->group_num].weight = weight;
-    context->qos_group[context->group_num].id = args->group_id[0];
+    struct ibv_qos_group *new_group = context->qos_group + (context->group_num - 1);
+    new_group->weight = weight;
+    new_group->id = args->group_id[0];
     context->total_group_weight += weight;
+    HGRNIC_PRINT("QoS group created! id: %d, weight: %d, total group weight: %d\n", args->group_id[0], weight, context->total_group_weight);
     return context->qos_group + context->group_num;
 }
 
+/**
+ * @note set QoS group scheduling granularity
+*/
 int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint16_t granularity)
 {
     struct kfd_ioctl_set_group_args *args = (struct kfd_ioctl_set_group_args *)malloc(sizeof(struct kfd_ioctl_set_group_args));
@@ -633,6 +649,7 @@ int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint
     {
         args->group_id[i] = group->id;
         args->granularity[i] = granularity;
+        HGRNIC_PRINT("QoS group granularity set! id: %d, granularity: %d\n", group->id, granularity);
     }
     write_cmd(dvr->fd, HGKFD_IOC_SET_GROUP, args);
 }

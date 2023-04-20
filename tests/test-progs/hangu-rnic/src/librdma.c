@@ -81,9 +81,10 @@ int cm_post_send(struct ibv_context *ctx, struct rdma_cr *cr_info, int wr_num, u
 }
 
 /**
- * @note create RDMA communication resource in one QoS group
+ * @note initialize RDMA communication resource in one QoS group
 */
-struct rdma_resc *rdma_resc_init(int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem) {
+struct rdma_resc *rdma_resc_init(struct ibv_context *ctx,int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem) {
+    // struct rdma_resc *rdma_resc_init(int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem) {
     int i = 0;
 
     /* Allocate memory for struct rdma_resc */
@@ -98,12 +99,13 @@ struct rdma_resc *rdma_resc_init(int num_mr, int num_cq, int num_qp, uint16_t ll
     resc->qp = (struct ibv_qp **)malloc(sizeof(struct ibv_qp*) * num_qp * num_rem);
     resc->rinfo = (struct rem_info *)malloc(sizeof(struct rem_info) * num_rem);
     resc->qos_group = (struct ibv_qos_group **)malloc(sizeof(struct ibv_qos_group *));
-
-    /* device initialization */
-    struct ibv_context *ctx = (struct ibv_context *)malloc(sizeof(struct ibv_context));
-    ibv_open_device(ctx, llid);
     resc->ctx = ctx;
-    RDMA_PRINT(librdma, "ibv_open_device : doorbell address 0x%lx\n", (long int)ctx->dvr);
+
+    // /* device initialization */
+    // struct ibv_context *ctx = (struct ibv_context *)malloc(sizeof(struct ibv_context));
+    // ibv_open_device(ctx, llid);
+    // resc->ctx = ctx;
+    // RDMA_PRINT(librdma, "ibv_open_device : doorbell address 0x%lx\n", (long int)ctx->dvr);
 
     /* Post receive to CM */
     cm_post_recv(ctx, RCV_WR_MAX);
@@ -253,6 +255,9 @@ struct rdma_cr *rdma_listen(struct rdma_resc *resc, int *cm_cpl_num) {
     return cr_info;
 }
 
+/**
+ * @param cm_req_num: QP number in this connection exchange
+*/
 int rdma_connect(struct rdma_resc *resc, struct rdma_cr *cr_info, uint16_t *dest_info, int cm_req_num) {
     struct ibv_context *ctx = resc->ctx;
 

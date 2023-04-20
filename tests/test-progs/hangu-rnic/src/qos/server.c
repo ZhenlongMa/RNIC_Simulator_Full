@@ -25,6 +25,15 @@ int svr_update_qps(struct rdma_resc *resc) {
     }
     ibv_modify_batch_qp(resc->ctx, resc->qp[0], resc->num_qp * resc->num_rem);
 
+    /* update the sum of QP weight in this group */
+    int group_qp_total_weight = 0;
+    for (int i = 0; i < resc->num_qp * resc->num_rem; i++)
+    {
+        struct ibv_qp *qp = resc->qp[i];
+        group_qp_total_weight += qp->weight;
+    }
+    resc->qos_group[0]->total_qp_weight = group_qp_total_weight;
+
     return 0;
 }
 
@@ -66,82 +75,6 @@ int svr_update_info(struct rdma_resc *resc) {
 
     /* modify qp in server side */
     svr_update_qps(resc);
-
-    return 0;
-}
-
-int svr_connect_qps(struct rdma_resc *resc) {
-    RDMA_PRINT(Server, "Start svr_connect_qps\n");
-    int sum = 0, num, rem_sum = 0;
-    struct rdma_cr *cr_info;
-    uint16_t *dest_info = (uint16_t *)malloc(sizeof(uint16_t) * SND_WR_MAX * resc->num_rem);
-
-    while (sum < resc->num_qp * resc->num_rem) {
-        cr_info = rdma_listen(resc, &num); /* listen connection request from client (QP0) */
-        if (num == 0) {
-            continue;
-        }
-        RDMA_PRINT(Server, "svr_connect_qps: rdma_listen end, Polled %d CR data\n", num);
-        
-        for (int i = 0; i < num; ++i) {
-
-            RDMA_PRINT(Server, "svr_connect_qps: rem_sum %d resc_num_rem %d\n", rem_sum, resc->num_rem);
-
-            /* get remote addr information */
-            struct rem_info *rinfo_ptr = NULL;
-            for (int j = 0; j < resc->num_rem; ++j) {
-                if (resc->rinfo[j].dlid == cr_info[i].src_lid) {
-                    rinfo_ptr = &(resc->rinfo[j]);
-                    break;
-                }
-            }
-            if (rinfo_ptr == NULL) {
-                // RDMA_PRINT(Server, "pointer is NULL rem_ptr 0x%lx\n", (uintptr_t)rinfo_ptr);
-                resc->rinfo[rem_sum].dlid  = cr_info[i].src_lid;
-                resc->rinfo[rem_sum].raddr = cr_info[i].raddr;
-                resc->rinfo[rem_sum].rkey  = cr_info[i].rkey;
-                rinfo_ptr = &(resc->rinfo[rem_sum]);
-                ++rem_sum;
-            }
-            
-            RDMA_PRINT(Server, "svr_connect_qps: start modify_qp, total_sum %d, qp_sum %d, cq sum %d, start_off %d\n", 
-                    sum, rinfo_ptr->sum, rinfo_ptr->sum % TEST_CQ_NUM, rinfo_ptr->start_off);
-            /* Modify Local QP */
-            struct ibv_qp *qp;
-            qp = resc->qp[rinfo_ptr->sum + rinfo_ptr->start_off];
-            qp->ctx = resc->ctx;
-            qp->flag = 0;
-            qp->type = cr_info[i].qp_type;
-            qp->cq = resc->cq[sum % TEST_CQ_NUM];
-            qp->snd_wqe_offset = 0;
-            qp->rcv_wqe_offset = 0;
-            qp->lsubnet.llid = resc->ctx->lid;
-            qp->dest_qpn = cr_info[i].src_qpn;
-            qp->snd_psn = 0;
-            qp->ack_psn = qp->snd_psn;
-            qp->exp_psn = cr_info[i].snd_psn;
-            qp->dsubnet.dlid = cr_info[i].src_lid;
-            RDMA_PRINT(Server, "svr_connect_qps: start modify_qp, dlid %d, src_qp %d, dst_qp %d, cqn %d\n", 
-                    qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num);
-            ibv_modify_qp(resc->ctx, qp);
-
-            /* Generate Connect Request to respond client */
-            cr_info[i].dst_qpn = qp->qp_num;
-            cr_info[i].snd_psn = qp->snd_psn;
-            cr_info[i].flag = CR_TYPE_ACK;
-            cr_info[i].raddr = (uintptr_t)resc->mr[0]->addr;
-            cr_info[i].rkey  = resc->mr[0]->lkey;
-            dest_info[i] = cr_info[i].src_lid;
-            RDMA_PRINT(Server, "svr_connect_qps: dest 0x%x cr_info dlid 0x%x dst_qpn %d src_qpn %d\n", 
-                    dest_info[i], cr_info[i].src_lid, cr_info[i].dst_qpn, cr_info[i].src_qpn);
-
-            ++rinfo_ptr->sum;
-            ++sum;
-        }
-        RDMA_PRINT(Server, "svr_connect_qps start rdma_connect, sum %d\n", sum);
-        rdma_connect(resc, cr_info, dest_info, num); /* post connection request to client (QP0) */
-        free(cr_info);
-    }
 
     return 0;
 }
@@ -319,11 +252,11 @@ double throughput_test(struct rdma_resc *resc, uint8_t op_mode, uint32_t offset,
     return (*snd_cnt * 1000000.0) / *con_time; /* message rate */
 }
 
-struct rdma_resc *set_group_resource(int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem, int grp_weight)
+struct rdma_resc *set_group_resource(struct ibv_context *ctx, int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem, int grp_weight)
 {
     uint8_t  op_mode = OPMODE_RDMA_WRITE; /* 0: RDMA Write; 1: RDMA Read */
     uint32_t offset;
-    struct rdma_resc *resc = rdma_resc_init(num_mr, num_cq, num_qp, llid, num_client);
+    struct rdma_resc *resc = rdma_resc_init(ctx, num_mr, num_cq, num_qp, llid, num_client);
     struct ibv_qos_group *group = create_qos_group(resc->ctx, grp_weight);
     resc->qos_group[0] = group;
 
@@ -411,12 +344,16 @@ int main (int argc, char **argv) {
     int grp2_num_qp = 1;
     int grp1_weight = 3;
     int grp2_weight = 2;
-    int group_num = 3;
-    struct ibv_context *ib_context;
+    struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));;
+
+    /* device initialization */
+    ibv_open_device(ib_context, svr_lid);
+    // resc->ctx = ctx;
+    RDMA_PRINT(librdma, "ibv_open_device : doorbell address 0x%lx\n", (long int)ib_context->dvr);
     // RDMA_PRINT(Server, "grp1_num_qp %d num_cq %d\n", grp1_num_qp, num_cq);
-    struct rdma_resc *grp1_resc = set_group_resource(num_mr, num_cq, grp1_num_qp, svr_lid, num_client, grp1_weight);
-    struct rdma_resc *grp2_resc = set_group_resource(num_mr, num_cq, grp2_num_qp, svr_lid, num_client, grp2_weight);
-    ib_context = grp1_resc->ctx;
+    struct rdma_resc *grp1_resc = set_group_resource(ib_context, num_mr, num_cq, grp1_num_qp, svr_lid, num_client, grp1_weight);
+    struct rdma_resc *grp2_resc = set_group_resource(ib_context, num_mr, num_cq, grp2_num_qp, svr_lid, num_client, grp2_weight);
+    // ib_context = grp1_resc->ctx;
 
     /* sync to make sure that we could get start */
     rdma_recv_sync(grp1_resc);
