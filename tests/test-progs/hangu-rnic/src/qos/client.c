@@ -301,7 +301,13 @@ int main (int argc, char **argv) {
     num_mr = 1;
     num_cq = TEST_CQ_NUM;
     num_qp = TEST_QP_NUM;
-    struct rdma_resc *resc = rdma_resc_init(num_mr, num_cq, num_qp, llid, 1);
+
+    struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));;
+
+    /* device initialization */
+    ibv_open_device(ib_context, llid);
+
+    struct rdma_resc *resc = rdma_resc_init(ib_context, num_mr, num_cq, num_qp, llid, 1);
 
     /* Connect QPs to server's QP */
     // clt_connect_qps(resc, svr_lid);
