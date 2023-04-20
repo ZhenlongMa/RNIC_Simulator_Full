@@ -597,10 +597,12 @@ HanGuDriver::writeQpc(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_a
 
         qpcResc[i].qkey    = args->qkey[i];
 
+        // qpGroup[args->src_qpn[i]] = args->groupID[i];
+        // qpWeight[args->src_qpn[i]] = args->weight[i];
+        qpcResc[i].indicator = args->indicator[i];
+        qpcResc[i].perfWeight = args->weight[i];
+        qpcResc[i].groupID = args->groupID[i];
         HANGU_PRINT(HanGuDriver, " writeQpc: qpn: 0x%x\n", qpcResc[i].srcQpn);
-
-        qpGroup[args->src_qpn[i]] = args->groupID[i];
-        qpWeight[args->src_qpn[i]] = args->weight[i];
     }
     HANGU_PRINT(HanGuDriver, " writeQpc: args->batch_size: %d\n", args->batch_size);
     portProxy.writeBlob(mailbox.vaddr, qpcResc, sizeof(HanGuRnicDef::QpcResc) * args->batch_size);

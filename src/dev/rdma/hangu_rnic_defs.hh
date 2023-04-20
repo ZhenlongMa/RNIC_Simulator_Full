@@ -45,7 +45,6 @@
 #define HANGU_PRINT(name, x, ...) do {                     \
             DPRINTF(name, "[" #name "] " x, ##__VA_ARGS__);\
         } while (0)
-
 #endif
 
 #define QPN_NUM   (512 * 3)
@@ -657,12 +656,13 @@ struct Regs : public Serializable {
 // WQE Scheduler relevant
 struct QPStatusItem
 {
-    QPStatusItem(uint32_t key, uint8_t weight, uint8_t type, uint32_t qpn)
+    QPStatusItem(uint32_t key, uint8_t weight, uint8_t type, uint32_t qpn, uint8_t group_id)
     {
-        this->key = key;
-        this->weight = weight;
-        this->type = type;
-        this->qpn = qpn;
+        this->key                   = key;
+        this->weight                = weight;
+        this->type                  = type;
+        this->qpn                   = qpn;
+        this->group_id              = group_id;
         this->head_ptr              = 0;
         this->fetch_ptr             = 0;
         this->tail_ptr              = 0;
@@ -684,6 +684,7 @@ struct QPStatusItem
     uint8_t type;
     uint32_t qpn;
     uint8_t perf; // This segment indicates whether the performance exceeds or is lower than expected
+    uint8_t group_id;
 };
 typedef std::shared_ptr<QPStatusItem> QPStatusPtr;
 

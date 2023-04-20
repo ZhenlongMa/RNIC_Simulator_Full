@@ -168,6 +168,9 @@ void HanGuRnic::DescScheduler::wqePrefetch()
     QPStatusPtr qpStatus = qpStatusTable[qpn];
 
     uint32_t descNum;
+    HANGU_PRINT(DescScheduler, "head_ptr: 0x%x, fetch_ptr: 0x%x\n", qpStatus->head_ptr, qpStatus->fetch_ptr);
+    HANGU_PRINT(DescScheduler, "QP num: %d, group ID: %d, weight: %d, group granularity: %d\n", 
+        qpStatus->qpn, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
     if (qpStatus->head_ptr - qpStatus->fetch_ptr > MAX_PREFETCH_NUM)
     {
         descNum = MAX_PREFETCH_NUM;
@@ -182,6 +185,7 @@ void HanGuRnic::DescScheduler::wqePrefetch()
 
     descReq->txDescRsp = new TxDesc[descNum];
     rNic->descReqFifo.push(descReq);
+    HANGU_PRINT(DescScheduler, "WQE req sent! QPN: %d, WQE num: %d\n", qpStatus->qpn, descNum);
     std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
     wqeFetchInfoQue.push(wqeFetchInfoPair);
 
@@ -257,9 +261,10 @@ void HanGuRnic::DescScheduler::wqeProc()
         }
 
         TxDescPtr desc = rNic->txdescRspFifo.front();
+        HANGU_PRINT(DescScheduler, "BW desc received by wqe proc!");
 
         uint32_t batchSize; // the size of data that should be transmitted in this period
-        batchSize = qpStatus->weight * MAX_COMMIT_SZ;
+        batchSize = qpStatus->weight * groupTable[qpStatus->group_id];
         uint32_t procSize = 0;
         uint32_t procDescNum = 0;
 
@@ -405,7 +410,7 @@ void HanGuRnic::DescScheduler::createQpStatus()
     assert(rNic->createQue.size());
     QPStatusPtr status = rNic->createQue.front();
     rNic->createQue.pop();
-    qpStatusTable.emplace(status->qpn, status);
+    qpStatusTable[status->qpn] = status;
     if (rNic->createQue.size())
     {
         rNic->schedule(createQpStatusEvent, curTick() + rNic->clockPeriod());
