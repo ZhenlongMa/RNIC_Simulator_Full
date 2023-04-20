@@ -59,9 +59,9 @@ HanGuRnic::HanGuRnic(const Params *p)
     cqcModule   (this, name() + ".CqcModule", p->cqc_cache_num),
     qpcModule   (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
     dmaReadDelay(p->dma_read_delay), dmaWriteDelay(p->dma_write_delay),
-    dmaEngine   (this, name() + ".DmaEngine"),
     pciBandwidth(p->pci_speed),
     etherBandwidth(p->ether_speed),
+    dmaEngine   (this, name() + ".DmaEngine"),
     LinkDelay     (p->link_delay),
     ethRxPktProcEvent([this]{ ethRxPktProc(); }, name()) {
 
@@ -337,8 +337,10 @@ HanGuRnic::mboxFetchCpl () {
         }
         delete mboxBuf;
         break;
+      case ALLOC_GROUP: // do nothing for ALLOC_GROUP in hardware
+        break;
       default:
-        panic("Bad inputed command.\n");
+        panic("Bad inputed command: %d\n", regs.cmdCtrl.op());
     }
     regs.cmdCtrl.go(0); // Set command indicator as finished.
 
@@ -392,6 +394,7 @@ HanGuRnic::ceuProc () {
       case ALLOC_GROUP:
         HANGU_PRINT(CcuEngine, " CcuEngine.ceuProc: SET_GROUP command!\n");
         size = regs.outParam._data * sizeof(uint8_t);
+        mboxBuf = (uint8_t *)new GroupInfo;
         break;
       default:
         size = 0;
