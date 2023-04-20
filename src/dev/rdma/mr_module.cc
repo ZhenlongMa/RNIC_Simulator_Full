@@ -183,7 +183,9 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
 
         for (uint32_t i = 0; (i * sizeof(TxDesc)) < tptRsp->length; ++i) {
             txDesc = make_shared<TxDesc>(tptRsp->txDescRsp + i);
-            assert((txDesc->len != 0) && (txDesc->lVaddr != 0) && (txDesc->opcode != 0));
+            assert(txDesc->len != 0);
+            assert(txDesc->lVaddr != 0);
+            assert(txDesc->opcode != 0);
             rnic->txdescRspFifo.push(txDesc);
         }
         // assert((tptRsp->txDescRsp->len != 0) && (tptRsp->txDescRsp->lVaddr != 0));
