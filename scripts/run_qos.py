@@ -44,7 +44,7 @@ def cmd_run_sim(debug, test_prog, option, params):
     cmd += " --qpc-cache-cap "  + str(params.qpc_cache_cap)
     cmd += " --reorder-cap "    + str(params.reorder_cap)
     cmd += " --mem-size 2048MB"
-    cmd += " > scripts/res_out/qos_test.txt"
+    cmd += " > scripts/qos_test.txt"
 
     return cmd
 
