@@ -51,6 +51,9 @@
 
 /* mailbox page number */
 #define MAILBOX_PAGE_NUM 32
+
+/* max group number*/
+#define MAX_GROUP_NUM 128
 /* -------software-hardware interface{end}------- */
 
 struct kfd_ioctl_init_dev_args {
@@ -168,7 +171,9 @@ struct kfd_ioctl_write_qpc_args {
     uint32_t snd_wqe_base_lkey[MAX_QPC_BATCH]; /* send wqe base lkey */
     uint32_t rcv_wqe_base_lkey[MAX_QPC_BATCH]; /* receive wqe base lkey */
     uint32_t qkey   [MAX_QPC_BATCH]; /* Queue key, used for UD incomming data validation */
-    
+    uint8_t  indicator [MAX_QPC_BATCH];
+    uint8_t  weight    [MAX_QPC_BATCH];
+    uint8_t  groupID   [MAX_QPC_BATCH];
 };
 
 struct kfd_ioctl_get_time_args {
@@ -177,6 +182,20 @@ struct kfd_ioctl_get_time_args {
     uint64_t cur_time; /* current time of simulation */
 };
 
+struct kfd_ioctl_set_group_args {
+    /* Input */
+    uint8_t group_num;
+    uint8_t group_id[MAX_GROUP_NUM];
+    uint16_t granularity[MAX_GROUP_NUM];
+};
+
+struct kfd_ioctl_alloc_group_args {
+    /* Input */
+    uint8_t group_num;
+    
+    /* Output */
+    uint8_t group_id[MAX_GROUP_NUM];
+};
 
 
 #define HGKFD_IOCTL_BASE 'K'
@@ -217,6 +236,12 @@ struct kfd_ioctl_get_time_args {
 
 #define HGKFD_IOC_GET_TIME		\
 		HGKFD_IOW(0x0b, struct kfd_ioctl_get_time_args)
+
+#define HGKFD_IOC_SET_GROUP  \
+        HGKFD_IOW(0x0c, struct kfd_ioctl_set_group_args)
+
+#define HGKFD_IOC_ALLOC_GROUP \
+        HGKFD_IOWR(0x0d, struct kfd_ioctl_alloc_group_args)
 
 #define HGKFD_COMMAND_START    0x01
 #define HGKFD_COMMAND_END      0x0b

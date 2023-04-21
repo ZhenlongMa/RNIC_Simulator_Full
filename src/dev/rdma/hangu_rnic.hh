@@ -46,7 +46,8 @@
 #include "dev/pci/device.hh"
 #include "params/HanGuRnic.hh"
 
-
+// #include "dev/rdma/resc_cache.hh"
+// #include "dev/rdma/hangu_cache.hh"
 
 using namespace HanGuRnicDef;
 
@@ -69,15 +70,16 @@ class HanGuRnic : public RdmaNic {
 
         /* --------------------CCU <-> RDMA Engine {begin}-------------------- */
         std::vector<DoorbellPtr> doorbellVector;
-        // std::queue<uint8_t> df2ccuIdxFifo;
+        std::queue<uint8_t> df2ccuIdxFifo;
         /* --------------------CCU <-> RDMA Engine {end}-------------------- */
 
         /* --------------------TPT <-> RDMA Engine {begin}-------------------- */
         // Descriptor relevant
         std::queue<MrReqRspPtr>descReqFifo; // tx(DFU) & rx(RPU) descriptor req post to this fifo.
-        std::queue<MrReqRspPtr> txdescRspFifo; /* Store descriptor, **not list** */
-        // std::queue<RxDescPtr> rxdescRspFifo;
-        std::queue<MrReqRspPtr> rxdescRspFifo;
+        std::queue<TxDescPtr> txdescRspFifo; /* Store descriptor, **not list** */
+        std::queue<RxDescPtr> rxdescRspFifo;
+        // std::queue<MrReqRspPtr> txdescRspFifo;
+        // std::queue<MrReqRspPtr> rxdescRspFifo;
 
         // CQ write req fifo, SCU and RCU post the request
         std::queue<MrReqRspPtr> cqWreqFifo;
@@ -102,13 +104,14 @@ class HanGuRnic : public RdmaNic {
         std::queue<CxtReqRspPtr> rxCqcRspFifo; /* CqcModule -(update rsp)-> rcu */
         /* --------------------CqcModule <-> RDMA Engine {end}-------------------- */
 
-        /* --------------------Cache(in TPT & CxtM) <-> DMA Engine {begin}-------------------- */
-        // std::queue<DmaReqPtr> cacheDmaReadFifo;
-        // std::queue<DmaReqPtr> cacheDmaWriteFifo;
-        std::queue<DmaReqPtr> cacheDmaAccessFifo;
+        /* --------------------DescScheduler <-> RDMA Engine {begin}---------------------------*/
+        std::queue<TxDescPtr> txDescLaunchQue;
+        std::queue<std::pair<uint32_t, uint32_t>> updateQue;
+        /* --------------------DescScheduler <-> RDMA Engine {end}-----------------------------*/
 
-        std::queue<DmaReqPtr> qpcDmaRdCplFifo; /* read response fifo for qpc cache */
-        /* --------------------Cache(in TPT & CxtM) <-> DMA Engine {end}-------------------- */
+        /* --------------------DescScheduler <-> CCU {begin}---------------------------*/
+        std::queue<QPStatusPtr> createQue;
+        /* --------------------DescScheduler <-> CCU {end}-----------------------------*/
 
         /* --------------------TPT <-> DMA Engine {begin}-------------------- */
         std::queue<DmaReqPtr> descDmaReadFifo;
@@ -132,9 +135,7 @@ class HanGuRnic : public RdmaNic {
         EventFunctionWrapper mboxEvent;
 
         uint8_t* mboxBuf;
-
-        // std::vector<uint32_t> coreQpn;
-
+        
         /* -----------------------CCU Relevant {end}----------------------- */
 
         /* -----------------------RDMA Engine Relevant{begin}----------------------- */
@@ -150,11 +151,11 @@ class HanGuRnic : public RdmaNic {
 
 
                 /* dfu -> ddu */
-                std::queue<DoorbellPtr> df2ddDBFifo;
+                // std::queue<DoorbellPtr> df2ddFifo;
                 uint32_t txDescLenSel(uint8_t num);/* Return number of descriptors to prefetch */
 
                 /* DDU owns */
-                DoorbellPtr dduDbell; /* Doorbell stored for DDU use. */
+                DoorbellPtr dduDbell; /* Doorbell stored for DDU use. This is NOT the PIO doorbell */
                 bool allowNewDb;
 
                 /* ddu -> dpu */
@@ -185,6 +186,8 @@ class HanGuRnic : public RdmaNic {
                 bool messageEnd;
                 void rguProcessing(); /* Request Generation Unit */
                 void setMacAddr (uint8_t *dst, uint64_t src);
+                void setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* pktPtr, uint8_t &needAck);
+                void copyEthData(EthPacketPtr rawPkt, EthPacketPtr newPkt, MrReqRspPtr rspData);
 
                 /* rru owns */
                 void rruProcessing(); /* Response Receiving Unit */
@@ -235,12 +238,9 @@ class HanGuRnic : public RdmaNic {
                 // rpu -> rcu
                 std::queue<CqDescPtr> rp2rcFifo;
 
-                void setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* pkt, uint8_t &needAck);
-                void copyEthData(EthPacketPtr rawPkt, EthPacketPtr newPkt, MrReqRspPtr rspData);
-
             public:
 
-                RdmaEngine (HanGuRnic *rnic, const std::string n, uint32_t elemCap, uint8_t coreid)
+                RdmaEngine (HanGuRnic *rnic, const std::string n, uint32_t elemCap)
                 : rnic(rnic),
                     _name(n),
                     allowNewDb(true),
@@ -250,7 +250,6 @@ class HanGuRnic : public RdmaNic {
                     windowFull(false),
                     messageEnd(true),
                     rs2rpVector(elemCap),
-                    coreID(coreid),
                     dfuEvent ([this]{ dfuProcessing(); }, n),
                     dduEvent ([this]{ dduProcessing(); }, n),
                     dpuEvent ([this]{ dpuProcessing(); }, n),
@@ -261,16 +260,13 @@ class HanGuRnic : public RdmaNic {
                     rpuEvent ([this]{ rpuProcessing(); }, n),
                     rcvRpuEvent  ([this]{rcvRpuProcessing();  }, n),
                     rdCplRpuEvent([this]{rdCplRpuProcessing();}, n),
-                    rcuEvent([this]{ rcuProcessing();}, n)
-                    // curQpn(INVALID_QPN)
-                    { 
+                    rcuEvent([this]{ rcuProcessing();}, n) { 
                         for (uint32_t x = 0; x < elemCap; ++x) {
                             dp2ddIdxFifo.push(x);
                             rp2raIdxFifo.push(x);
                         }
                         assert(rp2raIdxFifo.size() == elemCap);
                     }
-                uint8_t coreID;
 
                 std::string name() { return _name; }
 
@@ -310,96 +306,83 @@ class HanGuRnic : public RdmaNic {
                 void rcuProcessing(); // Receive Completion Unit
                 EventFunctionWrapper rcuEvent;
 
-
-                // uint32_t curQpn;
+                std::queue<DoorbellPtr> df2ddFifo; // TODO: move this FIFO to Top level and change its name
         };
 
-        // RdmaEngine rdmaEngine;
-        
+        RdmaEngine rdmaEngine;
         /* -----------------------RDMA Engine Relevant{end}----------------------- */
 
-        /* -----------------------RDMA Array Relevant{begin}---------------------- */
-        class RdmaArray{
+        /* -------------------WQE Scheduler Relevant{begin}---------------------- */
+        class DescScheduler{
             private:
                 HanGuRnic *rNic;
                 std::string _name;
+                uint32_t totalWeight;
+                void qpcRspProc();
+                void qpStatusProc();
+                // void qpStatusReqProc();
+                void wqePrefetchSchedule();
+                void wqePrefetch();
+                void wqeProc();
+                void rxUpdate();
+                // void commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue);
+                void launchWQE();
+                void createQpStatus();
+                std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
+                std::queue<uint32_t> highPriorityQpnQue;
+                std::queue<uint32_t> lowPriorityQpnQue;
+                std::queue<uint32_t> leastPriorityQpnQue;
+                std::queue<TxDescPtr> highPriorityDescQue;
+                std::queue<TxDescPtr> lowPriorityDescQue;
+                std::queue<DoorbellPtr> dbProcQpStatusRReqQue;
+                std::queue<std::pair<DoorbellPtr, QPStatusPtr>> dbQpStatusRspQue;
+                std::queue<uint32_t> wqePrefetchQpStatusRReqQue;
+                std::queue<std::pair<uint32_t, QPStatusPtr>> wqeFetchInfoQue;
+                std::queue<DoorbellPtr> wqeProcToLaunchWqeQue;
+                EventFunctionWrapper qpStatusRspEvent;
+                // EventFunctionWrapper rxUpdateEvent;
+                // EventFunctionWrapper qpStatusReqEvent;
+                EventFunctionWrapper wqePrefetchEvent;
+                EventFunctionWrapper getPrefetchQpnEvent;
+                EventFunctionWrapper launchWqeEvent;
             public:
-                RdmaArray(HanGuRnic *rnic, uint8_t corenum, uint32_t reorderCap, const std::string n);
-
-                EventFunctionWrapper txQpAddrRspEvent;
-                EventFunctionWrapper txQpcRspEvent;
-                // EventFunctionWrapper rxQpcRspEvent;
-                EventFunctionWrapper txDescRdReqEvent;
-                EventFunctionWrapper txdduDescRspEvent;
-                EventFunctionWrapper txDataRdReqEvent;
-                EventFunctionWrapper txDataRdRspEvent;
-                // EventFunctionWrapper txPktEvent;
-                EventFunctionWrapper txSendToLinkLayerEvent;
-                EventFunctionWrapper sendCqcRspEvent;
-                EventFunctionWrapper rxPktEvent;
-                EventFunctionWrapper recvQpcRspEvent;
-                EventFunctionWrapper rxDescRdReqEvent;
-                EventFunctionWrapper rxDescRdRspEvent;
-                EventFunctionWrapper rcvDataRdReqEvent;
-                EventFunctionWrapper wrRpuDataWrReqEvent;
-                EventFunctionWrapper rdRpuDataRdReqEvent;
-                EventFunctionWrapper rdRpuDataRdRspEvent;
-                EventFunctionWrapper rcvCqcRdRspEvent;
-                EventFunctionWrapper rcvCqDescWrReqEvent;
-
-                std::vector<std::vector<DoorbellPtr>> doorbellVectorVec;
-                std::vector<std::queue<uint8_t>> df2ccuIdxFifoVec;
-                std::vector<std::shared_ptr<RdmaEngine>> rdmaEngineVec; 
-                std::vector<std::queue<CxtReqRspPtr>> txQpAddrRspCoreQueVec;
-                std::vector<std::queue<MrReqRspPtr>> descReqFifoVec;
-                std::vector<std::queue<TxDescPtr>> txdescRspFifoVec;
-                std::vector<std::queue<CxtReqRspPtr>> txQpcRspQueVec;
-                std::vector<std::queue<MrReqRspPtr>> txDataRdReqQueVec;
-                std::vector<std::queue<MrReqRspPtr>> txDataRdRspQueVec;
-                std::vector<std::queue<EthPacketPtr>> txPktArbQueVec;
-                std::vector<std::queue<CxtReqRspPtr>> sqCqcRspQueVec;
-                std::vector<std::queue<EthPacketPtr>> rxPktQueVec;
-                std::vector<std::queue<CxtReqRspPtr>> rxQpcRspQueVec;
-                std::vector<std::queue<MrReqRspPtr>> rxDescRdReqQueVec;
-                std::vector<std::queue<RxDescPtr>> rxdescRdRspQueVec;
-                std::vector<std::queue<MrReqRspPtr>> rcvDataRdReqQueVec;
-                std::vector<std::queue<MrReqRspPtr>> wrRpuDataWrReqQueVec;
-                std::vector<std::queue<MrReqRspPtr>> rdRpuDataRdReqQueVec;
-                std::vector<std::queue<MrReqRspPtr>> rdRpuDataRdRspQueVec;
-                std::vector<std::queue<CxtReqRspPtr>> rcvCqcRdRspQueVec;
-                std::vector<std::queue<MrReqRspPtr>> rcvCqDescWrReqQueVec;
-                
-                // std::vector<uint32_t> coreQpn;
-
-                void postQpcReq(CxtReqRspPtr Req);
-                void txQpAddrRspSch();
-                void txDescReqProc();
-                void txDescRspSch();
-                // void descReqProc();
-                void txDataRdReqProc();
-                void txDataRdRspProc();
-                void txQpCtxRspSch();
-                void txSendToLinkLayerProc();
-                void postCqcReq(CxtReqRspPtr Req);
-                void sendCqcRspSch();
-                void recvPktSch();
-                void recvQpcRspSch();
-                void rxDescRdReqSch();
-                void rxDescRdRspAlloc();
-                void rcvDataRdReqSch();
-                void wrRpuDataWrReqSch();
-                void rdRpuDataRdReqSch();
-                void rdRpuDataRdRspAlloc();
-                void rcvCqcRdRspAlloc();
-                void rcvCqDescWrReqSch();
-                uint8_t coreNum;
-
-                uint8_t AllocCore(uint32_t qpn);
-                std::string name() { return _name; }
+                DescScheduler(HanGuRnic *rNic, std::string name);
+                EventFunctionWrapper updateEvent;
+                EventFunctionWrapper createQpStatusEvent;
+                EventFunctionWrapper qpcRspEvent;
+                EventFunctionWrapper wqeRspEvent;
+                std::unordered_map<uint8_t, uint16_t> groupTable;
+                std::string name()
+                {
+                    return _name;
+                }
         };
-        RdmaArray rdmaArray;
-        /* -----------------------RDMA Array Relevant{end}------------------------ */
+        DescScheduler descScheduler;
+        /* -------------------WQE Scheduler Relevant{end}------------------------ */
 
+        /* -------------------WQE Buffer Relevant{begin}---------------------- */
+        // class DescBuffer{
+        //     private:
+
+        //     public:
+        //         DescBuffer();
+        //         uint64_t byteSize;
+        //         uint32_t totalWeight;
+        // };
+        // DescBuffer wqeBuffer;
+        // /* -------------------WQE Buffer Relevant{end}------------------------ */
+
+        // /* -------------------QP Status Relevant{begin}---------------------- */
+        // class QPStatus{
+        //     private:
+
+        //     public:
+        //         QPStatus();
+        // };
+        // QPStatus qpStatus;
+        /* -------------------QP Status Relevant{end}------------------------ */
+
+        
         /* -----------------------Cache {begin}------------------------ */
         template <class T, class S>
         class RescCache {
@@ -495,6 +478,102 @@ class HanGuRnic : public RdmaNic {
         };
         /* -----------------------Cache {end}------------------------ */
 
+
+
+        // /* -----------------------Cache {begin}------------------------ */
+        // template <class T, class S>
+        // class RescCache {
+        //     private:
+
+        //         struct CacheRdPkt {
+        //             CacheRdPkt(Event *cplEvent, uint32_t rescIdx, 
+        //                     T *rescDma, S reqPkt, DmaReqPtr dmaReq, T *rspResc, const std::function<bool(T&)> &rescUpdate) 
+        //             : cplEvent(cplEvent), rescIdx(rescIdx), rescDma(rescDma), reqPkt(reqPkt), 
+        //                 rspResc(rspResc), 
+        //                 rescUpdate(rescUpdate) { this->dmaReq = dmaReq; }
+        //             Event   *cplEvent; /* event to be scheduled when resource fetched */
+        //             uint32_t rescIdx; /* resource index */
+        //             T       *rescDma; /* addr used to get resc through DMA read */
+        //             S        reqPkt ; /* temp store the request pkt */
+        //             DmaReqPtr dmaReq; /* DMA read request pkt, to fetch missed resource (cache), 
+        //                                 we only use its isValid to fetch the rsp */
+        //             T       *rspResc; /* addr used to rsp the requester !TODO: delete it later */
+        //             const std::function<bool(T&)> rescUpdate;
+        //         };
+
+        //         /* Pointer to the device I am in. */
+        //         HanGuRnic *rnic;
+
+        //         /* Stores my name in string */
+        //         std::string _name;
+
+        //         /* Cache for resource T */
+        //         std::unordered_map<uint32_t, T> cache;
+        //         uint32_t capacity; /* number of cache entries this Resource cache owns */
+
+        //         /* used to process cache read */
+        //         void readProc();
+        //         EventFunctionWrapper readProcEvent;
+            
+        //         /* Request FIFO, Only used in Cache Read.
+        //         * Used to temp store request pkt in order */
+        //         std::queue<CacheRdPkt> reqFifo;
+                
+
+        //         // Base ICM address of resources in ICM space.
+        //         uint64_t baseAddr;
+                
+        //         // Storage for ICM
+        //         uint64_t *icmPage;
+        //         uint32_t rescSz; // size of one entry of resource
+
+        //         // Convert resource number into physical address.
+        //         uint64_t rescNum2phyAddr(uint32_t num);
+
+        //         /* Cache replace scheme, return key in cache */
+        //         uint32_t replaceScheme();
+
+        //         // Write evited elem back to memory
+        //         void storeReq(uint64_t addr, T *resc);
+
+        //         // Read wanted elem from memory
+        //         void fetchReq(uint64_t addr, Event *cplEvent, uint32_t rescNum, S reqPkt, T *resc, const std::function<bool(T&)> &rescUpdate=nullptr);
+
+        //         /* get fetched data from memory */
+        //         void fetchRsp();
+        //         EventFunctionWrapper fetchCplEvent;
+                
+        //         /* read req -> read rsp Fifo
+        //         * Used only in Read Cache miss. */
+        //         std::queue<CacheRdPkt> rreq2rrspFifo;
+
+        //     public:
+
+        //         RescCache (HanGuRnic *i, uint32_t cacheSize, const std::string n) 
+        //         : rnic(i),
+        //             _name(n),
+        //             capacity(cacheSize),
+        //             readProcEvent([this]{ readProc(); }, n),
+        //             fetchCplEvent([this]{ fetchRsp(); }, n) { icmPage = new uint64_t [ICM_MAX_PAGE_NUM]; rescSz = sizeof(T); }
+
+        //         /* Set base address of ICM space */
+        //         void setBase(uint64_t base);
+
+        //         /* ICM Write Request */
+        //         void icmStore(IcmResc *icmResc, uint32_t chunkNum);
+
+        //         /* Write resource back to Cache */
+        //         void rescWrite(uint32_t rescIdx, T *resc, const std::function<bool(T&, T&)> &rescUpdate=nullptr);
+
+        //         /* Read resource from Cache */
+        //         void rescRead(uint32_t rescIdx, Event *cplEvent, S reqPkt, T *rspResc=nullptr, const std::function<bool(T&)> &rescUpdate=nullptr);
+
+        //         /* Outer module uses to get cache entry (so don't delete the element) */
+        //         std::queue<std::pair<T *, S> > rrspFifo;
+
+        //         std::string name() { return _name; }
+        // };
+        // /* -----------------------Cache {end}------------------------ */
 
         /* -----------------------TPT Relevant{begin}----------------------- */
         class MrRescModule {
@@ -650,7 +729,7 @@ class HanGuRnic : public RdmaNic {
                 std::string name() { return _name; }
         };
         /* -----------------------ICM Management Module {end}------------------- */
-
+                
         /* -----------------------QPC Cache {begin}---------------------- */
         template <class T>
         class Cache {
@@ -692,6 +771,48 @@ class HanGuRnic : public RdmaNic {
                 std::string name() { return _name; }
         };
         /* -----------------------QPC Cache {end}---------------------- */
+
+        // /* -----------------------QPC Cache {begin}---------------------- */
+        // template <class T>
+        // class Cache {
+        //     private:
+        //         /* Name of myself */
+        //         std::string _name;
+
+        //         /* Cache for resource T */
+        //         std::unordered_map<uint32_t, std::pair<T*, uint64_t> > cache; /* <entryNum, <entry, lru>> */
+        //         uint32_t capacity; /* number of cache entries this cache owns */
+        //         uint32_t cacheSz;
+
+        //         uint64_t seq_end;
+
+        //     public:
+        //         Cache (const std::string n, uint32_t qpcCacheNum)
+        //         : _name(n),
+        //             capacity(qpcCacheNum),
+        //             seq_end(0) { cacheSz = sizeof(T); }
+
+        //         /* Cache replace scheme, return key in cache */
+        //         uint32_t replaceEntry();
+
+        //         /* lookup entry in cache */
+        //         bool lookupHit(uint32_t entryNum); /* return true if really hit */
+        //         bool lookupFull(uint32_t entryNum); /* return true if cache is full */
+
+        //         /* read entry from cache */
+        //         bool readEntry(uint32_t entryNum, T* entry); /* use memcpy to get entry */
+
+        //         bool updateEntry(uint32_t entryNum, const std::function<bool(T&)> &update=nullptr);
+
+        //         /* write entry to cache */
+        //         bool writeEntry(uint32_t entryNum, T* entry); /* use memcpy to write entry */
+
+        //         /* delete entry in cache */
+        //         T* deleteEntry(uint32_t entryNum);
+
+        //         std::string name() { return _name; }
+        // };
+        // /* -----------------------QPC Cache {end}---------------------- */
 
         /* -----------------------PendingStruct {begin}---------------------- */
         class PendingStruct {
@@ -939,8 +1060,6 @@ class HanGuRnic : public RdmaNic {
                 std::string name() { return _name; }
 
         };
-
-        DmaEngine dmaEngine;
         /* -----------------------DMA Engine {end}----------------------- */
 
         // Packet that we are currently putting into the txFifo
@@ -984,6 +1103,16 @@ class HanGuRnic : public RdmaNic {
         bool isMacEqual(uint8_t *devSrcMac, uint8_t *pktDstMac);
 
     public:
+        /* --------------------Cache(in TPT & CxtM) <-> DMA Engine {begin}-------------------- */
+        // std::queue<DmaReqPtr> cacheDmaReadFifo;
+        // std::queue<DmaReqPtr> cacheDmaWriteFifo;
+        std::queue<DmaReqPtr> cacheDmaAccessFifo;
+
+        std::queue<DmaReqPtr> qpcDmaRdCplFifo; /* read response fifo for qpc cache */
+        /* --------------------Cache(in TPT & CxtM) <-> DMA Engine {end}-------------------- */
+
+        DmaEngine dmaEngine;
+
         typedef HanGuRnicParams Params;
         const Params *
         params() const {
@@ -1021,8 +1150,6 @@ class HanGuRnic : public RdmaNic {
 
         DrainState drain() override;
         void drainResume() override;
-
-        uint8_t coreNum;
 
 };
 

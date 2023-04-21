@@ -233,6 +233,7 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
         {   
             HANGU_PRINT(HanGuDriver, " ioctl : HGKFD_IOC_WRITE_QPC\n");
 
+            // copy from user space to kernel space
             TypedBufferArg<kfd_ioctl_write_qpc_args> args(ioc_buf);
             args.copyIn(virt_proxy);
 
@@ -246,6 +247,24 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
             // HANGU_PRINT(HanGuDriver, " ioctl : HGKFD_IOC_CHECK_GO, `GO` is cleared.\n");
         }
         break;
+        case HGKFD_IOC_SET_GROUP:
+        {
+            HANGU_PRINT(HanGuDriver, "ioctl: HGKFD_IOC_SET_GROUP\n");
+            TypedBufferArg<kfd_ioctl_set_group_args> args(ioc_buf);
+            args.copyIn(virt_proxy);
+            setGroup(virt_proxy, args);
+            args.copyOut(virt_proxy);
+            break;
+        }
+        case HGKFD_IOC_ALLOC_GROUP:
+        {
+            HANGU_PRINT(HanGuDriver, "ioctl: HGKFD_IOC_ALLOC_GROUP\n");
+            TypedBufferArg<kfd_ioctl_alloc_group_args> args(ioc_buf);
+            args.copyIn(virt_proxy);
+            allocGroup(virt_proxy, args);
+            args.copyOut(virt_proxy);
+            break;
+        }
       default:
         {
             fatal("%s: bad ioctl %d\n", req);
@@ -382,7 +401,7 @@ HanGuDriver::allocIcm(Process *process, RescMeta &rescMeta, Addr index) {
         ++icmVPage;
     }
     HANGU_PRINT(HanGuDriver, " rescMeta.start: 0x%lx, index 0x%x, entrySize %d icmVPage 0x%lx\n", rescMeta.start, index, rescMeta.entrySize, icmVPage);
-    for (uint32_t i = 0; i < ICM_ALLOC_PAGE_NUM; ++i) {
+    for (uint32_t i =  0; i < ICM_ALLOC_PAGE_NUM; ++i) {
         if (i == 0) {
             icmAddrmap[icmVPage] = process->system->allocPhysPages(ICM_ALLOC_PAGE_NUM);
         } else {
@@ -409,6 +428,28 @@ HanGuDriver::writeIcm(PortProxy& portProxy, uint8_t rescType, RescMeta &rescMeta
 
 /* -------------------------- ICM {end} ------------------------ */
 
+/* -------------------------- Group {begin}----------------------- */
+void HanGuDriver::setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args)
+{
+    HanGuRnicDef::GroupInfo groupInfo[MAX_GROUP_NUM];
+    for (int i = 0; i < args->group_num; i++)
+    {
+        groupInfo[i].groupID = args->group_id[i];
+        groupInfo[i].granularity = args->granularity[i];
+    }
+    portProxy.writeBlob(mailbox.vaddr, groupInfo, sizeof(HanGuRnicDef::GroupInfo) * args->group_num);
+    postHcr(portProxy, (uint64_t)mailbox.paddr, 1, args->group_num, HanGuRnicDef::SET_GROUP);
+}
+
+void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args)
+{
+    postHcr(portProxy, (uint64_t)mailbox.paddr, 1, args->group_num, HanGuRnicDef::ALLOC_GROUP);
+    assert(args->group_num == 1);
+    args->group_id[0] = groupNum;
+    groupNum += args->group_num;
+    HANGU_PRINT(HanGuDriver, "group allocated! group ID: %d\n", groupNum);
+}
+/* --------------------------- Group {end}---------------------------- */
 
 /* -------------------------- Resc {begin} ------------------------ */
 uint32_t 
@@ -557,6 +598,11 @@ HanGuDriver::writeQpc(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_a
 
         qpcResc[i].qkey    = args->qkey[i];
 
+        // qpGroup[args->src_qpn[i]] = args->groupID[i];
+        // qpWeight[args->src_qpn[i]] = args->weight[i];
+        qpcResc[i].indicator = args->indicator[i];
+        qpcResc[i].perfWeight = args->weight[i];
+        qpcResc[i].groupID = args->groupID[i];
         HANGU_PRINT(HanGuDriver, " writeQpc: qpn: 0x%x\n", qpcResc[i].srcQpn);
     }
     HANGU_PRINT(HanGuDriver, " writeQpc: args->batch_size: %d\n", args->batch_size);

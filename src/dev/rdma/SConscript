@@ -38,6 +38,15 @@ Source('hangu_rnic.cc')
 # The implementation of HanGu driver
 Source('hangu_driver.cc')
 
+Source('cqc_module.cc')
+Source('qpc_module.cc')
+Source('rdma_engine.cc')
+Source('desc_scheduler.cc')
+Source('hangu_cache.cc')
+Source('resc_cache.cc')
+Source('hangu_dma_engine.cc')
+Source('mr_module.cc')
+Source('pending_struct.cc')
 
 DebugFlag('HanGuDriver')
 
@@ -49,7 +58,8 @@ DebugFlag('RescCache')
 DebugFlag('CxtResc')
 DebugFlag('RdmaEngine')
 DebugFlag('MrResc')
-DebugFlag('RdmaArray')
+
+DebugFlag('DescScheduler')
 
 CompoundFlag('HanGu', ['HanGuDriver', 'HanGuRnic', 'PioEngine', 'CcuEngine', 'RescCache', 'CxtResc', 'DmaEngine',
-    'RdmaEngine', 'MrResc', 'RdmaArray'])
+    'RdmaEngine', 'MrResc', 'DescScheduler'])

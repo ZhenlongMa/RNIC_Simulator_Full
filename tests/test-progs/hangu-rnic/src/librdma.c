@@ -65,8 +65,8 @@ int cm_post_send(struct ibv_context *ctx, struct rdma_cr *cr_info, int wr_num, u
         send_wqe[i].send.dqpn = ctx->cm_qp->qp_num;
         send_wqe[i].send.qkey = QKEY_CM;
 
-        // RDMA_PRINT(librdma, "cm_post_send[%d]: flag 0x%x base addr 0x%lx, off 0x%lx\n", 
-        //     i, cr_info[i].flag, (uint64_t)send_wqe[i].mr->addr, (uint64_t)send_wqe[i].offset);
+        RDMA_PRINT(librdma, "cm_post_send[%d]: flag 0x%x base addr 0x%lx, off 0x%lx\n", 
+            i, cr_info[i].flag, (uint64_t)send_wqe[i].mr->addr, (uint64_t)send_wqe[i].offset);
 
         ctx->cm_snd_off += sizeof(struct rdma_cr);
         if (ctx->cm_snd_off + sizeof(struct rdma_cr) > SND_WR_BASE + SND_WR_MAX * sizeof(struct rdma_cr)) {
@@ -75,12 +75,16 @@ int cm_post_send(struct ibv_context *ctx, struct rdma_cr *cr_info, int wr_num, u
     }
     ibv_post_send(ctx, send_wqe, ctx->cm_qp, wr_num);
     free(send_wqe);
-    // RDMA_PRINT(librdma, "cm_post_send: after free\n");
+    RDMA_PRINT(librdma, "cm_post_send: after free\n");
 
     return wr_num;
 }
 
-struct rdma_resc *rdma_resc_init(int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem) {
+/**
+ * @note initialize RDMA communication resource in one QoS group
+*/
+struct rdma_resc *rdma_resc_init(struct ibv_context *ctx,int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem) {
+    // struct rdma_resc *rdma_resc_init(int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem) {
     int i = 0;
 
     /* Allocate memory for struct rdma_resc */
@@ -94,19 +98,22 @@ struct rdma_resc *rdma_resc_init(int num_mr, int num_cq, int num_qp, uint16_t ll
     resc->cq = (struct ibv_cq **)malloc(sizeof(struct ibv_cq*) * num_cq);
     resc->qp = (struct ibv_qp **)malloc(sizeof(struct ibv_qp*) * num_qp * num_rem);
     resc->rinfo = (struct rem_info *)malloc(sizeof(struct rem_info) * num_rem);
-
-    /* device initialization */
-    struct ibv_context *ctx = (struct ibv_context *)malloc(sizeof(struct ibv_context));
-    ibv_open_device(ctx, llid);
+    resc->qos_group = (struct ibv_qos_group **)malloc(sizeof(struct ibv_qos_group *));
     resc->ctx = ctx;
-    RDMA_PRINT(librdma, "ibv_open_device : doorbell address 0x%lx\n", (long int)ctx->dvr);
+
+    // /* device initialization */
+    // struct ibv_context *ctx = (struct ibv_context *)malloc(sizeof(struct ibv_context));
+    // ibv_open_device(ctx, llid);
+    // resc->ctx = ctx;
+    // RDMA_PRINT(librdma, "ibv_open_device : doorbell address 0x%lx\n", (long int)ctx->dvr);
 
     /* Post receive to CM */
     cm_post_recv(ctx, RCV_WR_MAX);
 
     /* Create MR */
     struct ibv_mr_init_attr mr_attr;
-    mr_attr.length = 1 << 12;
+    // mr_attr.length = 1 << 12;
+    mr_attr.length = 1 << 20;
     mr_attr.flag = MR_FLAG_RD | MR_FLAG_WR | MR_FLAG_LOCAL | MR_FLAG_REMOTE;
     for (i = 0; i < num_mr; ++i) {
         resc->mr[i] = ibv_reg_mr(ctx, &mr_attr);
@@ -248,6 +255,9 @@ struct rdma_cr *rdma_listen(struct rdma_resc *resc, int *cm_cpl_num) {
     return cr_info;
 }
 
+/**
+ * @param cm_req_num: QP number in this connection exchange
+*/
 int rdma_connect(struct rdma_resc *resc, struct rdma_cr *cr_info, uint16_t *dest_info, int cm_req_num) {
     struct ibv_context *ctx = resc->ctx;
 
@@ -423,6 +433,7 @@ int poll_sync(struct rdma_resc *resc) {
     return -1;
 }
 
+// 
 int rdma_recv_sync(struct rdma_resc *resc) {
 
     RDMA_PRINT(librdma, "rdma_recv_sync!\n");
@@ -454,4 +465,15 @@ int rdma_send_sync(struct rdma_resc *resc) {
     return 0;
 }
 
-
+void set_group_granularity(struct rdma_resc *grp_resc)
+{
+    uint16_t N = grp_resc->ctx->N;
+    uint8_t group_weight = grp_resc->qos_group[0]->weight;
+    uint8_t total_group_weight = grp_resc->ctx->total_group_weight;
+    uint8_t group_total_qp_weight = grp_resc->qos_group[0]->total_qp_weight;
+    grp_resc->qos_group[0]->granularity = (double)group_weight / total_group_weight * N /group_total_qp_weight;
+    RDMA_PRINT(librdma, "setting group granularity! group id: %d, group weight: %d, total group weight: %d, N: %d, group total qp weight: %d\n", 
+        grp_resc->qos_group[0]->id, group_weight, total_group_weight, N, group_total_qp_weight);
+    set_qos_group(grp_resc->ctx, grp_resc->qos_group[0], grp_resc->qos_group[0]->granularity);
+    RDMA_PRINT(librdma, "group granularity set! group: %d, granularity: %d\n", grp_resc->qos_group[0]->id, grp_resc->qos_group[0]->granularity);
+}

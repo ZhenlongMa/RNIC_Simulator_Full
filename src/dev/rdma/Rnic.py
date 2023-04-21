@@ -90,4 +90,3 @@ class HanGuRnic(RdmaNic):
 
     link_delay = Param.Latency('1us', "ethernet link delay")
     cpu_num    = Param.Int(10, "Number of CPUs in this node")
-    rdma_core_num = Param.Int(8, "Number of RDMA Processing Core")

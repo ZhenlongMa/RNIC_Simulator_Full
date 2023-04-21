@@ -45,17 +45,23 @@
 #define HANGU_PRINT(name, x, ...) do {                     \
             DPRINTF(name, "[" #name "] " x, ##__VA_ARGS__);\
         } while (0)
-
 #endif
 
-#define QPN_NUM   (1 * 1)
+#define QPN_NUM   (512 * 3)
 
+#define MAX_PREFETCH_NUM 8
+#define MAX_COMMIT_SZ 4096
+#define MAX_MSG_RATE 60
+#define MAX_BW 100
+#define WQE_BUFFER_CAPACITY 120
+#define WQE_PREFETCH_THRESHOLD 100
+#define LAT_QP 1
+#define BW_QP 2
+#define RATE_QP 3
+#define SCH_GRANULARITY 1024 // maximum submessage size
 
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
-
-#define INVALID_QPN 0xffffffff
-#define INVALID_CORE 0xff
 
 namespace HanGuRnicDef {
 
@@ -78,6 +84,9 @@ const uint8_t WRITE_MPT = 0x03;
 const uint8_t WRITE_MTT = 0x04;
 const uint8_t WRITE_QPC = 0x05;
 const uint8_t WRITE_CQC = 0x06;
+const uint8_t SET_GROUP = 0x07;
+// const uint8_t SET_ALL_GROUP = 0x08;
+const uint8_t ALLOC_GROUP = 0x08;
 
 struct Doorbell {
     uint8_t  opcode;
@@ -99,6 +108,11 @@ struct DoorbellFifo {
         this->num = num;
         this->qpn = qpn;
         this->offset = offset;
+    }
+    DoorbellFifo (uint8_t num, uint32_t qpn) 
+    {
+        this->num = num;
+        this->qpn = qpn;
     }
     uint8_t  opcode;
     uint8_t  num;
@@ -155,12 +169,10 @@ const uint8_t MPT_FLAG_REMOTE = (1 << 3);
 
 // WRITE_QP
 struct QpcResc {
-    uint8_t flag; // QP state, not used now
+    uint8_t flag; // QP state, not useed now
     uint8_t qpType;
     uint8_t sqSizeLog; /* The size of SQ in log (It is now fixed at 4KB, which is 12) */
     uint8_t rqSizeLog; /* The size of RQ in log (It is now fixed at 4KB, which is 12) */
-    uint8_t perfShare; /* Performance share of this QP */
-    uint8_t perfIndicator; /* Performance indicator of this QP, throughput/message rate/latency */
     uint16_t sndWqeOffset;
     uint16_t rcvWqeOffset;
     uint16_t lLid; // Local LID
@@ -175,16 +187,16 @@ struct QpcResc {
     uint32_t rcvWqeBaseLkey; // receive wqe base lkey
     uint32_t qkey;
     uint32_t reserved[52];
+
+    uint8_t  indicator; // 1: latency-sensitive; 2: bandwidth-sensitive; 3: message rate sensitive
+    uint8_t  perfWeight;
+    uint8_t  groupID;
 };
+
 const uint8_t QP_TYPE_RC = 0x00;
 const uint8_t QP_TYPE_UC = 0x01;
 const uint8_t QP_TYPE_RD = 0x02;
 const uint8_t QP_TYPE_UD = 0x03;
-
-const uint8_t PERF_TH = 0x01;
-const uint8_t PERF_MR = 0x02;
-const uint8_t PERF_LA = 0x03;
-
 
 // WRITE_CQ
 struct CqcResc {
@@ -199,27 +211,43 @@ struct CqcResc {
 
 const uint32_t WR_FLAG_SIGNALED = (1 << 31);
 
-// Send descriptor struct
+/**
+ * @note Send descriptor struct. This struct must BE IDENTICAL to the difinition in libhgrnic!!!!
+ * 
+*/
 struct TxDesc {
 
     TxDesc(TxDesc * tx) {
-        this->len    = tx->len;
-        this->lkey   = tx->lkey;
-        this->lVaddr = tx->lVaddr;
-        this->flags  = tx->flags;
-        this->sendType.destQpn = tx->sendType.destQpn;
-        this->sendType.dlid    = tx->sendType.dlid;
-        this->sendType.qkey    = tx->sendType.qkey;
+        this->len               = tx->len;
+        this->lkey              = tx->lkey;
+        this->lVaddr            = tx->lVaddr;
+        this->flags             = tx->flags;
+        this->sendType.destQpn  = tx->sendType.destQpn;
+        this->sendType.dlid     = tx->sendType.dlid;
+        this->sendType.qkey     = tx->sendType.qkey;
+        // this->qpn               = tx->qpn;
+    }
+
+    TxDesc(std::shared_ptr<TxDesc> tx) {
+        this->len               = tx->len;
+        this->lkey              = tx->lkey;
+        this->lVaddr            = tx->lVaddr;
+        this->flags             = tx->flags;
+        this->sendType.destQpn  = tx->sendType.destQpn;
+        this->sendType.dlid     = tx->sendType.dlid;
+        this->sendType.qkey     = tx->sendType.qkey;
+        // this->qpn               = tx->qpn;
     }
 
     TxDesc() {
-        this->len    = 0;
-        this->lkey   = 0;
-        this->lVaddr = 0;
-        this->flags  = 0;
-        this->sendType.destQpn = 0;
-        this->sendType.dlid    = 0;
-        this->sendType.qkey    = 0;
+        this->len               = 0;
+        this->lkey              = 0;
+        this->lVaddr            = 0;
+        this->flags             = 0;
+        this->sendType.destQpn  = 0;
+        this->sendType.dlid     = 0;
+        this->sendType.qkey     = 0;
+        // this->qpn               = 0;
     }
 
     bool isSignaled () {
@@ -229,6 +257,8 @@ struct TxDesc {
     uint32_t len;
     uint32_t lkey;
     uint64_t lVaddr;
+    
+    // uint32_t qpn;
 
     union {
         struct {        
@@ -250,7 +280,6 @@ struct TxDesc {
     };
 };
 typedef std::shared_ptr<TxDesc> TxDescPtr;
-
 
 
 // Receive Descriptor struct
@@ -297,8 +326,7 @@ typedef std::shared_ptr<CqDesc> CqDescPtr;
 struct MrReqRsp {
     
     MrReqRsp(uint8_t type, uint8_t chnl, uint32_t lkey, 
-            uint32_t len, uint32_t vaddr, uint8_t coreID = INVALID_CORE) 
-    {
+            uint32_t len, uint32_t vaddr) {
         this->type = type;
         this->chnl = chnl;
         this->lkey = lkey;
@@ -306,28 +334,22 @@ struct MrReqRsp {
         this->offset = vaddr;
         
         this->wrDataReq = nullptr;
-        this->coreID = coreID;
-    }
-    MrReqRsp()
-    {
-        this->coreID = INVALID_CORE;
     }
 
     uint8_t  type  ; /* 1 - wreq; 2 - rreq, 3 - rrsp; */
     uint8_t  chnl  ; /* 1 - wreq TX cq; 2 - wreq RX cq; 3 - wreq TX data; 4 - wreq RX data;
                       * 5 - rreq TX Desc; 6 - rreq RX Desc; 7 - rreq TX Data; 8 - rreq RX Data */
-    uint8_t coreID;
     uint32_t lkey  ;
     uint32_t length; /* in Bytes */
     uint32_t offset; /* Accessed VAddr, used to compare with vaddr in MPT, 
                       * and calculate MTT Index, Besides, this field also provides
                       * access offset to the actual paddr. 
                       * !TODO: Now we only support lower 16 bit comparasion with Vaddr, 
-                      * which means only maximum 16KB for one MR is supported. */
-    uint32_t mttNum; /* MTT item number corresponding to this MR request, equals to DMA request number */
-    uint32_t mttRspNum; /* number of responsed MTT items */ 
-    uint32_t dmaRspNum; /* number of responsed DMA requests */ 
-    uint32_t sentPktNum; /* number of Ethernet packet that has finished */
+                      * which means support maximum 16KB for one MR. */
+    uint32_t mttNum;        /* MTT item number corresponding to this MR request, equals to DMA request number */
+    uint32_t mttRspNum;     /* number of responded MTT items */ 
+    uint32_t dmaRspNum;     /* number of responded DMA requests */ 
+    uint32_t sentPktNum;    /* number of Ethernet packet that has finished */
     struct MptResc *mpt;
     union {
         TxDesc  *txDescRsp;
@@ -354,21 +376,19 @@ const uint8_t MR_RCHNL_RX_DATA = 0x08;
 
 
 struct CxtReqRsp {
-    CxtReqRsp (uint8_t type, uint8_t chnl, uint32_t num, uint32_t sz = 1, uint8_t idx = 0, uint8_t core = INVALID_CORE) {
+    CxtReqRsp (uint8_t type, uint8_t chnl, uint32_t num, uint32_t sz = 1, uint8_t idx = 0) {
         this->type = type;
         this->chnl = chnl;
         this->num  = num;
         this->sz   = sz;
         this->idx  = idx;
         this->txCqcRsp = nullptr;
-        this->coreID = core;
     }
     uint8_t type; // 1: qp wreq; 2: qp rreq; 3: qp rrsp; 4: cq rreq; 5: cq rrsp; 6: sq addr req
     uint8_t chnl; // 1: tx Channel; 2: rx Channel
     uint32_t num; // Resource num (QPN or CQN).
     uint32_t sz; // request number of the resources, used in qpc read (TX)
     uint8_t  idx; // used to uniquely identify the req pkt */
-    uint8_t  coreID; // indicate the source or destination RDMA core
     union {
         QpcResc  *txQpcRsp;
         QpcResc  *rxQpcRsp;
@@ -475,7 +495,6 @@ struct WindowElem {
     uint32_t qpn;
     uint32_t psn;
 
-    // used for RDMA read only
     TxDescPtr txDesc;
 };
 typedef std::shared_ptr<WindowElem> WindowElemPtr;
@@ -641,6 +660,60 @@ struct Regs : public Serializable {
         paramIn(cp, "cqcNumLog", cqcNumLog);
     }
 };
+
+// WQE Scheduler relevant
+struct QPStatusItem
+{
+    QPStatusItem(uint32_t key, uint8_t weight, uint8_t type, uint32_t qpn, uint8_t group_id)
+    {
+        this->key                   = key;
+        this->weight                = weight;
+        this->type                  = type;
+        this->qpn                   = qpn;
+        this->group_id              = group_id;
+        this->head_ptr              = 0;
+        this->fetch_ptr             = 0;
+        this->tail_ptr              = 0;
+        this->wnd_start             = 0;
+        this->wnd_fetch             = 0;
+        this->wnd_end               = 0;
+        this->current_msg_offset    = 0;
+    }
+    uint32_t head_ptr;
+    uint32_t fetch_ptr;
+    uint32_t tail_ptr;
+    uint32_t wnd_start;
+    uint32_t fetch_offset; // offset pointer in the current message
+    uint32_t wnd_end;
+    uint32_t wnd_fetch;
+    uint32_t current_msg_offset;
+    uint32_t key;
+    uint8_t weight;
+    uint8_t type;
+    uint32_t qpn;
+    uint8_t perf; // This segment indicates whether the performance exceeds or is lower than expected
+    uint8_t group_id;
+};
+typedef std::shared_ptr<QPStatusItem> QPStatusPtr;
+
+struct GroupInfo
+{
+    uint8_t groupID;
+    uint16_t granularity;
+    // GroupInfo(uint8_t groupID, uint16_t granularity)
+    // {
+    //     this->groupID = groupID;
+    //     this->granularity = granularity;
+    // }
+    // GroupInfo()
+    // {}
+};
+
+// struct AllGroupInfo
+// {
+//     uint16_t granularity[MAX_GROUP_NUM];
+// };
+
 
 } // namespace HanGuRnicDef
 

@@ -9,6 +9,9 @@ CPU_CLK   = "2GHz"
 EN_SPEED  = "100Gbps"
 PCI_SPEED = "128Gbps"
 
+WRITE = 0
+READ = 1
+
 class Param():
     def __init__(self, num_nodes, qpc_cache_cap, reorder_cap, op_mode):
         self.num_nodes     = num_nodes
@@ -41,18 +44,21 @@ def cmd_run_sim(debug, test_prog, option, params):
     cmd += " --qpc-cache-cap "  + str(params.qpc_cache_cap)
     cmd += " --reorder-cap "    + str(params.reorder_cap)
     cmd += " --mem-size 2048MB"
-    cmd += " > scripts/res_out/rnic_sys_test.txt"
+    cmd += " > scripts/qos_test.txt"
 
     return cmd
 
 def execute_program(debug, test_prog, option, params):
 
+    # compile Gem-5
     cmd_list = [
-        "cd ../tests/test-progs/hangu-rnic/src && make",
-        "cd ../ && scons build/X86/gem5.opt"
+        # "cd ../tests/test-progs/hangu-rnic/src && make",
+        # "cd ../ && scons build/X86/gem5.opt"
     ]
+    # run simulation
     cmd_list.append(cmd_run_sim(debug, test_prog, option, params))
 
+    # execute cmd_list sequentially
     for cmd in cmd_list:
         print(cmd)
         rtn = os.system(cmd)
@@ -61,9 +67,8 @@ def execute_program(debug, test_prog, option, params):
         time.sleep(0.1)
 
 def main():
-    if len(sys.argv) < 5:
-        raise Exception("\033[0;31;40mMissing input parameter. Needs 4. " + cmd + "\033[0m")
-    params = Param(int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]))
+
+    params = Param(2, 300, 64, WRITE)
 
     num_nodes = params.num_nodes
     svr_lid = SERVER_LID
@@ -71,20 +76,19 @@ def main():
     debug = ""
     debug = "PioEngine,CcuEngine,MrResc,HanGuDriver,RescCache,Ethernet,RdmaEngine,"
     debug +="HanGuRnic,CxtResc,DmaEngine,"
-    debug +="RdmaArray,"
     debug +="DescScheduler"
 
-    test_prog = "'tests/test-progs/hangu-rnic/bin/server"
+    test_prog = "'tests/test-progs/hangu-rnic/src/qos/server"
     opt = "'-s " + str(svr_lid) + " -t " + str(num_nodes - 1) + " -m " + str(params.op_mode)
+
+    # add client program to test_prog
     for i in range(num_nodes - 1):
-        test_prog += ";tests/test-progs/hangu-rnic/bin/client"
+        test_prog += ";tests/test-progs/hangu-rnic/src/qos/client"
         opt += ";-s " + str(svr_lid) + " -l " + str(svr_lid + i + 1) + " -t " + str(num_nodes - 1) + " -m " + str(params.op_mode)
     test_prog += "'"
     opt += "'"
 
     return execute_program(debug=debug, test_prog=test_prog, option=opt, params=params)
-
-
 
 if __name__ == "__main__":
     main()

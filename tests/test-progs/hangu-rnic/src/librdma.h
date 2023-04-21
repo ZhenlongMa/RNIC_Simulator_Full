@@ -15,6 +15,11 @@
 #define US (1000UL * NS)
 #define NS (1000UL)
 
+/* QP indicator */
+#define LAT_QP 1
+#define BW_QP 2
+#define RATE_QP 3
+
 
 /* valid op-mode */
 #define OPMODE_RDMA_WRITE    0
@@ -103,6 +108,8 @@ struct rdma_resc {
     // uint8_t *sync_flag; 
 
     struct cpl_desc **desc;
+
+    struct ibv_qos_group **qos_group;
 };
 
 // struct rdma_cr_cpl_cnt {
@@ -133,13 +140,14 @@ struct rdma_cr {
 };
 
 
-struct rdma_resc *rdma_resc_init(int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem);
+struct rdma_resc *rdma_resc_init(struct ibv_context *ctx, int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem);
 struct rdma_cr *rdma_listen(struct rdma_resc *resc, int *cm_cpl_num);
 int rdma_connect(struct rdma_resc *resc, struct rdma_cr *cr_info, uint16_t *dest_info, int cm_req_num);
 int rdma_send_sync(struct rdma_resc *resc);
 int rdma_recv_sync(struct rdma_resc *resc);
 
-
+void set_group_granularity(struct rdma_resc *grp_resc);
+void set_qp_qos_group();
 
 
 

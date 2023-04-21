@@ -30,6 +30,8 @@
 
 #define MAX_CPL_NUM 100
 
+#define BIGN 16384
+
 char id_name[10];
 uint8_t  cpu_id;
 uint32_t num_client;
@@ -73,6 +75,13 @@ enum ibv_trans_func {
 
 enum ibv_wqe_flags {
     WR_FLAG_SIGNALED  = (1 << 31),
+};
+
+enum perf_indicator
+{
+    LATENCY         = (uint8_t)0x01,
+    MSG_RATE        = (uint8_t)0x02,
+    BANDWIDTH       = (uint8_t)0x03,
 };
 
 
@@ -156,6 +165,12 @@ struct ibv_context {
     uint32_t cm_rcv_acked_off; /* Posted offset */
     uint32_t cm_rcv_num; /* number of RCV WR posted to cm_qp, outstanding */
     
+    /* QoS Group */
+    struct ibv_qos_group* cm_group;
+    struct ibv_qos_group* qos_group;
+    uint8_t group_num;
+    uint64_t total_group_weight;
+    uint16_t N;
 };
 
 struct ibv_mtt {
@@ -211,6 +226,10 @@ struct ibv_qp {
 
     // For UD type
     uint32_t qkey;
+
+    uint8_t weight;
+    enum perf_indicator indicator;
+    uint8_t group_id;
 };
 
 
@@ -354,6 +373,15 @@ struct hghca_cq {
     uint32_t sz_log; // The size of CQ. (It is now fixed at 4KB)
 };
 
+struct ibv_qos_group
+{
+    uint8_t id;
+    uint8_t weight;
+    uint16_t granularity;
+    struct ibv_qp **qp;
+    uint64_t total_qp_weight;
+    uint16_t qp_num; // amount of QPs registered in this group
+};
 
 /* -------Interact with kernel space driver{end}------- */
 
@@ -372,6 +400,9 @@ int ibv_post_recv(struct ibv_context *context, struct ibv_wqe *wqe, struct ibv_q
 int ibv_poll_cpl(struct ibv_cq *cq, struct cpl_desc **desc, int max_num);
 
 int cpu_sync(struct ibv_context *context);
+
+struct ibv_qos_group* create_qos_group(struct ibv_context *context, int weight);
+int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint16_t granularity);
 
 void trans_wait(struct ibv_context *context);
 

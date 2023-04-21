@@ -101,6 +101,10 @@ class HanGuDriver final : public EmulatedDriver {
     uint32_t allocResc(uint8_t rescType, RescMeta &rescMeta);
     /* ------- Resc {end} ------- */
 
+    /* -------- Group {begin} ------------ */
+    uint8_t groupNum;
+    /* -------- Group {end} -------------- */
+
     /* -------ICM resources {begin}------- */
     /* we use one entry to store one page */
     std::unordered_map<Addr, Addr> icmAddrmap; // <icm vaddr page, icm paddr>
@@ -162,6 +166,14 @@ class HanGuDriver final : public EmulatedDriver {
     
     void writeQpc(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_args> &args);
     /* -------QPC resources {end}------- */
+
+    /* -------QoS Group resources {begin}------- */
+    void setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args);
+    void allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args);
+    // std::unordered_map<uint8_t, uint16_t> groupWeight;
+    // std::unordered_map<uint32_t, uint8_t> qpGroup;
+    // std::unordered_map<uint32_t, uint8_t> qpWeight;
+    /* -------QoS Group resources {end}------- */
 
     /* -------mailbox {begin} ------- */
 
