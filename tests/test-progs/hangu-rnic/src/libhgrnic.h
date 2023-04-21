@@ -30,6 +30,8 @@
 
 #define MAX_CPL_NUM 100
 
+#define BIGN 16384
+
 char id_name[10];
 uint8_t  cpu_id;
 uint32_t num_client;

@@ -109,6 +109,11 @@ struct DoorbellFifo {
         this->qpn = qpn;
         this->offset = offset;
     }
+    DoorbellFifo (uint8_t num, uint32_t qpn) 
+    {
+        this->num = num;
+        this->qpn = qpn;
+    }
     uint8_t  opcode;
     uint8_t  num;
     uint32_t qpn;
@@ -206,7 +211,10 @@ struct CqcResc {
 
 const uint32_t WR_FLAG_SIGNALED = (1 << 31);
 
-// Send descriptor struct
+/**
+ * @note Send descriptor struct. This struct must BE IDENTICAL to the difinition in libhgrnic!!!!
+ * 
+*/
 struct TxDesc {
 
     TxDesc(TxDesc * tx) {
@@ -217,7 +225,7 @@ struct TxDesc {
         this->sendType.destQpn  = tx->sendType.destQpn;
         this->sendType.dlid     = tx->sendType.dlid;
         this->sendType.qkey     = tx->sendType.qkey;
-        this->qpn               = tx->qpn;
+        // this->qpn               = tx->qpn;
     }
 
     TxDesc(std::shared_ptr<TxDesc> tx) {
@@ -228,7 +236,7 @@ struct TxDesc {
         this->sendType.destQpn  = tx->sendType.destQpn;
         this->sendType.dlid     = tx->sendType.dlid;
         this->sendType.qkey     = tx->sendType.qkey;
-        this->qpn               = tx->qpn;
+        // this->qpn               = tx->qpn;
     }
 
     TxDesc() {
@@ -239,7 +247,7 @@ struct TxDesc {
         this->sendType.destQpn  = 0;
         this->sendType.dlid     = 0;
         this->sendType.qkey     = 0;
-        this->qpn               = 0;
+        // this->qpn               = 0;
     }
 
     bool isSignaled () {
@@ -250,7 +258,7 @@ struct TxDesc {
     uint32_t lkey;
     uint64_t lVaddr;
     
-    uint32_t qpn;
+    // uint32_t qpn;
 
     union {
         struct {        

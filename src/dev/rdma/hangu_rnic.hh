@@ -151,11 +151,11 @@ class HanGuRnic : public RdmaNic {
 
 
                 /* dfu -> ddu */
-                std::queue<DoorbellPtr> df2ddFifo;
+                // std::queue<DoorbellPtr> df2ddFifo;
                 uint32_t txDescLenSel(uint8_t num);/* Return number of descriptors to prefetch */
 
                 /* DDU owns */
-                DoorbellPtr dduDbell; /* Doorbell stored for DDU use. */
+                DoorbellPtr dduDbell; /* Doorbell stored for DDU use. This is NOT the PIO doorbell */
                 bool allowNewDb;
 
                 /* ddu -> dpu */
@@ -306,6 +306,7 @@ class HanGuRnic : public RdmaNic {
                 void rcuProcessing(); // Receive Completion Unit
                 EventFunctionWrapper rcuEvent;
 
+                std::queue<DoorbellPtr> df2ddFifo; // TODO: move this FIFO to Top level and change its name
         };
 
         RdmaEngine rdmaEngine;
@@ -337,6 +338,7 @@ class HanGuRnic : public RdmaNic {
                 std::queue<std::pair<DoorbellPtr, QPStatusPtr>> dbQpStatusRspQue;
                 std::queue<uint32_t> wqePrefetchQpStatusRReqQue;
                 std::queue<std::pair<uint32_t, QPStatusPtr>> wqeFetchInfoQue;
+                std::queue<DoorbellPtr> wqeProcToLaunchWqeQue;
                 EventFunctionWrapper qpStatusRspEvent;
                 // EventFunctionWrapper rxUpdateEvent;
                 // EventFunctionWrapper qpStatusReqEvent;

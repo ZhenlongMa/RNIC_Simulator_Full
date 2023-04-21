@@ -60,7 +60,7 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
     }
 
     /* Post doorbell to DDU */
-    df2ddFifo.push(dbell);
+    // df2ddFifo.push(dbell);
 
     assert(qpcRsp->txQpcRsp->srcQpn == dbell->qpn);
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing:"
@@ -115,7 +115,7 @@ HanGuRnic::RdmaEngine::dduProcessing () {
         assert(this->dduDbell == nullptr);
         this->dduDbell = df2ddFifo.front();
         df2ddFifo.pop();
-        // this->allowNewDb = false;
+        this->allowNewDb = false;
         HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: Get one Doorbell!\n");
     }
 
@@ -147,11 +147,11 @@ HanGuRnic::RdmaEngine::dduProcessing () {
     rnic->qpcModule.postQpcReq(qpcRdReq);
 
     /* update allowNewDb */
-    // --this->dduDbell->num;
-    // if (this->dduDbell->num == 0) {
-    //     this->allowNewDb = true;
-    //     this->dduDbell = nullptr;
-    // }
+    --this->dduDbell->num;
+    if (this->dduDbell->num == 0) {
+        this->allowNewDb = true;
+        this->dduDbell = nullptr;
+    }
 
     /* Schedule myself again if there's new descriptor
      * or there remains descriptors to post */
@@ -450,7 +450,9 @@ HanGuRnic::RdmaEngine::rruProcessing () {
         }
 
         // update QP Status in descriptor scheduler
-        std::pair<uint32_t, uint32_t> qpStatusUpdate(winElem->list->front()->txDesc->qpn, 
+        // std::pair<uint32_t, uint32_t> qpStatusUpdate(winElem->list->front()->txDesc->qpn, 
+        //                                              winElem->list->front()->txDesc->len);
+        std::pair<uint32_t, uint32_t> qpStatusUpdate(destQpn, 
                                                      winElem->list->front()->txDesc->len);
         rnic->updateQue.push(qpStatusUpdate);
         if (!rnic->descScheduler.updateEvent.scheduled())

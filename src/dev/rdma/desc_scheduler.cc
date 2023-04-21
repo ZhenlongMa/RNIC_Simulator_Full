@@ -12,7 +12,7 @@ using namespace std;
 HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name):
     rNic(rNic),
     _name(name),
-
+    totalWeight(0),
     qpStatusRspEvent([this]{qpStatusProc();}, name),
     wqePrefetchEvent([this]{wqePrefetch();}, name),
     getPrefetchQpnEvent([this]{wqePrefetchSchedule();}, name),
@@ -20,8 +20,7 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name)
     updateEvent([this]{rxUpdate();}, name),
     createQpStatusEvent([this]{createQpStatus();}, name),
     qpcRspEvent([this]{qpcRspProc();}, name),
-    wqeRspEvent([this]{wqeProc();}, name),
-    totalWeight(0)
+    wqeRspEvent([this]{wqeProc();}, name)
 {
     // HANGU_PRINT(DescScheduler, "init\n");
 }
@@ -81,9 +80,10 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     if (qpStatus->head_ptr == qpStatus->tail_ptr)
     {
         // If head pointer equals to tail pointer, this QP is absent in the prefetch queue,
-        // so it should be pushed into prefetch queue and totoal weight should be updated.
+        // so it should be pushed into prefetch queue.
+        // TODO: high pirority queue is not supported yet!
         lowPriorityQpnQue.push(db->qpn);
-        totalWeight += qpStatus->weight;
+        // totalWeight += qpStatus->weight;
         HANGU_PRINT(DescScheduler, "Unactive QP!\n");
     }
     qpStatus->head_ptr += db->num;
@@ -180,12 +180,14 @@ void HanGuRnic::DescScheduler::wqePrefetch()
         descNum = qpStatus->head_ptr - qpStatus->fetch_ptr;
     }
 
+    // MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
+    //         qpStatus->key, descNum << 5, qpStatus->fetch_ptr);
     MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-            qpStatus->key, descNum << 5, qpStatus->fetch_ptr);
+            qpStatus->key, descNum * sizeof(TxDesc), qpStatus->fetch_ptr);
 
     descReq->txDescRsp = new TxDesc[descNum];
     rNic->descReqFifo.push(descReq);
-    HANGU_PRINT(DescScheduler, "WQE req sent! QPN: %d, WQE num: %d\n", qpStatus->qpn, descNum);
+    HANGU_PRINT(DescScheduler, "WQE req sent! QPN: %d, WQE num: %d, req size: %d\n", qpStatus->qpn, descNum, descNum * sizeof(TxDesc));
     std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
     wqeFetchInfoQue.push(wqeFetchInfoPair);
 
@@ -213,8 +215,9 @@ void HanGuRnic::DescScheduler::wqeProc()
     QPStatusPtr qpStatus = wqeFetchInfoQue.front().second;
     wqeFetchInfoQue.pop();
     TxDescPtr desc;
+    uint8_t procDescNum = 0;
 
-    // HANGU_PRINT(DescScheduler, "hello\n");
+    HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: %d, type: %d\n", qpStatus->qpn, qpStatus->type);
 
     // check QP type
     if (qpStatus->type == LAT_QP)
@@ -261,18 +264,17 @@ void HanGuRnic::DescScheduler::wqeProc()
         }
 
         TxDescPtr desc = rNic->txdescRspFifo.front();
-        HANGU_PRINT(DescScheduler, "BW desc received by wqe proc!");
+        HANGU_PRINT(DescScheduler, "BW desc received by wqe proc! qpn: %d\n", qpStatus->qpn);
 
         uint32_t batchSize; // the size of data that should be transmitted in this period
         batchSize = qpStatus->weight * groupTable[qpStatus->group_id];
         uint32_t procSize = 0;
-        uint32_t procDescNum = 0;
 
         while(procSize < batchSize)
         {
             TxDescPtr subDesc = make_shared<TxDesc>(desc);
             subDesc->opcode = desc->opcode;
-            subDesc->qpn = qpStatus->qpn;
+            // subDesc->qpn = qpStatus->qpn;
             // WARNING: SEND/RECV are currently not supported!
             subDesc->lVaddr = desc->lVaddr + qpStatus->fetch_offset;
             subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->fetch_offset;
@@ -318,6 +320,10 @@ void HanGuRnic::DescScheduler::wqeProc()
     {
         panic("Illegal QP type!\n");
     }
+
+    DoorbellPtr doorbell = make_shared<DoorbellFifo>(procDescNum, qpStatus->qpn);
+    wqeProcToLaunchWqeQue.push(doorbell);
+    // HANGU_PRINT("pseudo doorbell pushed into queue, QPN: %d, num: %d\n", qpStatus->qpn, procDescNum);
     
     if (!launchWqeEvent.scheduled())
     {
@@ -332,6 +338,9 @@ void HanGuRnic::DescScheduler::wqeProc()
     }
 }
 
+/**
+ * @note: send sub-wqe to DDU in RDMA engine
+*/
 void HanGuRnic::DescScheduler::launchWQE()
 {
     assert(lowPriorityDescQue.size() || highPriorityDescQue.size());
@@ -345,11 +354,17 @@ void HanGuRnic::DescScheduler::launchWQE()
         rNic->txDescLaunchQue.push(lowPriorityDescQue.front());
         lowPriorityDescQue.pop();
     }
+
+    DoorbellPtr doorbell = wqeProcToLaunchWqeQue.front();
+    rNic->rdmaEngine.df2ddFifo.push(doorbell); 
+    HANGU_PRINT(DescScheduler, "pseudo doorbell pushed into queue, QPN: %d, num: %d\n", doorbell->qpn, doorbell->num);
+    wqeProcToLaunchWqeQue.pop();
+
     if (!rNic->rdmaEngine.dduEvent.scheduled())
     {
         rNic->schedule(rNic->rdmaEngine.dduEvent, curTick() + rNic->clockPeriod());
     }
-    if (!launchWqeEvent.scheduled())
+    if (!launchWqeEvent.scheduled() && (lowPriorityDescQue.size() || highPriorityDescQue.size()))
     {
         rNic->schedule(launchWqeEvent, curTick() + rNic->clockPeriod());
     }

@@ -127,6 +127,8 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
     context->cm_snd_off        = SND_WR_BASE;
     context->cm_rcv_num        = 0;
 
+    context->N = BIGN;
+
     HGRNIC_PRINT(" Exit ibv_open_device: out!\n");
     return 0;
 }
