@@ -472,5 +472,8 @@ void set_group_granularity(struct rdma_resc *grp_resc)
     uint8_t total_group_weight = grp_resc->ctx->total_group_weight;
     uint8_t group_total_qp_weight = grp_resc->qos_group[0]->total_qp_weight;
     grp_resc->qos_group[0]->granularity = (double)group_weight / total_group_weight * N /group_total_qp_weight;
+    RDMA_PRINT(librdma, "setting group granularity! group id: %d, group weight: %d, total group weight: %d, N: %d, group total qp weight: %d\n", 
+        grp_resc->qos_group[0]->id, group_weight, total_group_weight, N, group_total_qp_weight);
     set_qos_group(grp_resc->ctx, grp_resc->qos_group[0], grp_resc->qos_group[0]->granularity);
+    RDMA_PRINT(librdma, "group granularity set! group: %d, granularity: %d\n", grp_resc->qos_group[0]->id, grp_resc->qos_group[0]->granularity);
 }

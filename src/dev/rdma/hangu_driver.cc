@@ -447,6 +447,7 @@ void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_allo
     assert(args->group_num == 1);
     args->group_id[0] = groupNum;
     groupNum += args->group_num;
+    HANGU_PRINT(HanGuDriver, "group allocated! group ID: %d\n", groupNum);
 }
 /* --------------------------- Group {end}---------------------------- */
 

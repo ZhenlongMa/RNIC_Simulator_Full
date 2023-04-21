@@ -349,11 +349,12 @@ int main (int argc, char **argv) {
     /* device initialization */
     ibv_open_device(ib_context, svr_lid);
     // resc->ctx = ctx;
-    RDMA_PRINT(librdma, "ibv_open_device : doorbell address 0x%lx\n", (long int)ib_context->dvr);
+    RDMA_PRINT(Server, "ibv_open_device : doorbell address 0x%lx\n", (long int)ib_context->dvr);
     // RDMA_PRINT(Server, "grp1_num_qp %d num_cq %d\n", grp1_num_qp, num_cq);
     struct rdma_resc *grp1_resc = set_group_resource(ib_context, num_mr, num_cq, grp1_num_qp, svr_lid, num_client, grp1_weight);
     struct rdma_resc *grp2_resc = set_group_resource(ib_context, num_mr, num_cq, grp2_num_qp, svr_lid, num_client, grp2_weight);
     // ib_context = grp1_resc->ctx;
+    RDMA_PRINT(Server, "group resource created!\n");
 
     /* sync to make sure that we could get start */
     rdma_recv_sync(grp1_resc);

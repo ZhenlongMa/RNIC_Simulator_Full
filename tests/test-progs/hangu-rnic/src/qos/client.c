@@ -64,144 +64,6 @@ int clt_update_info(struct rdma_resc *resc, uint16_t svr_lid) {
     return 0;
 }
 
-int clt_connect_qps(struct rdma_resc *resc, uint16_t svr_lid) {
-
-    RDMA_PRINT(Client, "start clt_connect_qps\n");
-    int rcv_cnt = 0, snd_cnt = 0;
-    int snd_sum = 0, rcv_sum = 0;
-    int num;
-    struct rdma_cr *cr_snd;
-    uint16_t *dest_info = (uint16_t *)malloc(sizeof(uint16_t) * SND_WR_MAX);
-    struct rdma_cr *cr_rcv;
-    struct ibv_qp *qp;
-
-    cr_snd = (struct rdma_cr *)malloc(sizeof(struct rdma_cr) * SND_WR_MAX);
-    memset(cr_snd, 0, sizeof(struct rdma_cr) * SND_WR_MAX);
-
-    /* send connection request and wait for response */
-    for (snd_sum = 0; snd_sum < resc->num_qp; ++snd_sum) {
-        
-        /* CR count is full, send CR and wait 
-         * for Receiving pkt */
-        if (snd_cnt == SND_WR_MAX) {
-            rdma_connect(resc, cr_snd, dest_info, snd_cnt); /* post connection request to server (QP0) */
-
-            rcv_sum = 0;
-            while (rcv_sum < snd_cnt) {
-                cr_rcv = rdma_listen(resc, &num); /* listen connection request from client (QP0) */
-                if (num == 0) {
-                    continue;
-                }
-                RDMA_PRINT(Client, "clt_connect_qps: rdma_listen end, recved %d CR data\n", num);
-
-                /* get remote addr information */
-                resc->rinfo->dlid  = svr_lid;
-                resc->rinfo->raddr = cr_rcv->raddr;
-                resc->rinfo->rkey  = cr_rcv->rkey;
-
-                /* Modify Local QP */
-                for (rcv_cnt = 0; rcv_cnt < num; ++rcv_cnt) {
-                    RDMA_PRINT(Client, "clt_connect_qps: start modify_qp, sum %d, cq sum %d\n", 
-                    (snd_sum - snd_cnt) + rcv_sum, ((snd_sum - snd_cnt) + rcv_sum) % TEST_CQ_NUM);
-                    qp = resc->qp[(snd_sum - snd_cnt) + rcv_sum];
-                    RDMA_PRINT(Client, "clt_connect_qps1: modify_qp, src_qpn %d, dst_qpn %d\n", qp->qp_num, cr_rcv[rcv_cnt].dst_qpn);
-                    qp->ctx = resc->ctx;
-                    qp->flag = 0;
-                    qp->type = cr_rcv[rcv_cnt].qp_type;
-                    qp->cq = resc->cq[((snd_sum - snd_cnt) + rcv_sum) % TEST_CQ_NUM];// 
-                    qp->snd_wqe_offset = 0;
-                    qp->rcv_wqe_offset = 0;
-                    qp->lsubnet.llid = resc->ctx->lid;
-                    qp->dest_qpn = (resc->ctx->lid - svr_lid - 1) * TEST_QP_NUM + qp->qp_num; // cr_rcv[rcv_cnt].dst_qpn;
-                    qp->snd_psn = cr_snd[rcv_cnt].snd_psn;
-                    qp->ack_psn = qp->snd_psn;
-                    qp->exp_psn = cr_rcv[rcv_cnt].snd_psn;
-                    qp->dsubnet.dlid = svr_lid;
-                    ibv_modify_qp(resc->ctx, qp);
-                    RDMA_PRINT(Client, "clt_connect_qps: modify_qp, src_qpn %d, dst_qpn %d, lid %d\n", 
-                            qp->qp_num, qp->dest_qpn, resc->ctx->lid);
-
-                    ++rcv_sum;
-                }
-                free(cr_rcv);
-            }
-
-            /* Clear CR send count */
-            snd_cnt = 0;
-        }
-        
-        /* Modify Local QP */
-        cr_snd[snd_cnt].flag      = CR_TYPE_REQ;
-        cr_snd[snd_cnt].qp_type   = QP_TYPE_RC;
-        cr_snd[snd_cnt].src_lid   = resc->ctx->lid;
-        cr_snd[snd_cnt].src_qpn   = resc->qp[snd_sum]->qp_num;
-        cr_snd[snd_cnt].snd_psn   = 0;
-        cr_snd[snd_cnt].rkey  = resc->mr[0]->lkey; /* only use one mr in our design */
-        cr_snd[snd_cnt].raddr = (uintptr_t)resc->mr[0]->addr; /* only use one mr in our design */
-
-        dest_info[snd_cnt] = svr_lid;
-        
-        /* Update CR count */
-        ++snd_cnt;
-    }
-
-    RDMA_PRINT(Client, "clt_connect_qps: snd_sum %d, snd_cnt %d, rcv_sum %d, rcv_cnt %d\n", 
-            snd_sum, snd_cnt, rcv_sum, rcv_cnt);
-
-    /* CR count is full, send CR and wait 
-     * for Receiving pkt */
-    if (snd_cnt) {
-        rdma_connect(resc, cr_snd, dest_info, snd_cnt); /* post connection request to server (QP0) */
-
-        rcv_sum = 0;
-        while (rcv_sum < snd_cnt) {
-            cr_rcv = rdma_listen(resc, &num); /* listen connection request from client (QP0) */
-            if (num == 0) {
-                continue;
-            }
-            RDMA_PRINT(Client, "clt_connect_qps: rdma_listen end, recved %d CR Data\n", num);
-
-            /* get remote addr information */
-            resc->rinfo->dlid  = svr_lid;
-            resc->rinfo->raddr = cr_rcv->raddr;
-            resc->rinfo->rkey  = cr_rcv->rkey;
-
-            /* Modify Local QP */
-            for (rcv_cnt = 0; rcv_cnt < num; ++rcv_cnt) {
-                RDMA_PRINT(Client, "clt_connect_qps: start modify_qp, sum %d, cq sum %d\n", 
-                    (snd_sum - snd_cnt) + rcv_sum, ((snd_sum - snd_cnt) + rcv_sum) % TEST_CQ_NUM);
-                qp = resc->qp[(snd_sum - snd_cnt) + rcv_sum];
-                RDMA_PRINT(Client, "clt_connect_qps1: modify_qp, src_qpn %d, dst_qpn %d\n", qp->qp_num, cr_rcv[rcv_cnt].dst_qpn);
-                qp->ctx = resc->ctx;
-                qp->flag = 0;
-                qp->type = cr_rcv[rcv_cnt].qp_type;
-                qp->cq = resc->cq[((snd_sum - snd_cnt) + rcv_sum) % TEST_CQ_NUM];// 
-                qp->snd_wqe_offset = 0;
-                qp->rcv_wqe_offset = 0;
-                qp->lsubnet.llid = resc->ctx->lid;
-                qp->dest_qpn = (resc->ctx->lid - svr_lid - 1) * TEST_QP_NUM + qp->qp_num;// cr_rcv[rcv_cnt].dst_qpn;
-                qp->snd_psn = cr_snd[rcv_cnt].snd_psn;
-                qp->ack_psn = qp->snd_psn;
-                qp->exp_psn = cr_rcv[rcv_cnt].snd_psn;
-                qp->dsubnet.dlid = svr_lid;
-                ibv_modify_qp(resc->ctx, qp);
-                RDMA_PRINT(Client, "clt_connect_qps: modify_qp, src_qpn %d, dst_qpn %d, lid %d\n", 
-                        qp->qp_num, qp->dest_qpn, resc->ctx->lid);
-
-                ++rcv_sum;
-            }
-            free(cr_rcv);
-        }
-
-        /* Clear CR send count */
-        snd_cnt = 0;
-    }
-    
-    free(cr_snd);
-    
-    return 0;
-}
-
 static void usage(const char *argv0) {
     printf("Usage:\n");
     printf("  %s            start a client and build connection\n", argv0);
@@ -306,6 +168,8 @@ int main (int argc, char **argv) {
 
     /* device initialization */
     ibv_open_device(ib_context, llid);
+
+    RDMA_PRINT(Client, "Open device!\n");
 
     struct rdma_resc *resc = rdma_resc_init(ib_context, num_mr, num_cq, num_qp, llid, 1);
 
