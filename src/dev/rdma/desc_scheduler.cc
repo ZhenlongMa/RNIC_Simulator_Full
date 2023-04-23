@@ -74,10 +74,14 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     assert(dbQpStatusRspQue.size());
     DoorbellPtr db = dbQpStatusRspQue.front().first;
     QPStatusPtr qpStatus = dbQpStatusRspQue.front().second;
+    bool schedule = false;
     dbQpStatusRspQue.pop();
+    // delete this line in the future
     assert(db->qpn == qpStatus->qpn);
-    HANGU_PRINT(DescScheduler, "QP status doorbell pair received by QP status proc!\n");
-    if (qpStatus->head_ptr == qpStatus->tail_ptr)
+    assert(qpStatus->type == BW_QP);
+    HANGU_PRINT(DescScheduler, "QP status doorbell pair received by QP status proc! qpn: 0x%x, head: 0x%x, tail:  0x%x\n", 
+        qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr);
+    if (qpStatus->head_ptr == qpStatus->tail_ptr) // WARNING: consider corner case!
     {
         // If head pointer equals to tail pointer, this QP is absent in the prefetch queue,
         // so it should be pushed into prefetch queue.
@@ -85,11 +89,12 @@ void HanGuRnic::DescScheduler::qpStatusProc()
         lowPriorityQpnQue.push(db->qpn);
         // totalWeight += qpStatus->weight;
         HANGU_PRINT(DescScheduler, "Unactive QP!\n");
+        schedule = true;
     }
     qpStatus->head_ptr += db->num;
 
-    // schedule WQE prefetch event
-    if (!getPrefetchQpnEvent.scheduled())
+    // If this QP has no unfinished WQE, schedule WQE prefetch event
+    if (!getPrefetchQpnEvent.scheduled() && schedule)
     {
         rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
     }
@@ -268,6 +273,7 @@ void HanGuRnic::DescScheduler::wqeProc()
 
         uint32_t batchSize; // the size of data that should be transmitted in this period
         batchSize = qpStatus->weight * groupTable[qpStatus->group_id];
+        assert(batchSize != 0);
         uint32_t procSize = 0;
 
         while(procSize < batchSize)
@@ -380,12 +386,17 @@ void HanGuRnic::DescScheduler::rxUpdate()
     assert(rNic->updateQue.size());
     uint32_t qpn = rNic->updateQue.front().first;
     uint32_t len = rNic->updateQue.front().second;
+    bool schedule = false; 
     rNic->updateQue.pop();
     QPStatusPtr status = qpStatusTable[qpn];
     HANGU_PRINT(DescScheduler, "rx received! tail_ptr: 0x%x\n", status->tail_ptr);
     if (status->type == LAT_QP || status->type == RATE_QP)
     {
         status->tail_ptr++;
+        if (status->head_ptr > status->tail_ptr)
+        {
+            schedule = true;
+        }
     }
     else if (status->type == BW_QP)
     {
@@ -401,6 +412,7 @@ void HanGuRnic::DescScheduler::rxUpdate()
         if (status->tail_ptr < status->head_ptr)
         {
             lowPriorityQpnQue.push(status->qpn);
+            schedule = true;
         }
         else if (status->tail_ptr == status->head_ptr)
         {
@@ -410,13 +422,15 @@ void HanGuRnic::DescScheduler::rxUpdate()
             panic("tail pointer exceeds head pointer! qpn: %d", status->qpn);
         }
     }
-    
-    if (rNic->updateQue.size())
+
+    if (!getPrefetchQpnEvent.scheduled() && schedule)
     {
-        if (!updateEvent.scheduled())
-        {
-            rNic->schedule(updateEvent, curTick() + rNic->clockPeriod());
-        }
+        rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+    }
+    
+    if (rNic->updateQue.size() && !updateEvent.scheduled())
+    {
+        rNic->schedule(updateEvent, curTick() + rNic->clockPeriod());
     }
 }
 
