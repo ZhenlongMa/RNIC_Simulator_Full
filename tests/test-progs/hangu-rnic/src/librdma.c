@@ -31,7 +31,7 @@ int cm_post_recv(struct ibv_context *ctx, int wr_num) {
     
     ibv_post_recv(ctx, recv_wqe, ctx->cm_qp, i);
     free(recv_wqe);
-    // RDMA_PRINT(librdma, "cm_post_recv : exit\n");
+    RDMA_PRINT(librdma, "cm_post_recv : exit\n");
     return i;
 }
 
