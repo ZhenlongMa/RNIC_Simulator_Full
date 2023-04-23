@@ -80,8 +80,8 @@ enum ibv_wqe_flags {
 enum perf_indicator
 {
     LATENCY         = (uint8_t)0x01,
-    MSG_RATE        = (uint8_t)0x02,
-    BANDWIDTH       = (uint8_t)0x03,
+    BANDWIDTH       = (uint8_t)0x02,
+    MSG_RATE        = (uint8_t)0x03,
 };
 
 

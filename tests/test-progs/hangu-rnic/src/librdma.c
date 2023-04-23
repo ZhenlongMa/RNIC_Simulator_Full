@@ -257,6 +257,7 @@ struct rdma_cr *rdma_listen(struct rdma_resc *resc, int *cm_cpl_num) {
 
 /**
  * @param cm_req_num: QP number in this connection exchange
+ * @param dest_info: Destination DLID
 */
 int rdma_connect(struct rdma_resc *resc, struct rdma_cr *cr_info, uint16_t *dest_info, int cm_req_num) {
     struct ibv_context *ctx = resc->ctx;
