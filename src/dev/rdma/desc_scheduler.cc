@@ -426,6 +426,8 @@ void HanGuRnic::DescScheduler::createQpStatus()
     QPStatusPtr status = rNic->createQue.front();
     rNic->createQue.pop();
     qpStatusTable[status->qpn] = status;
+    HANGU_PRINT(DescScheduler, "new QP created! type: %d\n", status->type);
+    assert(status->type == LAT_QP || status->type == BW_QP || status->type == RATE_QP);
     if (rNic->createQue.size())
     {
         rNic->schedule(createQpStatusEvent, curTick() + rNic->clockPeriod());

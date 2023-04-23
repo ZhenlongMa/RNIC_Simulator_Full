@@ -20,6 +20,7 @@ int clt_update_qps(struct rdma_resc *resc, uint16_t svr_lid) {
         qp->ack_psn = 0;
         qp->exp_psn = 0;
         qp->dsubnet.dlid = svr_lid;
+        qp->indicator = BW_QP;
         // ibv_modify_qp(resc->ctx, qp);
         RDMA_PRINT(Client, "clt_update_qps: modify_qp, src_qpn %d, dst_qpn %d, lid %d\n", 
                 qp->qp_num, qp->dest_qpn, resc->ctx->lid);
