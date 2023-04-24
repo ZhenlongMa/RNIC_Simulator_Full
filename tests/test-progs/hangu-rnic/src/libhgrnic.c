@@ -118,9 +118,11 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
     context->cm_qp->indicator = BANDWIDTH;
     context->cm_qp->weight = 1;
     context->cm_qp->group_id = cm_group->id;
+    cm_group->total_qp_weight += context->cm_qp->weight;
     ibv_modify_qp(context, context->cm_qp);
 
     HGRNIC_PRINT("CM QP created! QPN: %d\n", context->cm_qp->qp_num);
+    HGRNIC_PRINT("CM group created! group_id: %d, group weight: %d, total qp weight: %ld\n", cm_group->id, cm_group->weight, cm_group->total_qp_weight);
 
     context->cm_rcv_posted_off = RCV_WR_BASE;
     context->cm_rcv_acked_off  = RCV_WR_BASE;
@@ -640,7 +642,7 @@ struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight)
     new_group->id = args->group_id[0];
     context->total_group_weight += weight;
     HGRNIC_PRINT("QoS group created! id: %d, weight: %d, total group weight: %ld\n", args->group_id[0], weight, context->total_group_weight);
-    return context->qos_group + context->group_num;
+    return new_group;
 }
 
 /**

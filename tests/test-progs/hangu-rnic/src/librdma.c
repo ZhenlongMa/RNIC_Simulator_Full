@@ -25,8 +25,8 @@ int cm_post_recv(struct ibv_context *ctx, int wr_num) {
         if (ctx->cm_rcv_posted_off + sizeof(struct rdma_cr) > RCV_WR_MAX * sizeof(struct rdma_cr)) {
             ctx->cm_rcv_posted_off = 0;
         }
-        // RDMA_PRINT(librdma, "cm_post_recv : %d, flag 0x%x base addr 0x%lx, off 0x%lx\n", 
-        //     i, ((struct rdma_cr *)(recv_wqe[i].mr->addr + recv_wqe[i].offset))->flag, (uint64_t)recv_wqe[i].mr->addr, (uint64_t)recv_wqe[i].offset);
+        RDMA_PRINT(librdma, "cm_post_recv : %d, flag 0x%x base addr 0x%lx, off 0x%lx\n", 
+            i, ((struct rdma_cr *)(recv_wqe[i].mr->addr + recv_wqe[i].offset))->flag, (uint64_t)recv_wqe[i].mr->addr, (uint64_t)recv_wqe[i].offset);
     }
     
     ibv_post_recv(ctx, recv_wqe, ctx->cm_qp, i);

@@ -675,6 +675,7 @@ struct QPStatusItem
         this->fetch_ptr             = 0;
         this->tail_ptr              = 0;
         this->wnd_start             = 0;
+        this->fetch_offset          = 0;
         // this->wnd_fetch             = 0;
         this->wnd_end               = 0;
         // this->current_msg_offset    = 0;

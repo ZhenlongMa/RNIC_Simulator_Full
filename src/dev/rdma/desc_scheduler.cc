@@ -274,9 +274,10 @@ void HanGuRnic::DescScheduler::wqeProc()
 
         HANGU_PRINT(DescScheduler, "BW desc received by wqe proc! qpn: %d\n", qpStatus->qpn);
 
-        while(procSize < batchSize) // TODO: not accurate
+        while(procSize < batchSize) // WARNING: not accurate
         {
             TxDescPtr desc = rNic->txdescRspFifo.front();
+            HANGU_PRINT(DescScheduler, "fetch offset: %d, desc len: %d\n", qpStatus->fetch_offset, desc->len);
             assert(qpStatus->fetch_offset < desc->len);
             TxDescPtr subDesc = make_shared<TxDesc>(desc);
             subDesc->opcode = desc->opcode;

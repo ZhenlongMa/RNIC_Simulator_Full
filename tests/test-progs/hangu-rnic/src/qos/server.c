@@ -257,11 +257,15 @@ struct rdma_resc *set_group_resource(struct ibv_context *ctx, int num_mr, int nu
     uint8_t  op_mode = OPMODE_RDMA_WRITE; /* 0: RDMA Write; 1: RDMA Read */
     uint32_t offset;
     struct rdma_resc *resc = rdma_resc_init(ctx, num_mr, num_cq, num_qp, llid, num_client);
+    RDMA_PRINT(Server, "group resource initialized!\n");
     struct ibv_qos_group *group = create_qos_group(resc->ctx, grp_weight);
+    RDMA_PRINT(Server, "group created!\n");
     resc->qos_group[0] = group;
 
     /* Connect QPs to client's QP */
     svr_update_info(resc);
+
+    RDMA_PRINT(Server, "Server finishes connection!\n");
 
     set_group_granularity(resc);
 
@@ -352,9 +356,10 @@ int main (int argc, char **argv) {
     RDMA_PRINT(Server, "ibv_open_device : doorbell address 0x%lx\n", (long int)ib_context->dvr);
     // RDMA_PRINT(Server, "grp1_num_qp %d num_cq %d\n", grp1_num_qp, num_cq);
     struct rdma_resc *grp1_resc = set_group_resource(ib_context, num_mr, num_cq, grp1_num_qp, svr_lid, num_client, grp1_weight);
+    RDMA_PRINT(Server, "group1 resource created!\n");
     struct rdma_resc *grp2_resc = set_group_resource(ib_context, num_mr, num_cq, grp2_num_qp, svr_lid, num_client, grp2_weight);
     // ib_context = grp1_resc->ctx;
-    RDMA_PRINT(Server, "group resource created!\n");
+    RDMA_PRINT(Server, "group2 resource created!\n");
 
     /* sync to make sure that we could get start */
     rdma_recv_sync(grp1_resc);
