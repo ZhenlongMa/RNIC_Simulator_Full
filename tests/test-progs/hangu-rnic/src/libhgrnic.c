@@ -298,7 +298,8 @@ int ibv_modify_batch_qp(struct ibv_context *context, struct ibv_qp *qp, uint32_t
             qpc_args->weight[i]     = qp[batch_cnt + i].weight;
             qpc_args->groupID[i]    = qp[batch_cnt + i].group_id;
 
-            // HGRNIC_PRINT(" ibv_modify_batch_qp! qpn 0x%x\n", qp[batch_cnt + i].qp_num);
+            HGRNIC_PRINT(" ibv_modify_batch_qp! qpn 0x%x, indicator: %d, weight: %d, group: %d\n", 
+                qp[batch_cnt + i].qp_num, qp[batch_cnt + i].indicator, qp[batch_cnt + i].weight, qp[batch_cnt + i].group_id);
         }
         write_cmd(dvr->fd, HGKFD_IOC_WRITE_QPC, qpc_args);
         
@@ -344,6 +345,8 @@ int ibv_modify_qp(struct ibv_context *context, struct ibv_qp *qp) {
     qpc_args->weight[0]     = qp->weight;
     qpc_args->groupID[0]    = qp->group_id;
     write_cmd(dvr->fd, HGKFD_IOC_WRITE_QPC, qpc_args);
+    HGRNIC_PRINT(" ibv_modify_qp! qpn 0x%x, indicator: %d, weight: %d, group: %d\n", 
+                qp->qp_num, qp->indicator, qp->weight, qp->group_id);
     free(qpc_args);
     return 0;
 }

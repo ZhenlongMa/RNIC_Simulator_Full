@@ -675,18 +675,20 @@ struct QPStatusItem
         this->fetch_ptr             = 0;
         this->tail_ptr              = 0;
         this->wnd_start             = 0;
-        this->wnd_fetch             = 0;
+        // this->wnd_fetch             = 0;
         this->wnd_end               = 0;
-        this->current_msg_offset    = 0;
+        // this->current_msg_offset    = 0;
     }
+    // queue pointers
     uint32_t head_ptr;
-    uint32_t fetch_ptr;
+    uint32_t fetch_ptr; // next WQE to fetch
     uint32_t tail_ptr;
-    uint32_t wnd_start;
+    // window
+    uint32_t wnd_start; // start offset in the current message
     uint32_t fetch_offset; // offset pointer in the current message
     uint32_t wnd_end;
-    uint32_t wnd_fetch;
-    uint32_t current_msg_offset;
+    // uint32_t wnd_fetch;
+    // uint32_t current_msg_offset;
     uint32_t key;
     uint8_t weight;
     uint8_t type;

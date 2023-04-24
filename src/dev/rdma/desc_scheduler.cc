@@ -259,31 +259,32 @@ void HanGuRnic::DescScheduler::wqeProc()
     else if (qpStatus->type == BW_QP)
     {
         assert(descNum >= 1);
-        assert(qpStatus->wnd_start <= qpStatus->wnd_fetch);
-        assert(qpStatus->wnd_fetch < qpStatus->wnd_end);
-        
-        // set wnd_end to the size of the whole message
-        if (qpStatus->wnd_start == 0)
-        {
-            qpStatus->wnd_end = rNic->txdescRspFifo.front()->len;
-        }
-
-        TxDescPtr desc = rNic->txdescRspFifo.front();
-        HANGU_PRINT(DescScheduler, "BW desc received by wqe proc! qpn: %d\n", qpStatus->qpn);
-
-        uint32_t batchSize; // the size of data that should be transmitted in this period
+        // assert(qpStatus->wnd_start <= qpStatus->wnd_fetch);
+        // assert(qpStatus->wnd_fetch < qpStatus->wnd_end);
+        uint32_t procSize = 0;
+        uint32_t batchSize; // the size of data that should be transmitted in this schedule period
         batchSize = qpStatus->weight * groupTable[qpStatus->group_id];
         assert(batchSize != 0);
-        uint32_t procSize = 0;
+        
+        // set wnd_end to the size of the whole message
+        // if (qpStatus->wnd_start == 0)
+        // {
+        //     qpStatus->wnd_end = rNic->txdescRspFifo.front()->len;
+        // }
 
-        while(procSize < batchSize)
+        HANGU_PRINT(DescScheduler, "BW desc received by wqe proc! qpn: %d\n", qpStatus->qpn);
+
+        while(procSize < batchSize) // TODO: not accurate
         {
+            TxDescPtr desc = rNic->txdescRspFifo.front();
+            assert(qpStatus->fetch_offset < desc->len);
             TxDescPtr subDesc = make_shared<TxDesc>(desc);
             subDesc->opcode = desc->opcode;
-            // subDesc->qpn = qpStatus->qpn;
             // WARNING: SEND/RECV are currently not supported!
             subDesc->lVaddr = desc->lVaddr + qpStatus->fetch_offset;
             subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->fetch_offset;
+
+            // set submessage length
             if (desc->len - qpStatus->fetch_offset > MAX_COMMIT_SZ)
             {
                 subDesc->len = MAX_COMMIT_SZ;
@@ -300,18 +301,19 @@ void HanGuRnic::DescScheduler::wqeProc()
                 subDesc->flags = 1;
                 rNic->txdescRspFifo.pop();
                 qpStatus->fetch_offset = 0;
+                lowPriorityDescQue.push(subDesc);
                 // If there are still descriptors left , switch to the next descriptor
                 if (procDescNum + 1 < descNum)
                 {
                     desc = rNic->txdescRspFifo.front();
-                    lowPriorityDescQue.push(subDesc);
                 }
                 else 
                 {
-                    lowPriorityDescQue.push(subDesc);
                     break;
                 }
                 procDescNum++;
+                // update tail pointer
+                qpStatus->tail_ptr++;
             }
             else
             {
@@ -321,6 +323,7 @@ void HanGuRnic::DescScheduler::wqeProc()
             }
             procSize += subDesc->len;
         }
+        // rNic->txdescRspFifo.pop();
     }
     else
     {
@@ -378,8 +381,7 @@ void HanGuRnic::DescScheduler::launchWQE()
 
 /**
  * @note
- * Update win_fetch and tail_ptr in QP status. Maybe tail_ptr updating should be implemented in 
- * CQ processing.
+ * Update win_fetch and tail_ptr in QP status. Add QPN back to QPN queue.
 */
 void HanGuRnic::DescScheduler::rxUpdate()
 {
@@ -389,7 +391,7 @@ void HanGuRnic::DescScheduler::rxUpdate()
     bool schedule = false; 
     rNic->updateQue.pop();
     QPStatusPtr status = qpStatusTable[qpn];
-    HANGU_PRINT(DescScheduler, "rx received! tail_ptr: 0x%x\n", status->tail_ptr);
+    HANGU_PRINT(DescScheduler, "rx received! head_ptr: 0x%x, tail_ptr: 0x%x\n", status->head_ptr, status->tail_ptr);
     if (status->type == LAT_QP || status->type == RATE_QP)
     {
         status->tail_ptr++;
@@ -400,15 +402,15 @@ void HanGuRnic::DescScheduler::rxUpdate()
     }
     else if (status->type == BW_QP)
     {
-        assert(status->wnd_fetch + len <= status->wnd_end);
-        status->wnd_fetch += len;
-        if (status->wnd_fetch >= status->wnd_end)
-        {
-            if (status->tail_ptr != status->head_ptr)
-            {
-                status->tail_ptr++;
-            }
-        }
+        assert(status->fetch_offset + len <= status->wnd_end);
+        // status->wnd_fetch += len;
+        // if (status->wnd_fetch >= status->wnd_end)
+        // {
+        //     if (status->tail_ptr != status->head_ptr)
+        //     {
+        //         status->tail_ptr++;
+        //     }
+        // }
         if (status->tail_ptr < status->head_ptr)
         {
             lowPriorityQpnQue.push(status->qpn);
