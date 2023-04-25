@@ -315,7 +315,7 @@ void HanGuRnic::DescScheduler::wqeProc()
                     // If there are still descriptors left , switch to the next descriptor
                     desc = rNic->txdescRspFifo.front();
                 }
-                else 
+                else  
                 {
                     // if procDescNum reaches the maximum descriptor number in this schedule period, 
                     // break to the next QP
