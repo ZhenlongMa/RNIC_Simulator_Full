@@ -277,7 +277,8 @@ void HanGuRnic::DescScheduler::wqeProc()
         while(procSize < batchSize) // WARNING: not accurate
         {
             TxDescPtr desc = rNic->txdescRspFifo.front();
-            HANGU_PRINT(DescScheduler, "fetch offset: %d, desc len: %d\n", qpStatus->fetch_offset, desc->len);
+            HANGU_PRINT(DescScheduler, "fetch offset: %d, desc len: %d, batch size: %d\n", 
+                qpStatus->fetch_offset, desc->len, batchSize);
             assert(qpStatus->fetch_offset < desc->len);
             TxDescPtr subDesc = make_shared<TxDesc>(desc);
             subDesc->opcode = desc->opcode;
@@ -303,19 +304,23 @@ void HanGuRnic::DescScheduler::wqeProc()
                 rNic->txdescRspFifo.pop();
                 qpStatus->fetch_offset = 0;
                 lowPriorityDescQue.push(subDesc);
-                // If there are still descriptors left , switch to the next descriptor
-                if (procDescNum + 1 < descNum)
+                procDescNum++;
+
+                // update tail pointer
+                qpStatus->tail_ptr++;
+                HANGU_PRINT(DescScheduler, "tail pointer update: %d, head pointer: %d\n", qpStatus->tail_ptr, qpStatus->head_ptr);
+
+                if (procDescNum < descNum)
                 {
+                    // If there are still descriptors left , switch to the next descriptor
                     desc = rNic->txdescRspFifo.front();
                 }
                 else 
                 {
+                    // if procDescNum reaches the maximum descriptor number in this schedule period, 
+                    // break to the next QP
                     break;
                 }
-                procDescNum++;
-                // update tail pointer
-                qpStatus->tail_ptr++;
-                HANGU_PRINT(DescScheduler, "tail pointer update: %d\n", qpStatus->tail_ptr);
             }
             else
             {
@@ -386,6 +391,7 @@ void HanGuRnic::DescScheduler::launchWQE()
     {
         rNic->schedule(launchWqeEvent, curTick() + rNic->clockPeriod());
     }
+    // HANGU_PRINT(DescScheduler, "launch WQE end, QPN: %d, num: %d\n", doorbell->qpn, doorbell->num);
 }
 
 /**
