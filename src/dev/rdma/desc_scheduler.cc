@@ -256,7 +256,7 @@ void HanGuRnic::DescScheduler::wqeProc()
         }
         qpStatus->fetch_ptr += descNum;
     }
-    else if (qpStatus->type == BW_QP)
+    else if (qpStatus->type == BW_QP || qpStatus->type == UD_QP)
     {
         assert(descNum >= 1);
         // assert(qpStatus->wnd_start <= qpStatus->wnd_fetch);
@@ -350,12 +350,9 @@ void HanGuRnic::DescScheduler::wqeProc()
     {
         rNic->schedule(launchWqeEvent, curTick() + rNic->clockPeriod());
     }
-    if (rNic->txdescRspFifo.size())
+    if (rNic->txdescRspFifo.size() && !wqeRspEvent.scheduled())
     {
-        if (!wqeRspEvent.scheduled())
-        {
-            rNic->schedule(wqeRspEvent, curTick() + rNic->clockPeriod());
-        }
+        rNic->schedule(wqeRspEvent, curTick() + rNic->clockPeriod());
     }
 }
 
