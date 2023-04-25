@@ -314,7 +314,8 @@ HanGuRnic::mboxFetchCpl () {
                 qpcReq->txQpcReq->perfWeight,
                 qpcReq->txQpcReq->indicator,
                 qpcReq->txQpcReq->srcQpn,
-                qpcReq->txQpcReq->groupID);
+                qpcReq->txQpcReq->groupID,
+                qpcReq->txQpcReq->qpType);
             // delete this line later
             HANGU_PRINT(CcuEngine, "write QPC, qpn: %d, indicator: %d, weight: %d\n", 
                 qpcReq->txQpcReq->srcQpn, qpcReq->txQpcReq->indicator, qpcReq->txQpcReq->perfWeight);

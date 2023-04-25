@@ -78,7 +78,7 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     dbQpStatusRspQue.pop();
     // delete this line in the future
     assert(db->qpn == qpStatus->qpn);
-    assert(qpStatus->type == BW_QP);
+    assert(qpStatus->type == BW_QP || qpStatus->type == UD_QP);
     HANGU_PRINT(DescScheduler, "QP status doorbell pair received by QP status proc! qpn: 0x%x, head: 0x%x, tail:  0x%x\n", 
         qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr);
     if (qpStatus->head_ptr == qpStatus->tail_ptr) // WARNING: consider corner case!
@@ -315,6 +315,7 @@ void HanGuRnic::DescScheduler::wqeProc()
                 procDescNum++;
                 // update tail pointer
                 qpStatus->tail_ptr++;
+                HANGU_PRINT(DescScheduler, "tail pointer update: %d\n", qpStatus->tail_ptr);
             }
             else
             {
@@ -329,6 +330,16 @@ void HanGuRnic::DescScheduler::wqeProc()
     else
     {
         panic("Illegal QP type!\n");
+    }
+
+    if ((qpStatus->type == UD_QP || qpStatus->type == UC_QP) && (qpStatus->tail_ptr < qpStatus->head_ptr))
+    {
+        lowPriorityQpnQue.push(qpStatus->qpn);
+        HANGU_PRINT(DescScheduler, "UD or UC QP prefetch: type: %d\n", qpStatus->type);
+        if (!getPrefetchQpnEvent.scheduled())
+        {
+            rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+        }
     }
 
     DoorbellPtr doorbell = make_shared<DoorbellFifo>(procDescNum, qpStatus->qpn);
@@ -444,7 +455,11 @@ void HanGuRnic::DescScheduler::createQpStatus()
     rNic->createQue.pop();
     qpStatusTable[status->qpn] = status;
     HANGU_PRINT(DescScheduler, "new QP created! type: %d\n", status->type);
-    assert(status->type == LAT_QP || status->type == BW_QP || status->type == RATE_QP);
+    assert(status->type == LAT_QP   || 
+           status->type == BW_QP    || 
+           status->type == RATE_QP  || 
+           status->type == UC_QP    || 
+           status->type == UD_QP);
     if (rNic->createQue.size())
     {
         rNic->schedule(createQpStatusEvent, curTick() + rNic->clockPeriod());

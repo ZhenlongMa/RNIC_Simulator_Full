@@ -58,6 +58,9 @@
 #define LAT_QP 1
 #define BW_QP 2
 #define RATE_QP 3
+#define UC_QP 4
+#define UD_QP 5
+// UC and UD QP above is only used in QoS!
 #define SCH_GRANULARITY 1024 // maximum submessage size
 
 #define PAGE_SIZE_LOG 12
@@ -664,11 +667,10 @@ struct Regs : public Serializable {
 // WQE Scheduler relevant
 struct QPStatusItem
 {
-    QPStatusItem(uint32_t key, uint8_t weight, uint8_t type, uint32_t qpn, uint8_t group_id)
+    QPStatusItem(uint32_t key, uint8_t weight, uint8_t qos_type, uint32_t qpn, uint8_t group_id, uint8_t service_type)
     {
         this->key                   = key;
         this->weight                = weight;
-        this->type                  = type;
         this->qpn                   = qpn;
         this->group_id              = group_id;
         this->head_ptr              = 0;
@@ -679,6 +681,24 @@ struct QPStatusItem
         // this->wnd_fetch             = 0;
         this->wnd_end               = 0;
         // this->current_msg_offset    = 0;
+        assert(service_type != QP_TYPE_RD);
+        switch (service_type)
+        {
+            case QP_TYPE_RC:
+                this->type = qos_type;
+                break;
+            case QP_TYPE_UC:
+                this->type = UC_QP;
+                break;
+            case QP_TYPE_RD:
+                // this->type = ;
+                break;
+            case QP_TYPE_UD:
+                this->type = UD_QP;
+                break;
+            default:
+                break;
+        }
     }
     // queue pointers
     uint32_t head_ptr;
