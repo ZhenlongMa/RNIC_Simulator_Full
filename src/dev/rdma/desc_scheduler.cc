@@ -307,20 +307,28 @@ void HanGuRnic::DescScheduler::wqeProc()
                 procDescNum++;
 
                 // update tail pointer
-                qpStatus->tail_ptr++;
                 HANGU_PRINT(DescScheduler, "tail pointer update: %d, head pointer: %d\n", qpStatus->tail_ptr, qpStatus->head_ptr);
+                assert(qpStatus->tail_ptr < qpStatus->head_ptr);
+                qpStatus->tail_ptr++;
 
-                if (procDescNum < descNum)
+                // if procDescNum reaches the maximum descriptor number in this schedule period, 
+                // break to the next QP
+                if (procDescNum >= descNum)
                 {
-                    // If there are still descriptors left , switch to the next descriptor
-                    desc = rNic->txdescRspFifo.front();
-                }
-                else  
-                {
-                    // if procDescNum reaches the maximum descriptor number in this schedule period, 
-                    // break to the next QP
                     break;
                 }
+
+                // if (procDescNum < descNum)
+                // {
+                //     // If there are still descriptors left , switch to the next descriptor
+                //     // desc = rNic->txdescRspFifo.front();
+                // }
+                // else
+                // {
+                //     // if procDescNum reaches the maximum descriptor number in this schedule period, 
+                //     // break to the next QP
+                //     break;
+                // }
             }
             else
             {
