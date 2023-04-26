@@ -173,22 +173,20 @@ void HanGuRnic::DescScheduler::wqePrefetch()
     QPStatusPtr qpStatus = qpStatusTable[qpn];
 
     uint32_t descNum;
-    HANGU_PRINT(DescScheduler, "head_ptr: 0x%x, fetch_ptr: 0x%x\n", qpStatus->head_ptr, qpStatus->fetch_ptr);
-    HANGU_PRINT(DescScheduler, "QP num: %d, group ID: %d, weight: %d, group granularity: %d\n", 
-        qpStatus->qpn, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
-    if (qpStatus->head_ptr - qpStatus->fetch_ptr > MAX_PREFETCH_NUM)
+    HANGU_PRINT(DescScheduler, "head_ptr: 0x%x, tail pointer: 0x%x\n", qpStatus->head_ptr, qpStatus->tail_ptr);
+    HANGU_PRINT(DescScheduler, "QP num: %d, type: %d, group ID: %d, weight: %d, group granularity: %d\n", 
+        qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
+    if (qpStatus->head_ptr - qpStatus->tail_ptr > MAX_PREFETCH_NUM)
     {
         descNum = MAX_PREFETCH_NUM;
     }
     else 
     {
-        descNum = qpStatus->head_ptr - qpStatus->fetch_ptr;
+        descNum = qpStatus->head_ptr - qpStatus->tail_ptr;
     }
 
-    // MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-    //         qpStatus->key, descNum << 5, qpStatus->fetch_ptr);
     MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-            qpStatus->key, descNum * sizeof(TxDesc), qpStatus->fetch_ptr);
+            qpStatus->key, descNum * sizeof(TxDesc), qpStatus->tail_ptr * sizeof(TxDesc));
 
     descReq->txDescRsp = new TxDesc[descNum];
     rNic->descReqFifo.push(descReq);
@@ -228,16 +226,18 @@ void HanGuRnic::DescScheduler::wqeProc()
     if (qpStatus->type == LAT_QP)
     {
         // For latency sensitive QP, commit all WQEs
+        assert(1);
         for (int i = 0; i < descNum; i++)
         {
             desc = rNic->txdescRspFifo.front();
             rNic->txdescRspFifo.pop();
             highPriorityDescQue.push(desc);
         }
-        qpStatus->fetch_ptr += descNum;
+        qpStatus->tail_ptr += descNum;
     }
     else if (qpStatus->type == RATE_QP)
     {
+        assert(1);
         // For message rate sensitive QP, commit up to 8 WQEs
         int fetchNum;
         if (descNum > MAX_PREFETCH_NUM)
@@ -254,97 +254,135 @@ void HanGuRnic::DescScheduler::wqeProc()
             rNic->txdescRspFifo.pop();
             lowPriorityDescQue.push(desc);
         }
-        qpStatus->fetch_ptr += descNum;
+        qpStatus->tail_ptr += descNum;
     }
     else if (qpStatus->type == BW_QP || qpStatus->type == UD_QP)
     {
         assert(descNum >= 1);
-        // assert(qpStatus->wnd_start <= qpStatus->wnd_fetch);
-        // assert(qpStatus->wnd_fetch < qpStatus->wnd_end);
-        uint32_t procSize = 0;
+        uint32_t procSize = 0; // data size been processed in this schedule period
         uint32_t batchSize; // the size of data that should be transmitted in this schedule period
         batchSize = qpStatus->weight * groupTable[qpStatus->group_id];
         assert(batchSize != 0);
-        
-        // set wnd_end to the size of the whole message
-        // if (qpStatus->wnd_start == 0)
-        // {
-        //     qpStatus->wnd_end = rNic->txdescRspFifo.front()->len;
-        // }
-
-        HANGU_PRINT(DescScheduler, "BW desc received by wqe proc! qpn: %d\n", qpStatus->qpn);
-
-        while(procSize < batchSize) // WARNING: not accurate
+        for (int i = 0; i < descNum; i++)
         {
-            TxDescPtr desc = rNic->txdescRspFifo.front();
-            HANGU_PRINT(DescScheduler, "fetch offset: %d, desc len: %d, batch size: %d\n", 
-                qpStatus->fetch_offset, desc->len, batchSize);
-            assert(qpStatus->fetch_offset < desc->len);
-            TxDescPtr subDesc = make_shared<TxDesc>(desc);
-            subDesc->opcode = desc->opcode;
-            // WARNING: SEND/RECV are currently not supported!
-            subDesc->lVaddr = desc->lVaddr + qpStatus->fetch_offset;
-            subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->fetch_offset;
-
-            // set submessage length
-            if (desc->len - qpStatus->fetch_offset > MAX_COMMIT_SZ)
+            HANGU_PRINT(DescScheduler, "new BW/UD desc received by wqe proc! qpn: %d\n", qpStatus->qpn);
+            assert(rNic->txdescRspFifo.size());
+            if (procSize < batchSize)
             {
-                subDesc->len = MAX_COMMIT_SZ;
-            }
-            else
-            {
-                subDesc->len = desc->len - qpStatus->fetch_offset;
-            }
+                TxDescPtr desc = rNic->txdescRspFifo.front();
+                HANGU_PRINT(DescScheduler, "fetch offset: %d, desc len: %d, batch size: %d\n", 
+                    qpStatus->fetch_offset, desc->len, batchSize);
+                assert(qpStatus->fetch_offset < desc->len);
 
-            // If this subDesc doesn't finish the whole message, don't generate CQE,
-            // or otherwise generate CQE, and switch to the next descriptor
-            if (qpStatus->fetch_offset + subDesc->len >= desc->len)
-            {
-                subDesc->flags = 1;
-                rNic->txdescRspFifo.pop();
-                qpStatus->fetch_offset = 0;
-                lowPriorityDescQue.push(subDesc);
-                procDescNum++;
-
-                // update tail pointer
-                HANGU_PRINT(DescScheduler, "tail pointer update: %d, head pointer: %d\n", qpStatus->tail_ptr, qpStatus->head_ptr);
-                assert(qpStatus->tail_ptr < qpStatus->head_ptr);
-                qpStatus->tail_ptr++;
-
-                // if procDescNum reaches the maximum descriptor number in this schedule period, 
-                // break to the next QP
-                if (procDescNum >= descNum)
+                TxDescPtr subDesc = make_shared<TxDesc>(desc);
+                subDesc->opcode = desc->opcode;
+                // WARNING: SEND/RECV are currently not supported!
+                subDesc->lVaddr = desc->lVaddr + qpStatus->fetch_offset;
+                subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->fetch_offset;
+                // set submessage length
+                if (desc->len - qpStatus->fetch_offset > batchSize - procSize) // WARNING: modify here
                 {
-                    break;
+                    subDesc->len = batchSize - procSize;
+                }
+                else
+                {
+                    subDesc->len = desc->len - qpStatus->fetch_offset;
                 }
 
-                // if (procDescNum < descNum)
-                // {
-                //     // If there are still descriptors left , switch to the next descriptor
-                //     // desc = rNic->txdescRspFifo.front();
-                // }
-                // else
-                // {
-                //     // if procDescNum reaches the maximum descriptor number in this schedule period, 
-                //     // break to the next QP
-                //     break;
-                // }
-            }
-            else
-            {
-                subDesc->flags = 0;
-                qpStatus->fetch_offset += subDesc->len;
+                // If this subDesc doesn't finish the whole message, don't generate CQE,
+                // or otherwise generate CQE, and switch to the next descriptor
+                if (qpStatus->fetch_offset + subDesc->len >= desc->len)
+                {
+                    // update tail pointer
+                    HANGU_PRINT(DescScheduler, "tail pointer to update: %d, head pointer: %d\n", qpStatus->tail_ptr, qpStatus->head_ptr);
+                    assert(qpStatus->tail_ptr < qpStatus->head_ptr);
+                    qpStatus->tail_ptr++;
+                    subDesc->flags = 1;
+                    qpStatus->fetch_offset = 0;
+                }
+                else
+                {
+                    subDesc->flags = 0;
+                    qpStatus->fetch_offset += subDesc->len;
+                }
+                HANGU_PRINT(DescScheduler, "finish WQE split: type: %d, sub WQE length: %d, qpn: %d\n", qpStatus->type, subDesc->len, qpStatus->qpn);
                 lowPriorityDescQue.push(subDesc);
+                procSize += subDesc->len;
             }
-            procSize += subDesc->len;
+            rNic->txdescRspFifo.pop();
         }
-        // rNic->txdescRspFifo.pop();
+
+
+
+        // uint32_t procSize = 0;
+        // uint32_t batchSize; // the size of data that should be transmitted in this schedule period
+        // batchSize = qpStatus->weight * groupTable[qpStatus->group_id];
+        // assert(batchSize != 0);
+
+        // HANGU_PRINT(DescScheduler, "BW desc received by wqe proc! qpn: %d\n", qpStatus->qpn);
+
+        // while(procSize < batchSize) // WARNING: not accurate
+        // {
+        //     assert(rNic->txdescRspFifo.size());
+        //     TxDescPtr desc = rNic->txdescRspFifo.front();
+        //     HANGU_PRINT(DescScheduler, "fetch offset: %d, desc len: %d, batch size: %d\n", 
+        //         qpStatus->fetch_offset, desc->len, batchSize);
+        //     assert(qpStatus->fetch_offset < desc->len);
+        //     TxDescPtr subDesc = make_shared<TxDesc>(desc);
+        //     subDesc->opcode = desc->opcode;
+        //     // WARNING: SEND/RECV are currently not supported!
+        //     subDesc->lVaddr = desc->lVaddr + qpStatus->fetch_offset;
+        //     subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->fetch_offset;
+
+        //     // set submessage length
+        //     if (desc->len - qpStatus->fetch_offset > MAX_COMMIT_SZ) // WARNING: modify here
+        //     {
+        //         subDesc->len = MAX_COMMIT_SZ;
+        //     }
+        //     else
+        //     {
+        //         subDesc->len = desc->len - qpStatus->fetch_offset;
+        //     }
+
+        //     // If this subDesc doesn't finish the whole message, don't generate CQE,
+        //     // or otherwise generate CQE, and switch to the next descriptor
+        //     if (qpStatus->fetch_offset + subDesc->len >= desc->len)
+        //     {
+        //         subDesc->flags = 1;
+        //         rNic->txdescRspFifo.pop();
+        //         qpStatus->fetch_offset = 0;
+        //         lowPriorityDescQue.push(subDesc);
+        //         procDescNum++;
+
+        //         // update tail pointer
+        //         HANGU_PRINT(DescScheduler, "tail pointer to update: %d, head pointer: %d\n", qpStatus->tail_ptr, qpStatus->head_ptr);
+        //         assert(qpStatus->tail_ptr < qpStatus->head_ptr);
+        //         qpStatus->tail_ptr++;
+
+        //         // if procDescNum reaches the maximum descriptor number in this schedule period, 
+        //         // break to the next QP
+        //         if (procDescNum >= descNum)
+        //         {
+        //             break;
+        //         }
+        //     }
+        //     else
+        //     {
+        //         subDesc->flags = 0;
+        //         qpStatus->fetch_offset += subDesc->len;
+        //         lowPriorityDescQue.push(subDesc);
+        //         HANGU_PRINT(DescScheduler, "finish WQE split: type: %d, sub WQE length: %d\n", qpStatus->type, subDesc->len);
+        //     }
+        //     procSize += subDesc->len;
+        // }
     }
     else
     {
         panic("Illegal QP type!\n");
     }
 
+
+    // write QPN back in case of UD and UC QP
     if ((qpStatus->type == UD_QP || qpStatus->type == UC_QP) && (qpStatus->tail_ptr < qpStatus->head_ptr))
     {
         lowPriorityQpnQue.push(qpStatus->qpn);
@@ -404,7 +442,7 @@ void HanGuRnic::DescScheduler::launchWQE()
 
 /**
  * @note
- * Update win_fetch and tail_ptr in QP status. Add QPN back to QPN queue.
+ * Update win_fetch and tail_ptr in QP status. Add QPN back to QPN queue in case of RC QP
 */
 void HanGuRnic::DescScheduler::rxUpdate()
 {
@@ -420,6 +458,7 @@ void HanGuRnic::DescScheduler::rxUpdate()
         status->tail_ptr++;
         if (status->head_ptr > status->tail_ptr)
         {
+            // TODO: push back QPN
             schedule = true;
         }
     }

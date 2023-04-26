@@ -673,9 +673,9 @@ struct QPStatusItem
         this->weight                = weight;
         this->qpn                   = qpn;
         this->group_id              = group_id;
-        this->head_ptr              = 0;
-        this->fetch_ptr             = 0;
-        this->tail_ptr              = 0;
+        this->head_ptr              = 0; // unit: descriptor!
+        // this->fetch_ptr             = 0;
+        this->tail_ptr              = 0; // unit: descriptor!
         this->wnd_start             = 0;
         this->fetch_offset          = 0;
         // this->wnd_fetch             = 0;
@@ -702,7 +702,7 @@ struct QPStatusItem
     }
     // queue pointers
     uint32_t head_ptr;
-    uint32_t fetch_ptr; // next WQE to fetch
+    // uint32_t fetch_ptr; // next WQE to fetch
     uint32_t tail_ptr;
     // window
     uint32_t wnd_start; // start offset in the current message
