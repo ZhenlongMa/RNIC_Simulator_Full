@@ -335,18 +335,18 @@ void HanGuRnic::DescScheduler::wqeProc()
             }
             rNic->txdescRspFifo.pop();
         }
-        // if (qpStatus->tail_ptr != qpStatus->head_ptr)
-        // {
-        //     while (leastPriorityQpnQue.size() >= LEAST_QPN_QUE_CAP)
-        //     {
-        //         leastPriorityQpnQue.pop();
-        //     }
-        //     leastPriorityQpnQue.push(qpStatus->qpn);
-        //     if (!getPrefetchQpnEvent.scheduled())
-        //     {
-        //         rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
-        //     }
-        // }
+        if (qpStatus->tail_ptr != qpStatus->head_ptr)
+        {
+            while (leastPriorityQpnQue.size() >= LEAST_QPN_QUE_CAP)
+            {
+                leastPriorityQpnQue.pop();
+            }
+            leastPriorityQpnQue.push(qpStatus->qpn);
+            if (!getPrefetchQpnEvent.scheduled())
+            {
+                rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+            }
+        }
 
 
 
