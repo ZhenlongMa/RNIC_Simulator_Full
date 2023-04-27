@@ -61,7 +61,7 @@
 #define UC_QP 4
 #define UD_QP 5
 // UC and UD QP above is only used in QoS!
-#define SCH_GRANULARITY 1024 // maximum submessage size
+#define LEAST_QPN_QUE_CAP 64
 
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
@@ -257,6 +257,26 @@ struct TxDesc {
         return (this->flags & WR_FLAG_SIGNALED) != 0;
     }
 
+    void setSignal()
+    {
+        this->flags = this->flags | (1 << 31);
+    }
+
+    void cancelSignal()
+    {
+        this->flags = this->flags & ~(1 << 31);
+    }
+
+    bool isQueUpdate()
+    {
+        return (this->flags & (1 << 30));
+    }
+
+    void setQueUpdate()
+    {
+        this->flags = this->flags | (1 << 30);
+    }
+
     uint32_t len;
     uint32_t lkey;
     uint64_t lVaddr;
@@ -278,7 +298,7 @@ struct TxDesc {
     // uint8_t opcode;
 
     union {
-        uint32_t flags;
+        uint32_t flags; // 32nd bit indicates CQE generation, 31st bit indicates QPN queue update
         uint8_t  opcode;
     };
 };
