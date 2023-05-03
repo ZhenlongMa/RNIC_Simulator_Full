@@ -354,6 +354,8 @@ int poll_sync(struct rdma_resc *resc) {
         return 0;
     }
 
+    RDMA_PRINT(librdma, "poll_sync: waiting!\n");
+
     while (1) {
 
         /* replenish cm recv wqe */
@@ -366,7 +368,7 @@ int poll_sync(struct rdma_resc *resc) {
         cnt = 0;
         while (1) {
             int res = ibv_poll_cpl(ctx->cm_cq, desc, MAX_CPL_NUM);
-            // RDMA_PRINT(librdma, "poll_sync: (ibv_poll_cpl) finish ! return is %d, cpl cnt %d\n", res, ctx->cm_cq->cpl_cnt);
+            RDMA_PRINT(librdma, "poll_sync: (ibv_poll_cpl) finish ! return is %d, cpl cnt %d\n", res, ctx->cm_cq->cpl_cnt);
             
             if (res) {
                 for (int j  = 0; j < res; ++j) {

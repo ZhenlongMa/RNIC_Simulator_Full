@@ -165,43 +165,53 @@ int main (int argc, char **argv) {
     num_cq = TEST_CQ_NUM;
     num_qp = TEST_QP_NUM;
 
-    struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));;
+    // int num_mr = 1;
+    // int num_cq = TEST_CQ_NUM;
+    int grp1_num_qp = 2;
+    int grp2_num_qp = 1;
+    int grp1_weight = 3;
+    int grp2_weight = 2;
+
+    struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
 
     /* device initialization */
     ibv_open_device(ib_context, llid);
 
     RDMA_PRINT(Client, "Open device!\n");
 
-    struct rdma_resc *resc = rdma_resc_init(ib_context, num_mr, num_cq, num_qp, llid, 1);
+    struct rdma_resc *resc1 = rdma_resc_init(ib_context, num_mr, num_cq, num_qp, llid, 1);
+    struct rdma_resc *resc2 = rdma_resc_init(ib_context, num_mr, num_cq, num_qp, llid, 1);
 
     /* Connect QPs to server's QP */
     // clt_connect_qps(resc, svr_lid);
-    clt_update_info(resc, svr_lid);
-    RDMA_PRINT(Client, "clt_connect_qps end\n");
+    clt_update_info(resc1, svr_lid);
+    RDMA_PRINT(Client, "clt_connect_qps 1 end\n");
+    clt_update_info(resc2, svr_lid);
+    RDMA_PRINT(Client, "clt_connect_qps 2 end\n");
 
     /* If this is RDMA READ, write data to mr, preparing for server reading */
-    if (op_mode == OPMODE_RDMA_READ) {
-        clt_fill_mr(resc->mr[0], 0);
-    }
+    // if (op_mode == OPMODE_RDMA_READ) {
+    //     clt_fill_mr(resc->mr[0], 0);
+    // }
 
     /* sync to make sure that we could get start */
-    rdma_send_sync(resc);
+    rdma_send_sync(resc1);
     RDMA_PRINT(Client, "ready for server send RDMA write\n");
 
     /* Wait for Completion of rdma write processing */
-    rdma_send_sync(resc);
+    rdma_send_sync(resc1);
 
-    if (op_mode == OPMODE_RDMA_WRITE) {
-        uint32_t offset = 0; // (4096 / num_qp);
-        // for (int i = 0; i < num_qp; ++i) {
-        //     RDMA_PRINT(Client, "QP[%d], RDMA Write data is %s\n", i, (char *)(resc->mr[0]->addr + offset * i));
-        // }
-        RDMA_PRINT(Client, "QP, RDMA Write data is %s\n", (char *)(resc->mr[0]->addr + offset));
-    }
+    // if (op_mode == OPMODE_RDMA_WRITE) {
+    //     uint32_t offset = 0; // (4096 / num_qp);
+    //     // for (int i = 0; i < num_qp; ++i) {
+    //     //     RDMA_PRINT(Client, "QP[%d], RDMA Write data is %s\n", i, (char *)(resc->mr[0]->addr + offset * i));
+    //     // }
+    //     RDMA_PRINT(Client, "QP, RDMA Write data is %s\n", (char *)(resc1->mr[0]->addr + offset));
+    // }
 
     /* close the fd */
-    RDMA_PRINT(Client, "fd : %d\n", ((struct hghca_context*)resc->ctx->dvr)->fd);
-    close(((struct hghca_context*)resc->ctx->dvr)->fd);
+    RDMA_PRINT(Client, "fd : %d\n", ((struct hghca_context*)resc1->ctx->dvr)->fd);
+    close(((struct hghca_context*)resc1->ctx->dvr)->fd);
     
     return 0;
     
