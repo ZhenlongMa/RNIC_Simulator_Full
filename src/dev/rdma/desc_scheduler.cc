@@ -241,7 +241,7 @@ void HanGuRnic::DescScheduler::wqeProc()
     HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: %d, type: %d\n", qpStatus->qpn, qpStatus->type);
 
     // check QP type
-    if (qpStatus->type == LAT_QP)
+    if (qpStatus->type == LAT_QP)// warning: modify here
     {
         // For latency sensitive QP, commit all WQEs
         assert(1);
@@ -253,7 +253,7 @@ void HanGuRnic::DescScheduler::wqeProc()
         }
         qpStatus->tail_ptr += descNum;
     }
-    else if (qpStatus->type == RATE_QP)
+    else if (qpStatus->type == RATE_QP) // WARNING: modify here
     {
         assert(1);
         // For message rate sensitive QP, commit up to 8 WQEs
@@ -433,7 +433,7 @@ void HanGuRnic::DescScheduler::wqeProc()
         }
     }
 
-    DoorbellPtr doorbell = make_shared<DoorbellFifo>(subDescNum, qpStatus->qpn);
+    DoorbellPtr doorbell = make_shared<DoorbellFifo>(subDescNum, qpStatus->qpn, qpStatus->type);
     wqeProcToLaunchWqeQue.push(doorbell);
     HANGU_PRINT(DescScheduler, "pseudo doorbell pushed into queue to launchWQE, QPN: %d, num: %d\n", qpStatus->qpn, subDescNum);
     
@@ -454,28 +454,39 @@ void HanGuRnic::DescScheduler::wqeProc()
 void HanGuRnic::DescScheduler::launchWQE()
 {
     HANGU_PRINT(DescScheduler, "launchWQE in!\n");
-    assert(lowPriorityDescQue.size() || highPriorityDescQue.size());
-    if (highPriorityDescQue.size())
+
+    // get pseudo doorbell
+    DoorbellPtr doorbell = wqeProcToLaunchWqeQue.front();
+    rNic->rdmaEngine.df2ddFifo.push(doorbell); 
+    HANGU_PRINT(DescScheduler, "pseudo doorbell get by launchWQE, QPN: %d, num: %d, type: %d\n", doorbell->qpn, doorbell->num, doorbell->opcode);
+    wqeProcToLaunchWqeQue.pop();
+
+    if (doorbell->opcode == BW_QP || doorbell->opcode == UC_QP || doorbell->opcode == UD_QP)
     {
-        rNic->txDescLaunchQue.push(highPriorityDescQue.front());
-        highPriorityDescQue.pop();
+        assert(lowPriorityDescQue.size() == doorbell->num);
+        assert(doorbell->num != 0);
+        for (int i = 0; i < doorbell->num; i++)
+        {
+            rNic->txDescLaunchQue.push(lowPriorityDescQue.front());
+            lowPriorityDescQue.pop();
+        }
     }
     else
     {
-        rNic->txDescLaunchQue.push(lowPriorityDescQue.front());
-        lowPriorityDescQue.pop();
+        assert(highPriorityDescQue.size() == doorbell->num);
+        assert(doorbell->num != 0);
+        for (int i = 0; i < doorbell->num; i++)
+        {
+            rNic->txDescLaunchQue.push(highPriorityDescQue.front());
+            highPriorityDescQue.pop();
+        }
     }
-
-    DoorbellPtr doorbell = wqeProcToLaunchWqeQue.front();
-    rNic->rdmaEngine.df2ddFifo.push(doorbell); 
-    HANGU_PRINT(DescScheduler, "pseudo doorbell pushed into queue, QPN: %d, num: %d\n", doorbell->qpn, doorbell->num);
-    wqeProcToLaunchWqeQue.pop();
 
     if (!rNic->rdmaEngine.dduEvent.scheduled())
     {
         rNic->schedule(rNic->rdmaEngine.dduEvent, curTick() + rNic->clockPeriod());
     }
-    if (!launchWqeEvent.scheduled() && (lowPriorityDescQue.size() || highPriorityDescQue.size()))
+    if (!launchWqeEvent.scheduled() && wqeProcToLaunchWqeQue.size())
     {
         rNic->schedule(launchWqeEvent, curTick() + rNic->clockPeriod());
     }

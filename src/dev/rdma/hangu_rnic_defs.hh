@@ -112,12 +112,13 @@ struct DoorbellFifo {
         this->qpn = qpn;
         this->offset = offset;
     }
-    DoorbellFifo (uint8_t num, uint32_t qpn) 
+    DoorbellFifo (uint8_t num, uint32_t qpn, uint8_t type) 
     {
         this->num = num;
         this->qpn = qpn;
+        this->opcode = type;
     }
-    uint8_t  opcode;
+    uint8_t  opcode; // for pseudo doorbell, this field indicates the type of QP
     uint8_t  num;
     uint32_t qpn;
     uint32_t offset;
