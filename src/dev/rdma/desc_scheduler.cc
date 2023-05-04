@@ -179,6 +179,7 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
 */
 void HanGuRnic::DescScheduler::wqePrefetch()
 {
+    HANGU_PRINT(DescScheduler, "wqePrefetch in!\n");
     assert(wqePrefetchQpStatusRReqQue.size());
     uint32_t qpn = wqePrefetchQpStatusRReqQue.front();
     wqePrefetchQpStatusRReqQue.pop();
@@ -220,6 +221,7 @@ void HanGuRnic::DescScheduler::wqePrefetch()
     {
         rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
     }
+    HANGU_PRINT(DescScheduler, "wqePrefetch out!\n");
 }
 
 /**
@@ -228,12 +230,13 @@ void HanGuRnic::DescScheduler::wqePrefetch()
 */
 void HanGuRnic::DescScheduler::wqeProc()
 {
+    HANGU_PRINT(DescScheduler, "wqeProc in!\n");
     assert(rNic->txdescRspFifo.size());
     uint32_t descNum = wqeFetchInfoQue.front().first;
     QPStatusPtr qpStatus = wqeFetchInfoQue.front().second;
     wqeFetchInfoQue.pop();
     TxDescPtr desc;
-    uint8_t procDescNum = 0;
+    uint8_t subDescNum = 0;
 
     HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: %d, type: %d\n", qpStatus->qpn, qpStatus->type);
 
@@ -332,6 +335,7 @@ void HanGuRnic::DescScheduler::wqeProc()
                 }
 
                 lowPriorityDescQue.push(subDesc);
+                subDescNum++;
             }
             rNic->txdescRspFifo.pop();
         }
@@ -429,9 +433,9 @@ void HanGuRnic::DescScheduler::wqeProc()
         }
     }
 
-    DoorbellPtr doorbell = make_shared<DoorbellFifo>(procDescNum, qpStatus->qpn);
+    DoorbellPtr doorbell = make_shared<DoorbellFifo>(subDescNum, qpStatus->qpn);
     wqeProcToLaunchWqeQue.push(doorbell);
-    // HANGU_PRINT("pseudo doorbell pushed into queue, QPN: %d, num: %d\n", qpStatus->qpn, procDescNum);
+    HANGU_PRINT(DescScheduler, "pseudo doorbell pushed into queue to launchWQE, QPN: %d, num: %d\n", qpStatus->qpn, subDescNum);
     
     if (!launchWqeEvent.scheduled())
     {
@@ -441,6 +445,7 @@ void HanGuRnic::DescScheduler::wqeProc()
     {
         rNic->schedule(wqeRspEvent, curTick() + rNic->clockPeriod());
     }
+    HANGU_PRINT(DescScheduler, "wqeProc out!\n");
 }
 
 /**
@@ -448,6 +453,7 @@ void HanGuRnic::DescScheduler::wqeProc()
 */
 void HanGuRnic::DescScheduler::launchWQE()
 {
+    HANGU_PRINT(DescScheduler, "launchWQE in!\n");
     assert(lowPriorityDescQue.size() || highPriorityDescQue.size());
     if (highPriorityDescQue.size())
     {
@@ -473,7 +479,7 @@ void HanGuRnic::DescScheduler::launchWQE()
     {
         rNic->schedule(launchWqeEvent, curTick() + rNic->clockPeriod());
     }
-    // HANGU_PRINT(DescScheduler, "launch WQE end, QPN: %d, num: %d\n", doorbell->qpn, doorbell->num);
+    HANGU_PRINT(DescScheduler, "launch WQE out!\n");
 }
 
 /**

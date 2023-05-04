@@ -340,21 +340,10 @@ int post_sync(struct rdma_resc *resc) {
 int poll_sync(struct rdma_resc *resc) {
     RDMA_PRINT(librdma, "into poll_sync function1!\n");
     /* Recv Sync CR Data */
-    // RDMA_PRINT(librdma, "ctx ok?\n");
-    // struct ibv_context *ctx = resc->ctx;
-    // RDMA_PRINT(librdma, "ctx ok!\n");
-    // struct rdma_cr *cr_info;
-    // RDMA_PRINT(librdma, "desc ok?\n");
-    // struct cpl_desc **desc = resc->desc;
-    // RDMA_PRINT(librdma, "desc ok!\n");
-    RDMA_PRINT(librdma, "ctx ok?\n");
-    struct cpl_desc **desc = resc->desc;
-    
-    RDMA_PRINT(librdma, "ctx ok!\n");
-    struct rdma_cr *cr_info;
-    RDMA_PRINT(librdma, "desc ok?\n");
     struct ibv_context *ctx = resc->ctx;
-    RDMA_PRINT(librdma, "desc ok!\n");
+    struct rdma_cr *cr_info;
+    struct cpl_desc **desc = resc->desc;
+
     int cnt;
     int polled_sync_num = 0;
 
