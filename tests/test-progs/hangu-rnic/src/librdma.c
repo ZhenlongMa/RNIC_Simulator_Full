@@ -320,6 +320,7 @@ struct cpl_desc **rdma_poll_cm_rcv_cpl(struct rdma_resc *resc, int *cnt) {
 
 
 int post_sync(struct rdma_resc *resc) {
+    RDMA_PRINT(librdma, "into post_sync function!\n");
     struct rdma_cr *cr_info = (struct rdma_cr *)malloc(sizeof(struct rdma_cr));
     
     memset(cr_info, 0, sizeof(struct rdma_cr));
@@ -327,6 +328,7 @@ int post_sync(struct rdma_resc *resc) {
     cr_info->src_lid = resc->ctx->lid;
     
     for (int i = 0; i < resc->num_rem; ++i) {
+        RDMA_PRINT(librdma, "post sync: %d\n", i);
         cm_post_send(resc->ctx, cr_info, 1, resc->rinfo[i].dlid);
     }
     free(cr_info);
@@ -336,12 +338,27 @@ int post_sync(struct rdma_resc *resc) {
 
 
 int poll_sync(struct rdma_resc *resc) {
+    RDMA_PRINT(librdma, "into poll_sync function1!\n");
     /* Recv Sync CR Data */
-    struct ibv_context *ctx = resc->ctx;
-    struct rdma_cr *cr_info;
+    // RDMA_PRINT(librdma, "ctx ok?\n");
+    // struct ibv_context *ctx = resc->ctx;
+    // RDMA_PRINT(librdma, "ctx ok!\n");
+    // struct rdma_cr *cr_info;
+    // RDMA_PRINT(librdma, "desc ok?\n");
+    // struct cpl_desc **desc = resc->desc;
+    // RDMA_PRINT(librdma, "desc ok!\n");
+    RDMA_PRINT(librdma, "ctx ok?\n");
     struct cpl_desc **desc = resc->desc;
+    
+    RDMA_PRINT(librdma, "ctx ok!\n");
+    struct rdma_cr *cr_info;
+    RDMA_PRINT(librdma, "desc ok?\n");
+    struct ibv_context *ctx = resc->ctx;
+    RDMA_PRINT(librdma, "desc ok!\n");
     int cnt;
     int polled_sync_num = 0;
+
+    RDMA_PRINT(librdma, "into poll_sync function2!\n");
 
     /* count already synced */
     for (int i = 0; i < resc->num_rem; ++i) {

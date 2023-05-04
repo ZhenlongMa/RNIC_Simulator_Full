@@ -274,6 +274,7 @@ struct rdma_resc *set_group_resource(struct ibv_context *ctx, int num_mr, int nu
         offset = 0;
         svr_fill_mr(resc->mr[0], offset);
     }
+    return resc;
 }
 
 int main (int argc, char **argv) {
