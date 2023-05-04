@@ -179,7 +179,7 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
 */
 void HanGuRnic::DescScheduler::wqePrefetch()
 {
-    HANGU_PRINT(DescScheduler, "wqePrefetch in!\n");
+    // HANGU_PRINT(DescScheduler, "wqePrefetch in!\n");
     assert(wqePrefetchQpStatusRReqQue.size());
     uint32_t qpn = wqePrefetchQpStatusRReqQue.front();
     wqePrefetchQpStatusRReqQue.pop();
@@ -221,7 +221,7 @@ void HanGuRnic::DescScheduler::wqePrefetch()
     {
         rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
     }
-    HANGU_PRINT(DescScheduler, "wqePrefetch out!\n");
+    // HANGU_PRINT(DescScheduler, "wqePrefetch out!\n");
 }
 
 /**
@@ -230,7 +230,7 @@ void HanGuRnic::DescScheduler::wqePrefetch()
 */
 void HanGuRnic::DescScheduler::wqeProc()
 {
-    HANGU_PRINT(DescScheduler, "wqeProc in!\n");
+    // HANGU_PRINT(DescScheduler, "wqeProc in!\n");
     assert(rNic->txdescRspFifo.size());
     uint32_t descNum = wqeFetchInfoQue.front().first;
     QPStatusPtr qpStatus = wqeFetchInfoQue.front().second;
@@ -445,7 +445,7 @@ void HanGuRnic::DescScheduler::wqeProc()
     {
         rNic->schedule(wqeRspEvent, curTick() + rNic->clockPeriod());
     }
-    HANGU_PRINT(DescScheduler, "wqeProc out!\n");
+    // HANGU_PRINT(DescScheduler, "wqeProc out!\n");
 }
 
 /**
@@ -453,7 +453,7 @@ void HanGuRnic::DescScheduler::wqeProc()
 */
 void HanGuRnic::DescScheduler::launchWQE()
 {
-    HANGU_PRINT(DescScheduler, "launchWQE in!\n");
+    // HANGU_PRINT(DescScheduler, "launchWQE in!\n");
 
     // get pseudo doorbell
     DoorbellPtr doorbell = wqeProcToLaunchWqeQue.front();
@@ -490,7 +490,7 @@ void HanGuRnic::DescScheduler::launchWQE()
     {
         rNic->schedule(launchWqeEvent, curTick() + rNic->clockPeriod());
     }
-    HANGU_PRINT(DescScheduler, "launch WQE out!\n");
+    // HANGU_PRINT(DescScheduler, "launch WQE out!\n");
 }
 
 /**
@@ -499,13 +499,16 @@ void HanGuRnic::DescScheduler::launchWQE()
 */
 void HanGuRnic::DescScheduler::rxUpdate()
 {
+    // HANGU_PRINT(DescScheduler, "rxUpdate in!\n");
     assert(rNic->updateQue.size());
     uint32_t qpn = rNic->updateQue.front().first;
     uint32_t len = rNic->updateQue.front().second;
     bool schedule = false; 
     rNic->updateQue.pop();
     QPStatusPtr status = qpStatusTable[qpn];
-    HANGU_PRINT(DescScheduler, "rx received! head_ptr: 0x%x, tail_ptr: 0x%x\n", status->head_ptr, status->tail_ptr);
+    HANGU_PRINT(DescScheduler, "rx received! qpn: %d, len: %d\n", qpn, len);
+    HANGU_PRINT(DescScheduler, "rx received! type: %d, head_ptr: 0x%x, tail_ptr: 0x%x\n", status->type, status->head_ptr, status->tail_ptr);
+    assert(status->type == LAT_QP || status->type == RATE_QP || status->type == BW_QP);
     if (status->type == LAT_QP || status->type == RATE_QP)
     {
         status->tail_ptr++;
@@ -517,15 +520,7 @@ void HanGuRnic::DescScheduler::rxUpdate()
     }
     else if (status->type == BW_QP)
     {
-        assert(status->fetch_offset + len <= status->wnd_end);
-        // status->wnd_fetch += len;
-        // if (status->wnd_fetch >= status->wnd_end)
-        // {
-        //     if (status->tail_ptr != status->head_ptr)
-        //     {
-        //         status->tail_ptr++;
-        //     }
-        // }
+        // assert(status->fetch_offset + len <= status->wnd_end);
         if (status->tail_ptr < status->head_ptr)
         {
             lowPriorityQpnQue.push(status->qpn);
@@ -533,6 +528,7 @@ void HanGuRnic::DescScheduler::rxUpdate()
         }
         else if (status->tail_ptr == status->head_ptr)
         {
+            HANGU_PRINT(DescScheduler, "do not push back QPN\n");
         }
         else
         {
@@ -549,6 +545,7 @@ void HanGuRnic::DescScheduler::rxUpdate()
     {
         rNic->schedule(updateEvent, curTick() + rNic->clockPeriod());
     }
+    // HANGU_PRINT(DescScheduler, "rxUpdate out!\n");
 }
 
 void HanGuRnic::DescScheduler::createQpStatus()

@@ -394,8 +394,8 @@ HanGuRnic::RdmaEngine::rruProcessing () {
     /* If RX ACK owns illegal psn, just abandon it. */
     if (winElem->firstPsn > ackPsn || winElem->lastPsn < ackPsn) {
         panic("[RdmaEngine] RdmaEngine.RGRRU.rruProcessing:"
-            " RX ACK owns illegal PSN! firstPsn: %d, lastPsn: %d, ackPsn: %d\n", 
-            winElem->firstPsn, winElem->lastPsn, ackPsn);
+            " RX ACK owns illegal PSN! QPN: %d, firstPsn: %d, lastPsn: %d, ackPsn: %d\n", 
+            destQpn, winElem->firstPsn, winElem->lastPsn, ackPsn);
         // HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rruProcessing:"
         //     " RX ACK owns illegal PSN! firstPsn: %d, lastPsn: %d, ackPsn: %d\n", 
         //     winElem->firstPsn, winElem->lastPsn, ackPsn);
@@ -581,14 +581,14 @@ HanGuRnic::RdmaEngine::rguProcessing () {
         sndWindowList[qpc->srcQpn]->lastPsn = qpc->sndPsn;
         sndWindowList[qpc->srcQpn]->list->push_back(winElem);
 
-        // for (auto &item : sndWindowList) {
-        //     uint32_t key = item.first;
-        //     WinMapElem* val = item.second;
-        //     if (val->list->size()) {
-        //         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: key %d firstPsn %d lastPsn %d, size %d\n\n", 
-        //                 key, val->firstPsn, val->lastPsn, val->list->size());
-        //     }
-        // }
+        for (auto &item : sndWindowList) {
+            uint32_t key = item.first;
+            WinMapElem* val = item.second;
+            if (val->list->size()) {
+                HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: key %d firstPsn %d lastPsn %d, size %d\n\n", 
+                        key, val->firstPsn, val->lastPsn, val->list->size());
+            }
+        }
         assert(sndWindowList[qpc->srcQpn]->firstPsn <= sndWindowList[qpc->srcQpn]->lastPsn);
 
         /* Update the state of send window.  
@@ -1002,8 +1002,8 @@ HanGuRnic::RdmaEngine::rauProcessing () {
 void 
 HanGuRnic::RdmaEngine::rpuWbQpc (QpcResc* qpc) {
     
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.rpuProcessing: Write back QPC to Context Module. RQ_offset %d, ePSN %d\n", 
-            qpc->rcvWqeOffset, qpc->expPsn);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.rpuProcessing: Write back QPC to Context Module. QPN: %d, RQ_offset %d, ePSN %d\n", 
+            qpc->srcQpn, qpc->rcvWqeOffset, qpc->expPsn);
 
     /* post qpc wr req to qpcModule */
     /* !FIXME: We don't use it now, cause we update qpc when read it. */
@@ -1154,6 +1154,7 @@ HanGuRnic::RdmaEngine::wrRpuProcessing (EthPacketPtr rxPkt, QpcResc* qpc) {
         bthOp = ((qpc->qpType << 5) | PKT_TRANS_ACK) << 24;
         ((BTH *) pktPtr)->op_destQpn = bthOp | qpc->destQpn;
         ((BTH *) pktPtr)->needAck_psn =  qpc->expPsn;
+        HANGU_PRINT(RdmaEngine, "wrRpuProcessing: src QPN: %d, dst QPN: %d, expPsn: 0x%x\n", qpc->srcQpn, qpc->destQpn, qpc->expPsn);
         pktPtr += PKT_BTH_SZ;
 
         /* Add AETH header */
@@ -1287,11 +1288,11 @@ HanGuRnic::RdmaEngine::rpuProcessing () {
     HANGU_PRINT(RdmaEngine, " RdmaEngine.rpuProcessing: Get QPC from cxtRspProcessing. srcQpn: %d, dstQpn %d, qpc->rcvWqeOffset: %d, idx %d\n", 
             qpc->srcQpn, qpc->destQpn, qpc->rcvWqeOffset, idx);
     
-    for (int i = 0; i < 100; ++i) {
-        if (rs2rpVector[i] != nullptr) {
-            HANGU_PRINT(RdmaEngine, " RdmaEngine.rpuProcessing: idx %d is valid\n", i);
-        }
-    }
+    // for (int i = 0; i < 100; ++i) {
+    //     if (rs2rpVector[i] != nullptr) {
+    //         HANGU_PRINT(RdmaEngine, " RdmaEngine.rpuProcessing: idx %d is valid\n", i);
+    //     }
+    // }
     
     /* Get RX pkt from RdmaEngine.rauProcessing */
     assert(rs2rpVector[idx] != nullptr);

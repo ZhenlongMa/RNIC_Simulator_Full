@@ -258,11 +258,11 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
 
     HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: mptResc->lkey 0x%x, len %d, chnl 0x%x, type 0x%x, offset %d\n", 
             mptResc->key, reqPkt->length, reqPkt->chnl, reqPkt->type, reqPkt->offset);
-    if (reqPkt->type == 1) {
-        for (int i = 0; i < reqPkt->length; ++i) {
-            HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: data[%d] 0x%x\n", i, reqPkt->data[i]);
-        }
-    }
+    // if (reqPkt->type == 1) {
+    //     for (int i = 0; i < reqPkt->length; ++i) {
+    //         HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: data[%d] 0x%x\n", i, reqPkt->data[i]);
+    //     }
+    // }
 
     /* Match the info in MR req and mptResc */
     if (!isMRMatching(mptResc, reqPkt)) {

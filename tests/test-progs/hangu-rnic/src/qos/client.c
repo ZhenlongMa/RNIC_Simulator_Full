@@ -179,8 +179,8 @@ int main (int argc, char **argv) {
 
     RDMA_PRINT(Client, "Open device!\n");
 
-    struct rdma_resc *resc1 = rdma_resc_init(ib_context, num_mr, num_cq, num_qp, llid, 1);
-    struct rdma_resc *resc2 = rdma_resc_init(ib_context, num_mr, num_cq, num_qp, llid, 1);
+    struct rdma_resc *resc1 = rdma_resc_init(ib_context, num_mr, num_cq, grp1_num_qp, llid, 1);
+    struct rdma_resc *resc2 = rdma_resc_init(ib_context, num_mr, num_cq, grp2_num_qp, llid, 1);
 
     /* Connect QPs to server's QP */
     // clt_connect_qps(resc, svr_lid);

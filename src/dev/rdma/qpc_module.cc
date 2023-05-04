@@ -68,6 +68,7 @@ bool qpcTxUpdate (QpcResc &resc, uint32_t sz) {
 bool qpcRxUpdate (QpcResc &resc) {
     if (resc.qpType == QP_TYPE_RC) {
         resc.expPsn += 1;
+        HANGU_PRINT(CxtResc, "RC QP qpcRxUpdate, QPN: %d, dst QPN: %d, epsn: %d\n", resc.srcQpn, resc.destQpn, resc.expPsn);
     }
     resc.rcvWqeOffset += sizeof(RxDesc);
     if (resc.rcvWqeOffset + sizeof(RxDesc) > (1 << resc.rqSizeLog)) {
