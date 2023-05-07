@@ -106,7 +106,7 @@ int svr_post_send (struct rdma_resc *resc, struct ibv_qp *qp, int wr_num, uint32
     if (op_mode == OPMODE_RDMA_WRITE) {
 
         for (int i = 0; i < wr_num; ++i) {
-            wqe[i].length = sizeof(TRANS_WRDMA_DATA);
+            wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 65;
             wqe[i].mr = local_mr;
             wqe[i].offset = offset;
 

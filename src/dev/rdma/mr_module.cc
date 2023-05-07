@@ -160,8 +160,12 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
 
     /* Get dma rrsp data */
     MrReqRspPtr tptRsp = dmaReq2RspFifo.front().first;
+    HANGU_PRINT(MrResc, "DMA read response received by MR module, dmaRspNum: %d, mttNum: %d, mttRspNum: %d\n", 
+        tptRsp->dmaRspNum, tptRsp->mttNum, tptRsp->mttRspNum);
+    assert(tptRsp->dmaRspNum < tptRsp->mttNum);
+    assert(tptRsp->dmaRspNum < tptRsp->mttRspNum);
+    tptRsp->dmaRspNum++;
     dmaReq2RspFifo.pop();
-
     assert(tptRsp->dmaRspNum != tptRsp->mttNum);
 
     if (tptRsp->type == DMA_TYPE_WREQ) {
@@ -172,6 +176,15 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
 
     HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: tptRsp lkey %d length %d offset %d!\n", 
                 tptRsp->lkey, tptRsp->length, tptRsp->offset);
+
+    if (tptRsp->dmaRspNum == tptRsp->mttNum)
+    {
+        
+    }
+    else
+    {
+        HANGU_PRINT(MrResc, "Not the last DMA response!\n");
+    }
 
     Event *event;
     RxDescPtr rxDesc;
@@ -277,10 +290,7 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     //         reqPkt->offset, mptResc->startVAddr, mptResc->mttSeg, mttIdx);
 
     // Calculate MTT index, modified by mazhenlong
-    // TO DO: change offset bitwidth
     uint64_t mttIdx = mptResc->mttSeg + ((reqPkt->offset + (mptResc->startVAddr & 0xFFF)) >> PAGE_SIZE_LOG);
-    HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: reqPkt->offset 0x%x, mptResc->startVAddr 0x%x, mptResc->mttSeg 0x%x, mttIdx 0x%x\n", 
-            reqPkt->offset, mptResc->startVAddr, mptResc->mttSeg, mttIdx);
 
     // Calculate mttNum
     if ((reqPkt->length + (reqPkt->offset % PAGE_SIZE)) % PAGE_SIZE == 0)
@@ -294,6 +304,8 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     reqPkt->mttRspNum   = 0;
     reqPkt->dmaRspNum   = 0;
     reqPkt->sentPktNum  = 0;
+    HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: reqPkt->offset 0x%x, mptResc->startVAddr 0x%x, mptResc->mttSeg 0x%x, mttIdx 0x%x, mttNum: %d\n", 
+        reqPkt->offset, mptResc->startVAddr, mptResc->mttSeg, mttIdx, reqPkt->mttNum);
 
     /* Post mtt req */
     // mttReqProcess(mttIdx, reqPkt);
@@ -325,6 +337,8 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
     mttCache.rrspFifo.pop();
     HANGU_PRINT(MrResc, " MrRescModule.mttRspProcessing: mttResc->paddr 0x%lx size %d mttCache.rrspFifo %d\n", 
             mttResc->pAddr, reqPkt->length, mttCache.rrspFifo.size());
+    HANGU_PRINT(MrResc, "MTT response received! reqPkt->mttRspNum: %d, dmaRspNum: %d\n", 
+            reqPkt->mttRspNum, reqPkt->dmaRspNum);
 
     /* Post dma req */
     // dmaReqProcess(mttResc->pAddr + reqPkt->offset, reqPkt);
@@ -337,7 +351,7 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
     // set DMA address
     if (reqPkt->mttRspNum == 0)
     {
-        dmaAddr = mttResc->pAddr + reqPkt->offset % PAGE_SIZE; // warning: suppose MR is page-aligned
+        dmaAddr = mttResc->pAddr + reqPkt->offset % PAGE_SIZE; // WARNING: suppose MR is page-aligned
     }
     else
     {
@@ -355,7 +369,7 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
     }
 
     // set length
-    if (reqPkt->mttRspNum == 0)
+    if (reqPkt->mttRspNum == 0) // if this is the first MTT response
     {
         if (reqPkt->mttRspNum + 1 == reqPkt->mttNum)
         {

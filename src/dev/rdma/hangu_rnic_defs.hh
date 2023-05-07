@@ -737,6 +737,7 @@ struct QPStatusItem
     uint32_t qpn;
     uint8_t perf; // This segment indicates whether the performance exceeds or is lower than expected
     uint8_t group_id;
+    uint8_t in_least_que; // This segment indicates the existance in the least priority queue
 };
 typedef std::shared_ptr<QPStatusItem> QPStatusPtr;
 
