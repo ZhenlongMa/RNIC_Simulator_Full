@@ -166,7 +166,6 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
     assert(tptRsp->dmaRspNum < tptRsp->mttRspNum);
     tptRsp->dmaRspNum++;
     dmaReq2RspFifo.pop();
-    assert(tptRsp->dmaRspNum != tptRsp->mttNum);
 
     if (tptRsp->type == DMA_TYPE_WREQ) {
         panic("mrReq type error, write type req cannot put into dmaReq2RspFifo\n");
@@ -179,74 +178,67 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
 
     if (tptRsp->dmaRspNum == tptRsp->mttNum)
     {
-        
+        Event *event;
+        RxDescPtr rxDesc;
+        TxDescPtr txDesc;
+        switch (tptRsp->chnl) {
+        case MR_RCHNL_TX_DESC:
+            // event = &rnic->rdmaEngine.dduEvent;
+            event = &rnic->descScheduler.wqeRspEvent;
+
+            for (uint32_t i = 0; (i * sizeof(TxDesc)) < tptRsp->length; ++i) {
+                txDesc = make_shared<TxDesc>(tptRsp->txDescRsp + i);
+                HANGU_PRINT(MrResc, "txDesc length: %d, lVaddr: 0x%x, opcode: %d\n", txDesc->len, txDesc->lVaddr, txDesc->opcode);
+                assert(txDesc->len != 0);
+                assert(txDesc->lVaddr != 0);
+                assert(txDesc->opcode != 0);
+                rnic->txdescRspFifo.push(txDesc);
+            }
+            // assert((tptRsp->txDescRsp->len != 0) && (tptRsp->txDescRsp->lVaddr != 0));
+            // rnic->txdescRspFifo.push(tptRsp->txDescRsp);
+            // rnic->txdescRspFifo.push(tptRsp);
+
+            HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: size is %d, desc total len is %d!\n", 
+                    rnic->txdescRspFifo.size(), tptRsp->length);
+            break;
+        case MR_RCHNL_RX_DESC:
+            event = &rnic->rdmaEngine.rcvRpuEvent;
+            for (uint32_t i = 0; (i * sizeof(RxDesc)) < tptRsp->length; ++i) {
+                rxDesc = make_shared<RxDesc>(tptRsp->rxDescRsp + i);
+                assert((rxDesc->len != 0) && (rxDesc->lVaddr != 0));
+                rnic->rxdescRspFifo.push(rxDesc);
+            }
+            // rnic->rxdescRspFifo.push(tptRsp);
+            delete tptRsp->rxDescRsp;
+            HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: rnic->rxdescRspFifo.size() is %d!\n", 
+                    rnic->rxdescRspFifo.size());
+            break;
+        case MR_RCHNL_TX_DATA:
+            event = &rnic->rdmaEngine.rgrrEvent;
+            rnic->txdataRspFifo.push(tptRsp);
+            break;
+        case MR_RCHNL_RX_DATA:
+            event = &rnic->rdmaEngine.rdCplRpuEvent;
+            rnic->rxdataRspFifo.push(tptRsp);
+            break;
+        default:
+            panic("TPT CHNL error, there should only exist RCHNL type!\n");
+            return;
+        }
+
+        /* Schedule relevant event in REQ */
+        if (!event->scheduled()) {
+            rnic->schedule(*event, curTick() + rnic->clockPeriod());
+        }
+        HANGU_PRINT(MrResc, "The last DMA response!\n");
     }
     else
     {
         HANGU_PRINT(MrResc, "Not the last DMA response!\n");
     }
 
-    Event *event;
-    RxDescPtr rxDesc;
-    TxDescPtr txDesc;
-    switch (tptRsp->chnl) {
-      case MR_RCHNL_TX_DESC:
-        // event = &rnic->rdmaEngine.dduEvent;
-        event = &rnic->descScheduler.wqeRspEvent;
-
-        for (uint32_t i = 0; (i * sizeof(TxDesc)) < tptRsp->length; ++i) {
-            txDesc = make_shared<TxDesc>(tptRsp->txDescRsp + i);
-            HANGU_PRINT(MrResc, "txDesc length: %d, lVaddr: 0x%x, opcode: %d\n", txDesc->len, txDesc->lVaddr, txDesc->opcode);
-            assert(txDesc->len != 0);
-            assert(txDesc->lVaddr != 0);
-            assert(txDesc->opcode != 0);
-            rnic->txdescRspFifo.push(txDesc);
-        }
-        // assert((tptRsp->txDescRsp->len != 0) && (tptRsp->txDescRsp->lVaddr != 0));
-        // rnic->txdescRspFifo.push(tptRsp->txDescRsp);
-        // rnic->txdescRspFifo.push(tptRsp);
-
-        HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: size is %d, desc total len is %d!\n", 
-                rnic->txdescRspFifo.size(), tptRsp->length);
-
-        break;
-      case MR_RCHNL_RX_DESC:
-        event = &rnic->rdmaEngine.rcvRpuEvent;
-        for (uint32_t i = 0; (i * sizeof(RxDesc)) < tptRsp->length; ++i) {
-            rxDesc = make_shared<RxDesc>(tptRsp->rxDescRsp + i);
-            assert((rxDesc->len != 0) && (rxDesc->lVaddr != 0));
-            rnic->rxdescRspFifo.push(rxDesc);
-        }
-        // rnic->rxdescRspFifo.push(tptRsp);
-        delete tptRsp->rxDescRsp;
-
-        HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: rnic->rxdescRspFifo.size() is %d!\n", 
-                rnic->rxdescRspFifo.size());
-
-        break;
-      case MR_RCHNL_TX_DATA:
-        event = &rnic->rdmaEngine.rgrrEvent;
-        rnic->txdataRspFifo.push(tptRsp);
-      
-        break;
-      case MR_RCHNL_RX_DATA:
-        event = &rnic->rdmaEngine.rdCplRpuEvent;
-        rnic->rxdataRspFifo.push(tptRsp);
-      
-        break;
-      default:
-        panic("TPT CHNL error, there should only exist RCHNL type!\n");
-        return;
-    }
-
-    /* Schedule relevant event in REQ */
-    if (!event->scheduled()) {
-        rnic->schedule(*event, curTick() + rnic->clockPeriod());
-    }
-
     /* Schedule myself if next elem in FIFO is ready */
     if (dmaReq2RspFifo.size() && dmaReq2RspFifo.front().second->rdVld) {
-
         if (!dmaRrspEvent.scheduled()) { /* Schedule myself */
             rnic->schedule(dmaRrspEvent, curTick() + rnic->clockPeriod());
         }
