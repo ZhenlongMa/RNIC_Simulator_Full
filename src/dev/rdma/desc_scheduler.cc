@@ -67,7 +67,7 @@ void HanGuRnic::DescScheduler::qpcRspProc()
 
 /**
  * @note
- * This method checks QP status and push WQE prefetch request into prefetch queue.
+ * This function checks QP status and push WQE prefetch request into prefetch QPN queue.
 */
 void HanGuRnic::DescScheduler::qpStatusProc()
 {
@@ -115,7 +115,7 @@ void HanGuRnic::DescScheduler::qpStatusProc()
 
 /**
  * @note
- * This method sends QP status read request to prefetch WQE. Scheduling policy is FIFO.
+ * Pop QPN from QPN queue to prefetch WQE. Scheduling policy is FIFO.
 */
 void HanGuRnic::DescScheduler::wqePrefetchSchedule()
 {
@@ -126,11 +126,14 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
     // assert(highPriorityQpnQue.size() <= WQE_BUFFER_CAPACITY && lowPriorityQpnQue.size() <= WQE_BUFFER_CAPACITY);
     allowNewHWQE = highPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
     allowNewLWQE = lowPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
-    allowNewWQE = (allowNewHWQE && highPriorityQpnQue.size()) || (allowNewLWQE && lowPriorityQpnQue.size());
+    allowNewWQE = (allowNewHWQE && highPriorityQpnQue.size()) || (allowNewLWQE && (lowPriorityQpnQue.size() || leastPriorityQpnQue.size()));
+    // HANGU_PRINT(DescScheduler, "Schedule QPN! lowPriorityQpnQue size: %d\n", 
+    //         lowPriorityQpnQue.size());
 
     if (!allowNewWQE)
     {
-        HANGU_PRINT(DescScheduler, "New WQE not allowed!\n");
+        HANGU_PRINT(DescScheduler, "New WQE not allowed! lowPriorityDescQue size: %d, lowPriorityQpnQue size: %d\n", 
+            lowPriorityDescQue.size(), lowPriorityQpnQue.size());
         return;
     }
 
@@ -186,7 +189,8 @@ void HanGuRnic::DescScheduler::wqePrefetch()
     QPStatusPtr qpStatus = qpStatusTable[qpn];
 
     uint32_t descNum;
-    HANGU_PRINT(DescScheduler, "wqe prefetch! head_ptr: 0x%x, tail pointer: 0x%x\n", qpStatus->head_ptr, qpStatus->tail_ptr);
+    HANGU_PRINT(DescScheduler, "wqe prefetch! qpn: %d, head_ptr: 0x%x, tail pointer: 0x%x, fetch offset: 0x%x\n", 
+        qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr, qpStatus->fetch_offset);
     HANGU_PRINT(DescScheduler, "QP num: %d, type: %d, group ID: %d, weight: %d, group granularity: %d\n", 
         qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
     if (qpStatus->head_ptr - qpStatus->tail_ptr > MAX_PREFETCH_NUM)
@@ -288,11 +292,11 @@ void HanGuRnic::DescScheduler::wqeProc()
             if (procSize < batchSize)
             {
                 TxDescPtr desc = rNic->txdescRspFifo.front();
-                HANGU_PRINT(DescScheduler, "qpn: %d, fetch offset: %d, current desc len: %d, batch size: %d\n", 
-                    qpStatus->qpn, qpStatus->fetch_offset, desc->len, batchSize);
+                HANGU_PRINT(DescScheduler, "qpn: %d, fetch offset: %d, current desc len: %d, batch size: %d, descNum: %d\n", 
+                    qpStatus->qpn, qpStatus->fetch_offset, desc->len, batchSize, descNum);
                 assert(qpStatus->fetch_offset < desc->len);
-                HANGU_PRINT(DescScheduler, "ready to split WQE! qpn: %d, tail pointer: %d, head pointer: %d\n", 
-                    qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr);
+                HANGU_PRINT(DescScheduler, "ready to split WQE! qpn: %d, tail pointer: %d, head pointer: %d, fetch offset: 0x%x\n", 
+                    qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr, qpStatus->fetch_offset);
                 assert(qpStatus->tail_ptr < qpStatus->head_ptr);
 
                 TxDescPtr subDesc = make_shared<TxDesc>(desc);
@@ -327,7 +331,8 @@ void HanGuRnic::DescScheduler::wqeProc()
                     qpStatus->fetch_offset += subDesc->len;
                 }
                 procSize += subDesc->len;
-                HANGU_PRINT(DescScheduler, "finish WQE split: type: %d, sub WQE length: %d, qpn: %d\n", qpStatus->type, subDesc->len, qpStatus->qpn);
+                HANGU_PRINT(DescScheduler, "finish WQE split: type: %d, sub WQE length: %d, qpn: %d, descNum: %d\n", 
+                    qpStatus->type, subDesc->len, qpStatus->qpn, descNum);
 
                 // if this is the last sub WQE in this period, mark it as prefetch queue update
                 if (procSize >= batchSize || i + 1 >= descNum)

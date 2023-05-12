@@ -112,8 +112,8 @@ HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq, uint3
           case MR_RCHNL_TX_DESC:
           case MR_RCHNL_RX_DESC:
 
-            HANGU_PRINT(MrResc, " MrRescModule.dmaReqProcess: read desc request lkey 0x%x len %d offset %d\n",
-                    mrReq->lkey, mrReq->length, mrReq->offset);
+            HANGU_PRINT(MrResc, " MrRescModule.dmaReqProcess: read desc request lkey 0x%x len %d offset %d, paddr: 0x%lx\n",
+                    mrReq->lkey, mrReq->length, mrReq->offset, pAddr);
 
             /* Post desc dma req to DMA engine */
             dmaRdReq = make_shared<DmaReq>(rnic->pciToDma(pAddr), mrReq->length, 
@@ -137,6 +137,7 @@ HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq, uint3
         /* Push to Fifo, and dmaRrspProcessing 
          * will fetch for processing */   
         dmaReq2RspFifo.emplace(mrReq, dmaRdReq);
+        HANGU_PRINT(MrResc, "push DMA read req into dmaReq2RspFifo, fifo asize: %d, type: %d, mttnum: %d\n", dmaReq2RspFifo.size(), mrReq->chnl, mrReq->mttNum);
 
         /* Schedule for fetch cached resources through dma read. */
         if (!rnic->dmaEngine.dmaReadEvent.scheduled()) {
@@ -152,16 +153,19 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
 
     HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing! FIFO size: %d\n", dmaReq2RspFifo.size());
     
+    // assert(!dmaReq2RspFifo.empty());
+    // assert(dmaReq2RspFifo.front().second->rdVld);
     /* If empty, just return */
     if (dmaReq2RspFifo.empty() || 
             0 == dmaReq2RspFifo.front().second->rdVld) {
+        HANGU_PRINT(MrResc, "DMA read response not ready!\n");
         return;
     }
 
     /* Get dma rrsp data */
     MrReqRspPtr tptRsp = dmaReq2RspFifo.front().first;
-    HANGU_PRINT(MrResc, "DMA read response received by MR module, dmaRspNum: %d, mttNum: %d, mttRspNum: %d\n", 
-        tptRsp->dmaRspNum, tptRsp->mttNum, tptRsp->mttRspNum);
+    HANGU_PRINT(MrResc, "DMA read response received by MR module, MR request length: %d, DMA request length: %d, dmaRspNum: %d, mttNum: %d, mttRspNum: %d\n", 
+        tptRsp->length, tptRsp->dmaRspNum, tptRsp->mttNum, tptRsp->mttRspNum);
     assert(tptRsp->dmaRspNum < tptRsp->mttNum);
     assert(tptRsp->dmaRspNum < tptRsp->mttRspNum);
     tptRsp->dmaRspNum++;
@@ -182,48 +186,48 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
         RxDescPtr rxDesc;
         TxDescPtr txDesc;
         switch (tptRsp->chnl) {
-        case MR_RCHNL_TX_DESC:
-            // event = &rnic->rdmaEngine.dduEvent;
-            event = &rnic->descScheduler.wqeRspEvent;
+            case MR_RCHNL_TX_DESC:
+                // event = &rnic->rdmaEngine.dduEvent;
+                event = &rnic->descScheduler.wqeRspEvent;
 
-            for (uint32_t i = 0; (i * sizeof(TxDesc)) < tptRsp->length; ++i) {
-                txDesc = make_shared<TxDesc>(tptRsp->txDescRsp + i);
-                HANGU_PRINT(MrResc, "txDesc length: %d, lVaddr: 0x%x, opcode: %d\n", txDesc->len, txDesc->lVaddr, txDesc->opcode);
-                assert(txDesc->len != 0);
-                assert(txDesc->lVaddr != 0);
-                assert(txDesc->opcode != 0);
-                rnic->txdescRspFifo.push(txDesc);
-            }
-            // assert((tptRsp->txDescRsp->len != 0) && (tptRsp->txDescRsp->lVaddr != 0));
-            // rnic->txdescRspFifo.push(tptRsp->txDescRsp);
-            // rnic->txdescRspFifo.push(tptRsp);
+                for (uint32_t i = 0; (i * sizeof(TxDesc)) < tptRsp->length; ++i) {
+                    txDesc = make_shared<TxDesc>(tptRsp->txDescRsp + i);
+                    HANGU_PRINT(MrResc, "txDesc length: %d, lVaddr: 0x%x, opcode: %d\n", txDesc->len, txDesc->lVaddr, txDesc->opcode);
+                    assert(txDesc->len != 0);
+                    assert(txDesc->lVaddr != 0);
+                    assert(txDesc->opcode != 0);
+                    rnic->txdescRspFifo.push(txDesc);
+                }
+                // assert((tptRsp->txDescRsp->len != 0) && (tptRsp->txDescRsp->lVaddr != 0));
+                // rnic->txdescRspFifo.push(tptRsp->txDescRsp);
+                // rnic->txdescRspFifo.push(tptRsp);
 
-            HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: size is %d, desc total len is %d!\n", 
-                    rnic->txdescRspFifo.size(), tptRsp->length);
-            break;
-        case MR_RCHNL_RX_DESC:
-            event = &rnic->rdmaEngine.rcvRpuEvent;
-            for (uint32_t i = 0; (i * sizeof(RxDesc)) < tptRsp->length; ++i) {
-                rxDesc = make_shared<RxDesc>(tptRsp->rxDescRsp + i);
-                assert((rxDesc->len != 0) && (rxDesc->lVaddr != 0));
-                rnic->rxdescRspFifo.push(rxDesc);
-            }
-            // rnic->rxdescRspFifo.push(tptRsp);
-            delete tptRsp->rxDescRsp;
-            HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: rnic->rxdescRspFifo.size() is %d!\n", 
-                    rnic->rxdescRspFifo.size());
-            break;
-        case MR_RCHNL_TX_DATA:
-            event = &rnic->rdmaEngine.rgrrEvent;
-            rnic->txdataRspFifo.push(tptRsp);
-            break;
-        case MR_RCHNL_RX_DATA:
-            event = &rnic->rdmaEngine.rdCplRpuEvent;
-            rnic->rxdataRspFifo.push(tptRsp);
-            break;
-        default:
-            panic("TPT CHNL error, there should only exist RCHNL type!\n");
-            return;
+                HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: size is %d, desc total len is %d!\n", 
+                        rnic->txdescRspFifo.size(), tptRsp->length);
+                break;
+            case MR_RCHNL_RX_DESC:
+                event = &rnic->rdmaEngine.rcvRpuEvent;
+                for (uint32_t i = 0; (i * sizeof(RxDesc)) < tptRsp->length; ++i) {
+                    rxDesc = make_shared<RxDesc>(tptRsp->rxDescRsp + i);
+                    assert((rxDesc->len != 0) && (rxDesc->lVaddr != 0));
+                    rnic->rxdescRspFifo.push(rxDesc);
+                }
+                // rnic->rxdescRspFifo.push(tptRsp);
+                delete tptRsp->rxDescRsp;
+                HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: rnic->rxdescRspFifo.size() is %d!\n", 
+                        rnic->rxdescRspFifo.size());
+                break;
+            case MR_RCHNL_TX_DATA:
+                event = &rnic->rdmaEngine.rgrrEvent;
+                rnic->txdataRspFifo.push(tptRsp);
+                break;
+            case MR_RCHNL_RX_DATA:
+                event = &rnic->rdmaEngine.rdCplRpuEvent;
+                rnic->rxdataRspFifo.push(tptRsp);
+                break;
+            default:
+                panic("TPT CHNL error, there should only exist RCHNL type!\n");
+                return;
         }
 
         /* Schedule relevant event in REQ */
@@ -298,6 +302,12 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     reqPkt->sentPktNum  = 0;
     HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: reqPkt->offset 0x%x, mptResc->startVAddr 0x%x, mptResc->mttSeg 0x%x, mttIdx 0x%x, mttNum: %d\n", 
         reqPkt->offset, mptResc->startVAddr, mptResc->mttSeg, mttIdx, reqPkt->mttNum);
+
+    if (reqPkt->chnl == MR_RCHNL_TX_DESC)
+    {
+        HANGU_PRINT(MrResc, "tx desc MR request! mttNum: %d\n", reqPkt->mttNum);
+        assert(reqPkt->mttNum == 1);
+    }
 
     /* Post mtt req */
     // mttReqProcess(mttIdx, reqPkt);

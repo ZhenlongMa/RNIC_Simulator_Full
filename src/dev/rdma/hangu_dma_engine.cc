@@ -250,7 +250,6 @@ HanGuRnic::DmaEngine::dmaReadProcessing () {
                 rnic->schedule(dmaReadCplEvent, dmaReq->schd);
             }
 
-
             /* Point to next chnl */
             ++readIdx;
             readIdx = readIdx % CHNL_NUM;
