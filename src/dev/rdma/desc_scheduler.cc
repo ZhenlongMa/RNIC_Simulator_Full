@@ -244,6 +244,22 @@ void HanGuRnic::DescScheduler::wqeProc()
 
     HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: %d, type: %d\n", qpStatus->qpn, qpStatus->type);
 
+    assert(qpStatus->head_ptr <= qpStatus->tail_ptr);
+    if (qpStatus->head_ptr == qpStatus->tail_ptr)
+    {
+        HANGU_PRINT(DescScheduler, "invalid WQE! QPN: %d, head_ptr: 0x%x, tail_ptr: 0x%x\n", 
+            qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr);
+        for (int i = 0; i < descNum; i++)
+        {
+            rNic->txdescRspFifo.pop();
+        }
+        if (rNic->txdescRspFifo.size() && !wqeRspEvent.scheduled())
+        {
+            rNic->schedule(wqeRspEvent, curTick() + rNic->clockPeriod());
+        }
+        return;
+    }
+
     // check QP type
     if (qpStatus->type == LAT_QP)// warning: modify here
     {

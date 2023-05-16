@@ -165,7 +165,7 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
     /* Get dma rrsp data */
     MrReqRspPtr tptRsp = dmaReq2RspFifo.front().first;
     HANGU_PRINT(MrResc, "DMA read response received by MR module, MR request length: %d, DMA request length: %d, dmaRspNum: %d, mttNum: %d, mttRspNum: %d\n", 
-        tptRsp->length, tptRsp->dmaRspNum, tptRsp->mttNum, tptRsp->mttRspNum);
+        tptRsp->length, dmaReq2RspFifo.front().second->size, tptRsp->dmaRspNum, tptRsp->mttNum, tptRsp->mttRspNum);
     assert(tptRsp->dmaRspNum < tptRsp->mttNum);
     assert(tptRsp->dmaRspNum < tptRsp->mttRspNum);
     tptRsp->dmaRspNum++;
