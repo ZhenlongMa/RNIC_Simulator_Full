@@ -188,37 +188,46 @@ void HanGuRnic::DescScheduler::wqePrefetch()
     wqePrefetchQpStatusRReqQue.pop();
     QPStatusPtr qpStatus = qpStatusTable[qpn];
 
-    uint32_t descNum;
-    HANGU_PRINT(DescScheduler, "wqe prefetch! qpn: %d, head_ptr: 0x%x, tail pointer: 0x%x, fetch offset: 0x%x\n", 
-        qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr, qpStatus->fetch_offset);
-    HANGU_PRINT(DescScheduler, "QP num: %d, type: %d, group ID: %d, weight: %d, group granularity: %d\n", 
-        qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
-    if (qpStatus->head_ptr - qpStatus->tail_ptr > MAX_PREFETCH_NUM)
+    if (qpStatus->fetch_lock == 0)
     {
-        descNum = MAX_PREFETCH_NUM;
-    }
-    else 
-    {
-        descNum = qpStatus->head_ptr - qpStatus->tail_ptr;
-    }
-
-    if (descNum != 0)
-    {
-        MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-            qpStatus->key, descNum * sizeof(TxDesc), qpStatus->tail_ptr * sizeof(TxDesc));
-
-        descReq->txDescRsp = new TxDesc[descNum];
-        rNic->descReqFifo.push(descReq);
-        HANGU_PRINT(DescScheduler, "WQE req sent! QPN: %d, WQE num: %d, req size: %d\n", qpStatus->qpn, descNum, descNum * sizeof(TxDesc));
-        std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
-        wqeFetchInfoQue.push(wqeFetchInfoPair);
-        if (!rNic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
-            rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
+        uint32_t descNum;
+        HANGU_PRINT(DescScheduler, "wqe prefetch! qpn: %d, head_ptr: 0x%x, tail pointer: 0x%x, fetch offset: 0x%x\n", 
+            qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr, qpStatus->fetch_offset);
+        HANGU_PRINT(DescScheduler, "QP num: %d, type: %d, group ID: %d, weight: %d, group granularity: %d\n", 
+            qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
+        if (qpStatus->head_ptr - qpStatus->tail_ptr > MAX_PREFETCH_NUM)
+        {
+            descNum = MAX_PREFETCH_NUM;
         }
+        else 
+        {
+            descNum = qpStatus->head_ptr - qpStatus->tail_ptr;
+        }
+
+        if (descNum != 0)
+        {
+            MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
+                qpStatus->key, descNum * sizeof(TxDesc), qpStatus->tail_ptr * sizeof(TxDesc));
+
+            descReq->txDescRsp = new TxDesc[descNum];
+            rNic->descReqFifo.push(descReq);
+            HANGU_PRINT(DescScheduler, "WQE req sent! QPN: %d, WQE num: %d, req size: %d, tail ptr: %d\n", 
+                qpStatus->qpn, descNum, descNum * sizeof(TxDesc), qpStatus->tail_ptr);
+            std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
+            wqeFetchInfoQue.push(wqeFetchInfoPair);
+            if (!rNic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
+                rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
+            }
+        }
+        else 
+        {
+            HANGU_PRINT(DescScheduler, "useless least-priority qpn! qpn: %d\n", qpStatus->qpn);
+        }
+        qpStatus->fetch_lock = 1;
     }
-    else 
+    else
     {
-        HANGU_PRINT(DescScheduler, "useless least-priority qpn! qpn: %d\n", qpStatus->qpn);
+        HANGU_PRINT(DescScheduler, "Fetch locked! QPN: %d\n", qpStatus->qpn);
     }
 
     if (wqePrefetchQpStatusRReqQue.size() && !wqePrefetchEvent.scheduled())
@@ -244,7 +253,7 @@ void HanGuRnic::DescScheduler::wqeProc()
 
     HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: %d, type: %d\n", qpStatus->qpn, qpStatus->type);
 
-    assert(qpStatus->head_ptr <= qpStatus->tail_ptr);
+    assert(qpStatus->head_ptr >= qpStatus->tail_ptr);
     if (qpStatus->head_ptr == qpStatus->tail_ptr)
     {
         HANGU_PRINT(DescScheduler, "invalid WQE! QPN: %d, head_ptr: 0x%x, tail_ptr: 0x%x\n", 
@@ -391,6 +400,10 @@ void HanGuRnic::DescScheduler::wqeProc()
             rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
         }
     }
+
+    // unlock WQE fetching
+    assert(qpStatus->fetch_lock == 1);
+    qpStatus->fetch_lock = 0;
 
     DoorbellPtr doorbell = make_shared<DoorbellFifo>(subDescNum, qpStatus->qpn, qpStatus->type);
     wqeProcToLaunchWqeQue.push(doorbell);
