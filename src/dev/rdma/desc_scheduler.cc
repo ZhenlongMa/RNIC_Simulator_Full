@@ -43,6 +43,8 @@ void HanGuRnic::DescScheduler::qpcRspProc()
     rNic->doorbellVector[qpc->idx] = nullptr;
     assert(db->qpn == qpc->txQpcRsp->srcQpn);
 
+    sqSize = pow(2, qpc->txQpcRsp->sqSizeLog);
+
     QPStatusPtr qpStatus;
     if (qpStatusTable.find(db->qpn) == qpStatusTable.end())
     {
@@ -207,7 +209,7 @@ void HanGuRnic::DescScheduler::wqePrefetch()
         if (descNum != 0)
         {
             MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-                qpStatus->key, descNum * sizeof(TxDesc), qpStatus->tail_ptr * sizeof(TxDesc));
+                qpStatus->key, descNum * sizeof(TxDesc), qpStatus->tail_ptr * sizeof(TxDesc) % sqSize);
 
             descReq->txDescRsp = new TxDesc[descNum];
             rNic->descReqFifo.push(descReq);
