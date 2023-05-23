@@ -131,6 +131,7 @@ HanGuRnic::RdmaEngine::dduProcessing () {
     /* Put one descriptor to waiting Memory */
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: desc->len 0x%x, desc->lkey 0x%x, desc->lvaddr 0x%x, desc->opcode 0x%x, desc->flags 0x%x, dduDbell->qpn 0x%x\n", 
             txDesc->len, txDesc->lkey, txDesc->lVaddr, txDesc->opcode, txDesc->flags, dduDbell->qpn);
+    HANGU_PRINT(RdmaEngine, "WQE left in queue: %d\n", rnic->txDescLaunchQue.size());
     uint8_t idx = dp2ddIdxFifo.front();
     dp2ddIdxFifo.pop();
     assert(dd2dpVector[idx] == nullptr);
@@ -155,7 +156,7 @@ HanGuRnic::RdmaEngine::dduProcessing () {
 
     /* Schedule myself again if there's new descriptor
      * or there remains descriptors to post */
-    if (dp2ddIdxFifo.size() && rnic->txdescRspFifo.size() && 
+    if (dp2ddIdxFifo.size() && rnic->txDescLaunchQue.size() && 
             ((allowNewDb && df2ddFifo.size()) || (!allowNewDb))) {
         if (!dduEvent.scheduled()) { /* Schedule myself */
             rnic->schedule(dduEvent, curTick() + rnic->clockPeriod());
@@ -500,8 +501,8 @@ HanGuRnic::RdmaEngine::rguProcessing () {
     EthPacketPtr txPkt = tmp->txPkt;
     dp2rgFifo.pop();
     
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: qpType %d, qpn %d sndPsn %d sndWqeOffset %d\n", 
-            qpc->qpType, qpc->srcQpn, qpc->sndPsn, qpc->sndWqeOffset);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: qpType %d, WQE type: %d, qpn %d sndPsn %d sndWqeOffset %d\n", 
+            qpc->qpType, desc->opcode, qpc->srcQpn, qpc->sndPsn, qpc->sndWqeOffset);
 
     /* Get Request Data (send & RDMA write) 
      * from MrRescModule.dmaRrspProcessing. */
@@ -892,7 +893,7 @@ HanGuRnic::RdmaEngine::sauProcessing () {
     // for (int i = 0; i < ETH_ADDR_LEN; ++i) {
     //     HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, dmac[%d]: 0x%x smac[%d] 0x%x\n", i, dmac[i], i, smac[i]);
     // }
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, type: %d srv : %d, BW %d, len %d, bwDelay %d\n", 
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, type: %d srv : %d, BW %dps/byte, len %d, bwDelay %d\n", 
             type, srv, rnic->etherBandwidth, txsauFifo.front()->length, bwDelay);
 
     if (rnic->etherInt->sendPacket(txsauFifo.front())) {

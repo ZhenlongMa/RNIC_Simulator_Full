@@ -619,6 +619,7 @@ int ibv_poll_cpl(struct ibv_cq *cq, struct cpl_desc **desc, int max_num) {
             if (cq->offset + sizeof(struct cpl_desc) > cq->mr->length) {
                 cq->offset = 0;
             }
+            // HGRNIC_PRINT("poll cpl! cq offset: 0x%h\n");
         } else {
             break;
         }

@@ -328,6 +328,8 @@ class HanGuRnic : public RdmaNic {
                 // void commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue);
                 void launchWQE();
                 void createQpStatus();
+                uint16_t sqSize;
+                uint16_t rqSize;
                 std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
                 std::queue<uint32_t> highPriorityQpnQue;
                 std::queue<uint32_t> lowPriorityQpnQue;

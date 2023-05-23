@@ -241,7 +241,8 @@ double throughput_test(struct rdma_resc *resc, uint8_t op_mode, uint32_t offset,
         }
         *end_time = get_time(resc->ctx);
         *con_time = *end_time - *start_time;
-    } while ((*con_time < 40UL * MS) || (*start_time == 0));
+        RDMA_PRINT(Server, "con_time: %ld/%lu\n", *con_time, 40UL * MS);
+    } while ((*con_time < 10UL * MS) || (*start_time == 0));
 
     for (int i = 0; i < num_client * num_qp; i++)
     {
@@ -392,6 +393,8 @@ int main (int argc, char **argv) {
 
     /* Inform Client that Transmission has completed */
     rdma_recv_sync(grp1_resc);
+
+    RDMA_PRINT(Server, "rdma_recv_sync finished!\n");
 
     /* Inform other CPUs that we can exit */
     cpu_sync(ib_context);

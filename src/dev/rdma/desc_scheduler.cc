@@ -90,7 +90,7 @@ void HanGuRnic::DescScheduler::qpStatusProc()
         // TODO: high pirority queue is not supported yet!
         lowPriorityQpnQue.push(db->qpn);
         // totalWeight += qpStatus->weight;
-        HANGU_PRINT(DescScheduler, "Unactive QP!\n");
+        HANGU_PRINT(DescScheduler, "Inactive QP!\n");
         schedule = true;
     }
     qpStatus->head_ptr += db->num;
