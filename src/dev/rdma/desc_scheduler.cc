@@ -356,10 +356,11 @@ void HanGuRnic::DescScheduler::wqeProc()
                 {
                     subDesc->cancelSignal();
                     qpStatus->fetch_offset += subDesc->len;
+                    HANGU_PRINT(DescScheduler, "Do not signal the sub desc! QPN: %d, flag: 0x%x\n", qpStatus->qpn, subDesc->flags);
                 }
                 procSize += subDesc->len;
-                HANGU_PRINT(DescScheduler, "finish WQE split: type: %d, sub WQE length: %d, qpn: %d, descNum: %d\n", 
-                    qpStatus->type, subDesc->len, qpStatus->qpn, descNum);
+                HANGU_PRINT(DescScheduler, "finish WQE split: type: %d, sub WQE length: %d, qpn: %d, descNum: %d, sub WQE flag: 0x%x\n", 
+                    qpStatus->type, subDesc->len, qpStatus->qpn, descNum, subDesc->flags);
 
                 // if this is the last sub WQE in this period, mark it as prefetch queue update
                 if (procSize >= batchSize || i + 1 >= descNum)

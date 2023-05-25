@@ -327,7 +327,12 @@ HanGuRnic::RdmaEngine::postTxCpl(uint8_t qpType, uint32_t qpn,
 
     /* signaled to CQ based on the info from wqe */
     if (!desc->isSignaled()) {
+        HANGU_PRINT(RdmaEngine, "Do not post completion! QPN: %d, desc flag: 0x%lx\n", qpn, desc->flags);
         return;
+    }
+    else
+    {
+        HANGU_PRINT(RdmaEngine, "Post completioin! QPN: %d, desc flag: 0x%lx\n", qpn, desc->flags);
     }
     
     /* Post related info into scu Fifo */
