@@ -197,6 +197,7 @@ void HanGuRnic::DescScheduler::wqePrefetch()
             qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr, qpStatus->fetch_offset);
         HANGU_PRINT(DescScheduler, "QP num: %d, type: %d, group ID: %d, weight: %d, group granularity: %d\n", 
             qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
+        
         if (qpStatus->head_ptr - qpStatus->tail_ptr > MAX_PREFETCH_NUM)
         {
             descNum = MAX_PREFETCH_NUM;
@@ -204,6 +205,16 @@ void HanGuRnic::DescScheduler::wqePrefetch()
         else 
         {
             descNum = qpStatus->head_ptr - qpStatus->tail_ptr;
+        }
+
+        // In case of going back in circular queue
+        uint32_t tailOffset = qpStatus->tail_ptr % (sqSize / sizeof(TxDesc));
+        if (descNum + tailOffset > sqSize / sizeof(TxDesc))
+        {
+            HANGU_PRINT(DescScheduler, "Loopback Send Queue! descNum: %d, tail pointer: %d, tailOffset: %d, sqSize: %d, size of desc: %d\n", 
+                descNum, qpStatus->tail_ptr, tailOffset, sqSize, sizeof(TxDesc));
+            descNum = sqSize / sizeof(TxDesc) - tailOffset;
+            assert(tailOffset + descNum <= sqSize / sizeof(TxDesc));
         }
 
         if (descNum != 0)

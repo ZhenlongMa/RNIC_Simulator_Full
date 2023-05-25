@@ -306,6 +306,7 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     if (reqPkt->chnl == MR_RCHNL_TX_DESC)
     {
         HANGU_PRINT(MrResc, "tx desc MR request! mttNum: %d\n", reqPkt->mttNum);
+        // The size of the Work Queue is up to one page.
         assert(reqPkt->mttNum == 1);
     }
 
