@@ -125,12 +125,9 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
     bool allowNewHWQE;
     bool allowNewLWQE;
     assert(highPriorityQpnQue.size() || lowPriorityQpnQue.size() || leastPriorityQpnQue.size());
-    // assert(highPriorityQpnQue.size() <= WQE_BUFFER_CAPACITY && lowPriorityQpnQue.size() <= WQE_BUFFER_CAPACITY);
     allowNewHWQE = highPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
     allowNewLWQE = lowPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
     allowNewWQE = (allowNewHWQE && highPriorityQpnQue.size()) || (allowNewLWQE && (lowPriorityQpnQue.size() || leastPriorityQpnQue.size()));
-    // HANGU_PRINT(DescScheduler, "Schedule QPN! lowPriorityQpnQue size: %d\n", 
-    //         lowPriorityQpnQue.size());
 
     if (!allowNewWQE)
     {
@@ -165,6 +162,11 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
         leastPriorityQpnQue.pop();
         wqePrefetchQpStatusRReqQue.push(qpn);
         HANGU_PRINT(DescScheduler, "Least priority QPN fetched! qpn: %d\n", qpn);
+    }
+
+    if (leastPriorityQpnQue.size() == 0 && lowPriorityQpnQue.size() == 0 && highPriorityQpnQue.size() == 0)
+    {
+        HANGU_PRINT(DescScheduler, "Empty QPN queue!\n");
     }
 
     if (!wqePrefetchEvent.scheduled())

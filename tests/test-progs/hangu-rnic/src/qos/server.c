@@ -1,4 +1,5 @@
 #include "librdma.h"
+#include "server.h"
 
 int svr_update_qps(struct rdma_resc *resc) {
     for (int i = 0; i < resc->num_qp * resc->num_rem; ++i) {
@@ -80,10 +81,6 @@ int svr_update_info(struct rdma_resc *resc) {
 }
 
 int svr_fill_mr (struct ibv_mr *mr, uint32_t offset) {
-
-#define TRANS_WRDMA_DATA "Hello World!  Hello RDMA Write! Hello World!  Hello RDMA Write!"
-#define TRANS_RRDMA_DATA "Hello World!  Hello RDMA Read ! Hello World!  Hello RDMA Read !"
-    
     char *string = (char *)(mr->addr + offset);
     memcpy(string, TRANS_WRDMA_DATA, sizeof(TRANS_WRDMA_DATA));
 
@@ -106,7 +103,7 @@ int svr_post_send (struct rdma_resc *resc, struct ibv_qp *qp, int wr_num, uint32
     if (op_mode == OPMODE_RDMA_WRITE) {
 
         for (int i = 0; i < wr_num; ++i) {
-            wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 16 * 64;
+            wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 16 * 64; // no larger than 1MB
             wqe[i].mr = local_mr;
             wqe[i].offset = offset;
 
@@ -218,7 +215,8 @@ double throughput_test(struct rdma_resc *resc, uint8_t op_mode, uint32_t offset,
                 for (int j = 0; j < res; ++j) {
                     // RDMA_PRINT(Server, "desc[j]->trans_type is %d, cq offset %d\n", desc[j]->trans_type, resc->cq[i]->offset);
                     if (desc[j]->trans_type == ibv_type[op_mode]) {
-                        *snd_cnt += (desc[j]->qp_num % TEST_WR_NUM) + 1;
+                        // *snd_cnt += (desc[j]->qp_num % TEST_WR_NUM) + 1;
+                        *snd_cnt += 1;
                         uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
                         // svr_post_send(resc, resc->qp[qp_ptr], (desc[j]->qp_num % TEST_WR_NUM) + 1, offset, op_mode); // (4096 / num_qp) * (qp_ptr % num_qp)
                         svr_post_send(resc, resc->qp[qp_ptr], 1, offset, op_mode); // (4096 / num_qp) * (qp_ptr % num_qp)
