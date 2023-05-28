@@ -138,6 +138,7 @@ HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq, uint3
          * will fetch for processing */   
         dmaReq2RspFifo.emplace(mrReq, dmaRdReq);
         HANGU_PRINT(MrResc, "push DMA read req into dmaReq2RspFifo, fifo asize: %d, type: %d, mttnum: %d\n", dmaReq2RspFifo.size(), mrReq->chnl, mrReq->mttNum);
+        assert(dmaRdReq->size != 0);
 
         /* Schedule for fetch cached resources through dma read. */
         if (!rnic->dmaEngine.dmaReadEvent.scheduled()) {
@@ -385,13 +386,27 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
     }
     else if (reqPkt->mttRspNum + 1 == reqPkt->mttNum)
     {
-        length = (reqPkt->length + reqPkt->offset) % PAGE_SIZE;
+        if ((reqPkt->length + reqPkt->offset) % PAGE_SIZE == 0)
+        {
+            length = PAGE_SIZE;
+        }
+        else
+        {
+            length = (reqPkt->length + reqPkt->offset) % PAGE_SIZE; 
+        }
     }
-    else
+    else if (reqPkt->mttRspNum + 1 < reqPkt->mttNum)
     {
         length = PAGE_SIZE;
     }
+    else
+    {
+        panic("Wrong mtt rsp num and mtt num! mtt rsp num: %d, mtt num: %d", reqPkt->mttRspNum, reqPkt->mttNum);
+    }
     // dmaReqProcess(mttResc->pAddr + reqPkt->offset, reqPkt);
+    // HANGU_PRINT(MrResc, "Generating DMA request! DMA length: %d, reqPkt offset: %d, reqPkt length: %d, mtt num: %d, mtt rsp num: %d\n", 
+    //     length, reqPkt->offset, reqPkt->length, reqPkt->mttNum, reqPkt->mttRspNum);
+    assert(length != 0);
     dmaReqProcess(dmaAddr, reqPkt, offset, length);
 
     assert(reqPkt->mttRspNum < reqPkt->mttNum);

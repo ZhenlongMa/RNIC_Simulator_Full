@@ -101,6 +101,7 @@ HanGuRnic::DmaEngine::dmaWriteProcessing () {
             
             HANGU_PRINT(DmaEngine, " DMAEngine.dmaWrite: dmaReq->addr 0x%x, dmaReq->size %d, delay %d, bwDelay %d!\n", 
             dmaReq->addr, dmaReq->size, delay, bwDelay);
+            assert(dmaReq->size != 0);
 
             /* Send dma req to dma channel
              * this event is used to call rnic->dmaWrite() */
@@ -235,6 +236,7 @@ HanGuRnic::DmaEngine::dmaReadProcessing () {
             
             HANGU_PRINT(DmaEngine, " DMAEngine.dmaRead: dmaReq->addr 0x%x, dmaReq->size %d, delay %d, bwDelay %d!\n", 
             dmaReq->addr, dmaReq->size, delay, bwDelay);
+            assert(dmaReq->size != 0);
 
             /* Send dma req to dma channel, 
              * this event is used to call rnic->dmaRead() */

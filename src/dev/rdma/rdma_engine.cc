@@ -213,7 +213,7 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
     assert(dd2dpVector[idx] != nullptr);
     TxDescPtr desc = dd2dpVector[idx];
     dd2dpVector[idx] = nullptr;
-    assert(desc->len <= 4096); // TO DO: the final step is to remove this
+    assert(desc->len <= 16384); // TO DO: the final step is to remove this
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing:"
                 " Get descriptor entry from RdmaEngine.dduProcessing, len: %d, lkey: %d, opcode: %d, rkey: %d\n", 
                 desc->len, desc->lkey, desc->opcode, desc->rdmaType.rkey);
