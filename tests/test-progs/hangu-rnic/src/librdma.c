@@ -474,6 +474,9 @@ int rdma_send_sync(struct rdma_resc *resc) {
     return 0;
 }
 
+/**
+ * @note: Set group WQE splitting granularity, note that before calling this function make sure total_group_weight and total_qp_weight are updated
+*/
 void set_group_granularity(struct rdma_resc *grp_resc)
 {
     uint16_t N = grp_resc->ctx->N;
@@ -481,8 +484,37 @@ void set_group_granularity(struct rdma_resc *grp_resc)
     uint8_t total_group_weight = grp_resc->ctx->total_group_weight;
     uint8_t group_total_qp_weight = grp_resc->qos_group[0]->total_qp_weight;
     grp_resc->qos_group[0]->granularity = (double)group_weight / total_group_weight * N /group_total_qp_weight;
-    RDMA_PRINT(librdma, "setting group granularity! group id: %d, group weight: %d, total group weight: %d, N: %d, group total qp weight: %d\n", 
-        grp_resc->qos_group[0]->id, group_weight, total_group_weight, N, group_total_qp_weight);
-    set_qos_group(grp_resc->ctx, grp_resc->qos_group[0], grp_resc->qos_group[0]->granularity);
+    RDMA_PRINT(librdma, "setting group granularity! group id: %d, group num: %d, group weight: %d, total group weight: %d, N: %d, group total qp weight: %d\n", 
+        grp_resc->qos_group[0]->id, grp_resc->ctx->group_num, group_weight, total_group_weight, N, group_total_qp_weight);
+    set_qos_group(grp_resc->ctx, grp_resc->qos_group[0], 1, &grp_resc->qos_group[0]->granularity);
     RDMA_PRINT(librdma, "group granularity set! group: %d, granularity: %d\n", grp_resc->qos_group[0]->id, grp_resc->qos_group[0]->granularity);
+}
+
+void set_all_granularity(struct ibv_context *ctx)
+{
+    struct ibv_qos_group *group;
+    uint16_t *granularity = (uint16_t *)malloc(sizeof(uint16_t) * (ctx->group_num - 1));
+    uint8_t group_num = ctx->group_num - 1; // exclude CM QP
+    for (int i = 0; i < group_num; i++)
+    {
+        group = ctx->qos_group + i;
+        group->granularity = (double)group->weight / ctx->total_group_weight * ctx->N / group->total_qp_weight;
+        granularity[i] = group->granularity;
+        RDMA_PRINT(librdma, "set all granularity! group id: %d, group weight: %d, total group weight: %ld, group total qp weight: %ld\n",
+            group->id, group->weight, ctx->total_group_weight, group->total_qp_weight);
+    }
+    set_qos_group(ctx, ctx->qos_group, group_num, granularity);
+}
+
+struct ibv_qos_group *create_comm_group(struct ibv_context *ctx, int group_weight)
+{
+    struct ibv_qos_group *group;
+    group = create_qos_group(ctx, group_weight);
+    set_all_granularity(ctx);
+    return group;
+}
+
+void set_qos_group_weight(struct ibv_qos_group *group, int weight)
+{
+
 }

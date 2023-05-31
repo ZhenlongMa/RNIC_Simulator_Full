@@ -147,8 +147,8 @@ int rdma_send_sync(struct rdma_resc *resc);
 int rdma_recv_sync(struct rdma_resc *resc);
 
 void set_group_granularity(struct rdma_resc *grp_resc);
-void set_qp_qos_group();
-
-
+void set_qos_group_weight(struct ibv_qos_group *group, int weight);
+struct ibv_qos_group *create_comm_group(struct ibv_context *ctx, int group_weight);
+void set_all_granularity(struct ibv_context *ctx);
 
 #endif // __LIBRDMA_H__

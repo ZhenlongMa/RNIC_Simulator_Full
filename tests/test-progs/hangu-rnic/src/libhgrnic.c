@@ -88,7 +88,10 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
 
     /* create group for CM */
     struct ibv_qos_group *cm_group = create_qos_group(context, 10);
-    set_qos_group(context, cm_group, 1024);
+    // int cm_weight = 1024;
+    uint16_t *cm_weight = (uint16_t*)malloc(sizeof(uint16_t));
+    *cm_weight = 1024;
+    set_qos_group(context, cm_group, 1, cm_weight);
 
     /* Init communication management */
     struct ibv_mr_init_attr mr_attr;
@@ -643,22 +646,24 @@ struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight)
     new_group->id = args->group_id[0];
     context->total_group_weight += weight;
     HGRNIC_PRINT("QoS group created! id: %d, weight: %d, total group weight: %ld\n", args->group_id[0], weight, context->total_group_weight);
+    // TODO: set granularity here
     return new_group;
 }
 
 /**
- * @note set QoS group scheduling granularity
+ * @note set QoS group scheduling granularity. When a new group weight is set, all group granularities should be updated; when a QP weight gets
+ * updated, the granularity of that group should be updated.
 */
-int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint16_t granularity)
+int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint8_t group_num, uint16_t *granularity)
 {
     struct kfd_ioctl_set_group_args *args = (struct kfd_ioctl_set_group_args *)malloc(sizeof(struct kfd_ioctl_set_group_args));
     struct hghca_context *dvr = (struct hghca_context *)context->dvr;
-    args->group_num = 1;
+    args->group_num = group_num;
     for (int i = 0; i < args->group_num; i++)
     {
-        args->group_id[i] = group->id;
-        args->granularity[i] = granularity;
-        HGRNIC_PRINT("QoS group granularity set! id: %d, granularity: %d\n", group->id, granularity);
+        args->group_id[i] = group[i].id;
+        args->granularity[i] = granularity[i];
+        HGRNIC_PRINT("QoS group granularity set! id: %d, granularity: %d\n", group[i].id, granularity[i]);
     }
     write_cmd(dvr->fd, HGKFD_IOC_SET_GROUP, args);
 }

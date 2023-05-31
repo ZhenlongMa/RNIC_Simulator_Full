@@ -265,7 +265,7 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
             args.copyOut(virt_proxy);
             break;
         }
-      default:
+        default:
         {
             fatal("%s: bad ioctl %d\n", req);
         }
