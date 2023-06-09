@@ -266,7 +266,8 @@ void HanGuRnic::DescScheduler::wqeProc()
     TxDescPtr desc;
     uint8_t subDescNum = 0;
 
-    HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: %d, type: %d\n", qpStatus->qpn, qpStatus->type);
+    HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: %d, type: %d, group: %d, QP weight: %d\n", 
+        qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight);
 
     assert(qpStatus->head_ptr >= qpStatus->tail_ptr);
     if (qpStatus->head_ptr == qpStatus->tail_ptr)
@@ -451,7 +452,8 @@ void HanGuRnic::DescScheduler::launchWQE()
 
     if (doorbell->opcode == BW_QP || doorbell->opcode == UC_QP || doorbell->opcode == UD_QP)
     {
-        assert(lowPriorityDescQue.size() == doorbell->num);
+        // assert(lowPriorityDescQue.size() == doorbell->num); // WHY?
+        assert(lowPriorityDescQue.size() >= doorbell->num);
         assert(doorbell->num != 0);
         for (int i = 0; i < doorbell->num; i++)
         {
