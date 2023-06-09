@@ -384,8 +384,8 @@ HanGuRnic::RdmaEngine::rruProcessing () {
         for (auto &item : sndWindowList) {
             uint32_t key = item.first;
             WinMapElem* val = item.second;
-            HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rruProcessing: key %d firstPsn %d lastPsn %d\n\n", 
-                    key, val->firstPsn, val->lastPsn);
+            HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rruProcessing: qpn: %d, key %d firstPsn %d lastPsn %d\n\n", 
+                    destQpn, key, val->firstPsn, val->lastPsn);
         }
         panic("[RdmaEngine] RdmaEngine.RGRRU.rruProcessing:"
             " cannot find windows elem according to destQpn\n");
@@ -587,14 +587,14 @@ HanGuRnic::RdmaEngine::rguProcessing () {
         sndWindowList[qpc->srcQpn]->lastPsn = qpc->sndPsn;
         sndWindowList[qpc->srcQpn]->list->push_back(winElem);
 
-        for (auto &item : sndWindowList) {
-            uint32_t key = item.first;
-            WinMapElem* val = item.second;
-            if (val->list->size()) {
-                HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: key %d firstPsn %d lastPsn %d, size %d\n\n", 
-                        key, val->firstPsn, val->lastPsn, val->list->size());
-            }
-        }
+        // for (auto &item : sndWindowList) {
+        //     uint32_t key = item.first;
+        //     WinMapElem* val = item.second;
+        //     if (val->list->size()) {
+        //         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: qpn: %d, key %d firstPsn %d lastPsn %d, size %d\n\n", 
+        //                 qpc->srcQpn, key, val->firstPsn, val->lastPsn, val->list->size());
+        //     }
+        // }
         assert(sndWindowList[qpc->srcQpn]->firstPsn <= sndWindowList[qpc->srcQpn]->lastPsn);
 
         /* Update the state of send window.  
@@ -602,7 +602,8 @@ HanGuRnic::RdmaEngine::rguProcessing () {
         ++windowSize;
         windowFull = (windowSize >= windowCap);
 
-        HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: windowSize %d\n", windowSize);
+        HANGU_PRINT(RdmaEngine, "need ACK! RdmaEngine.RGRRU.rguProcessing: qpn: %d, first psn: %d, last psn: %d, windowSize %d\n", 
+            qpc->srcQpn, sndWindowList[qpc->srcQpn]->firstPsn, sndWindowList[qpc->srcQpn]->lastPsn, windowSize);
     }
     
     /* Post Send Packet. Schedule RdmaEngine.sauProcessing 
@@ -721,9 +722,8 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
         needAck = 0x01;
         ((BTH *) pktPtr)->op_destQpn = bthOp | qpc->destQpn;
         ((BTH *) pktPtr)->needAck_psn = (needAck << 24) | qpc->sndPsn;
-        HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: "
-                "BTH head: 0x%x 0x%x\n", 
-                ((BTH *) pktPtr)->op_destQpn, ((BTH *) pktPtr)->needAck_psn);
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: BTH head: 0x%x 0x%x, src qpn: %d, dst qpn: %d\n", 
+                ((BTH *) pktPtr)->op_destQpn, ((BTH *) pktPtr)->needAck_psn, qpc->srcQpn, qpc->destQpn);
         pktPtr += PKT_BTH_SZ;
         
         // Add RETH header

@@ -15,7 +15,8 @@ int clt_update_qps(struct rdma_resc *resc, uint16_t svr_lid) {
         qp->snd_wqe_offset = 0;
         qp->rcv_wqe_offset = 0;
         qp->lsubnet.llid = resc->ctx->lid;
-        qp->dest_qpn = (cpu_id << RESC_LIM_LOG) + qpn_bia + i * num_client; // cr_rcv[i].dst_qpn;
+        // qp->dest_qpn = (cpu_id << RESC_LIM_LOG) + qpn_bia + i * num_client; // cr_rcv[i].dst_qpn;
+        qp->dest_qpn = qp->qp_num; //WARNING!
         qp->snd_psn = 0;
         qp->ack_psn = 0;
         qp->exp_psn = 0;

@@ -12,7 +12,8 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->snd_wqe_offset = 0;
         qp->rcv_wqe_offset = 0;
         qp->lsubnet.llid = resc->ctx->lid;
-        qp->dest_qpn = (cpu_id << RESC_LIM_LOG) + (i / resc->num_rem) + 1;
+        // qp->dest_qpn = (cpu_id << RESC_LIM_LOG) + (i / resc->num_rem) + 1;
+        qp->dest_qpn = qp->qp_num; // WARNING: only for two nodes!
         qp->snd_psn = 0;
         qp->ack_psn = 0;
         qp->exp_psn = 0;
@@ -315,6 +316,9 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     return (*snd_cnt * 1000000.0) / *con_time; /* message rate */
 }
 
+/**
+ * @note create group resource and establish connection with remote side
+*/
 struct rdma_resc *set_group_resource(struct ibv_context *ctx, int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem, int grp_weight)
 {
     uint8_t  op_mode = OPMODE_RDMA_WRITE; /* 0: RDMA Write; 1: RDMA Read */
