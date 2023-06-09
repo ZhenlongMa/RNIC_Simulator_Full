@@ -176,47 +176,132 @@ double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode) {
     return ((con_time * 1.0) / (num_qp * num_client * 1000.0));
 }
 
-double throughput_test(struct rdma_resc *resc, uint8_t op_mode, uint32_t offset, uint64_t *start_time, uint64_t *end_time, uint64_t *con_time, uint64_t *snd_cnt) {
-    uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
-    int num_qp = resc->num_qp;
-    int num_cq = resc->num_cq;
+// double throughput_test(struct rdma_resc *resc, uint8_t op_mode, uint32_t offset, uint64_t *start_time, uint64_t *end_time, uint64_t *con_time, uint64_t *snd_cnt) {
+//     uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
+//     int num_qp = resc->num_qp;
+//     int num_cq = resc->num_cq;
 
-    uint64_t *qp_data_cnt = (uint64_t *)malloc(sizeof(uint64_t) * num_qp * num_client);
-    memset(qp_data_cnt, 0, sizeof(uint64_t) * num_qp * num_client);
+//     uint64_t *qp_data_cnt = (uint64_t *)malloc(sizeof(uint64_t) * num_qp * num_client);
+//     memset(qp_data_cnt, 0, sizeof(uint64_t) * num_qp * num_client);
     
-    /* Start to post all the QPs */
-    for (int i = 0; i < num_client; ++i) {
-        for (int j = 0; j < num_qp; ++j) {
-            struct ibv_qp *qp = resc->qp[i * num_qp + j];
-            svr_post_send(resc, resc->qp[i * num_qp + j], (qp->qp_num % TEST_WR_NUM) + 1, offset, op_mode); // (4096 / num_qp) * j
+//     struct qp_comm_record record;
+//     record.qp_data_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client + 1));
+//     record.cqe_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client + 1));
+//     memset(record.qp_data_count, 0, sizeof(uint64_t) * (num_qp * num_client + 1));
+//     memset(record.cqe_count, 0, sizeof(uint64_t) * (num_qp * num_client + 1));
+//     int wr_num = 5;
+    
+//     /* Start to post all the QPs */
+//     for (int i = 0; i < num_client; ++i) {
+//         for (int j = 0; j < num_qp; ++j) {
+//             struct ibv_qp *qp = resc->qp[i * num_qp + j];
+//             svr_post_send(resc, resc->qp[i * num_qp + j], wr_num, offset, op_mode); // (4096 / num_qp) * j
+//         }
+//     }
+    
+//     /* polling for completion */
+//     struct cpl_desc **desc = resc->desc;
+//     do { // snd_cnt < (num_qp * TEST_WR_NUM * num_client)
+//         for (int i = 0; i < num_cq; ++i) {
+//             int res = ibv_poll_cpl(resc->cq[i], desc, MAX_CPL_NUM);
+
+//             if (res) {
+//                 if (*start_time == 0) {
+//                     *start_time = get_time(resc->ctx);
+//                 }
+//                 for (int j = 0; j < res; ++j) {
+//                     if (desc[j]->trans_type == ibv_type[op_mode]) {
+//                         *snd_cnt += 1;
+//                         record.cqe_count[desc[j]->qp_num]++;
+//                         if (record.cqe_count[desc[j]->qp_num] % wr_num == 0)
+//                         {
+//                             uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
+//                             svr_post_send(resc, resc->qp[qp_ptr], wr_num, offset, op_mode); // (4096 / num_qp) * (qp_ptr % num_qp)
+//                         }
+//                     }
+//                     else
+//                     {
+//                         fprintf(stderr, "Wrong trans type! trans type: %d, ibv type: %d\n", desc[j]->trans_type, ibv_type[op_mode]);
+//                     }
+//                 }
+//             }
+//         }
+//         *end_time = get_time(resc->ctx);
+//         *con_time = *end_time - *start_time;
+//         RDMA_PRINT(Server, "con_time: %ld/%lu\n", *con_time, 40UL * MS);
+//     } while ((*con_time < 10UL * MS) || (*start_time == 0));
+
+//     for (int i = 0; i < num_client * num_qp + 1; i++)
+//     {
+//         // note that this is not indexed by QPN!
+//         RDMA_PRINT(Server, "QP[%d] cqe count: %ld\n", i, record.cqe_count[i]);
+//     }
+//     RDMA_PRINT(Server, "time: %ld\n", *con_time);
+//     return (*snd_cnt * 1000000.0) / *con_time; /* message rate */
+// }
+
+double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uint8_t op_mode, uint32_t offset, uint64_t *start_time, uint64_t *end_time, uint64_t *con_time, uint64_t *snd_cnt) {
+    uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
+    // int num_qp = resc->num_qp;
+    // int num_cq = resc->num_cq;
+    int num_qp;
+    int qos_group_num = ctx->group_num - 1;
+    for (int i = 0; i < qos_group_num; i++)
+    {
+        num_qp += ctx->qos_group->qp_num;
+    }
+    
+    struct qp_comm_record record;
+    record.qp_data_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client));
+    record.cqe_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client));
+    memset(record.qp_data_count, 0, sizeof(uint64_t) * (num_qp * num_client));
+    memset(record.cqe_count, 0, sizeof(uint64_t) * (num_qp * num_client));
+    int wr_num = 5;
+    
+    /* Start to post all the QPs at beginning */
+    for (int k = 0; k < qos_group_num; k++) // exclude CM group
+    {
+        struct rdma_resc *resc = grp_resc[k];
+        for (int i = 0; i < num_client; ++i) {
+            for (int j = 0; j < resc->num_qp; ++j) {
+                struct ibv_qp *qp = resc->qp[i * resc->num_qp + j];
+                svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode); // (4096 / num_qp) * j
+            }
         }
     }
     
     /* polling for completion */
-    struct cpl_desc **desc = resc->desc;
     do { // snd_cnt < (num_qp * TEST_WR_NUM * num_client)
-        for (int i = 0; i < num_cq; ++i) {
-            int res = ibv_poll_cpl(resc->cq[i], desc, MAX_CPL_NUM);
-
-            if (res) {
-                if (*start_time == 0) {
-                    *start_time = get_time(resc->ctx);
-                }
-                for (int j = 0; j < res; ++j) {
-                    if (desc[j]->trans_type == ibv_type[op_mode]) {
-                        *snd_cnt += 1;
-                        uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
-                        svr_post_send(resc, resc->qp[qp_ptr], 1, offset, op_mode); // (4096 / num_qp) * (qp_ptr % num_qp)
-                        qp_data_cnt[desc[j]->qp_num % (num_qp * num_client)] += 1;
+        for (int grp_id = 0; grp_id < ctx->group_num - 1; grp_id++)
+        {
+            struct rdma_resc *resc = grp_resc[grp_id];
+            struct cpl_desc **desc = resc->desc;
+            int num_cq = resc->num_cq;
+            for (int i = 0; i < num_cq; ++i) {
+                int res = ibv_poll_cpl(resc->cq[i], desc, MAX_CPL_NUM);
+                if (res) {
+                    if (*start_time == 0) {
+                        *start_time = get_time(resc->ctx);
                     }
-                    else
-                    {
-                        fprintf(stderr, "Wrong trans type! trans type: %d, ibv type: %d\n", desc[j]->trans_type, ibv_type[op_mode]);
+                    for (int j = 0; j < res; ++j) {
+                        if (desc[j]->trans_type == ibv_type[op_mode]) {
+                            *snd_cnt += 1;
+                            record.cqe_count[desc[j]->qp_num]++;
+                            if (record.cqe_count[desc[j]->qp_num] % wr_num == 0)
+                            {
+                                uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
+                                svr_post_send(resc, resc->qp[qp_ptr], wr_num, offset, op_mode); // (4096 / num_qp) * (qp_ptr % num_qp)
+                            }
+                        }
+                        else
+                        {
+                            fprintf(stderr, "Wrong trans type! trans type: %d, ibv type: %d\n", desc[j]->trans_type, ibv_type[op_mode]);
+                        }
                     }
                 }
             }
         }
-        *end_time = get_time(resc->ctx);
+        *end_time = get_time(ctx);
         *con_time = *end_time - *start_time;
         RDMA_PRINT(Server, "con_time: %ld/%lu\n", *con_time, 40UL * MS);
     } while ((*con_time < 10UL * MS) || (*start_time == 0));
@@ -224,7 +309,7 @@ double throughput_test(struct rdma_resc *resc, uint8_t op_mode, uint32_t offset,
     for (int i = 0; i < num_client * num_qp; i++)
     {
         // note that this is not indexed by QPN!
-        RDMA_PRINT(Server, "QP[%d] data count: %ld\n", i, qp_data_cnt[i]);
+        RDMA_PRINT(Server, "QP[%d] cqe count: %ld\n", i, record.cqe_count[i]);
     }
     RDMA_PRINT(Server, "time: %ld\n", *con_time);
     return (*snd_cnt * 1000000.0) / *con_time; /* message rate */
@@ -237,7 +322,7 @@ struct rdma_resc *set_group_resource(struct ibv_context *ctx, int num_mr, int nu
     struct rdma_resc *resc = rdma_resc_init(ctx, num_mr, num_cq, num_qp, llid, num_client);
     RDMA_PRINT(Server, "group resource initialized!\n");
     struct ibv_qos_group *group = create_comm_group(resc->ctx, grp_weight);
-    RDMA_PRINT(Server, "group created!\n");
+    RDMA_PRINT(Server, "group created! group id: %d, group weight: %d\n", group->id, group->weight);
     resc->qos_group[0] = group;
 
     /* Connect QPs to client's QP */
@@ -356,7 +441,10 @@ int main (int argc, char **argv) {
     start_time = get_time(ib_context);
     RDMA_PRINT(Server, "start rdma_post_send0: %ld\n", start_time);
     start_time = 0;
-    msg_rate = throughput_test(grp1_resc, op_mode, offset, &start_time, &end_time, &con_time, &snd_cnt);
+    struct rdma_resc **grp_resc = (struct rdma_resc**)malloc(sizeof(struct rdma_resc *) * (ib_context->group_num - 1));
+    grp_resc[0] = grp1_resc;
+    grp_resc[1] = grp2_resc;
+    msg_rate = throughput_test(ib_context, grp_resc, op_mode, offset, &start_time, &end_time, &con_time, &snd_cnt);
 
     if (op_mode == OPMODE_RDMA_WRITE) {
         bandwidth = msg_rate * sizeof(TRANS_WRDMA_DATA);

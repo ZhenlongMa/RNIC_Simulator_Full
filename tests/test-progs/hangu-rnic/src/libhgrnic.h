@@ -166,9 +166,9 @@ struct ibv_context {
     uint32_t cm_rcv_num; /* number of RCV WR posted to cm_qp, outstanding */
     
     /* QoS Group */
-    struct ibv_qos_group* cm_group;
-    struct ibv_qos_group* qos_group;
-    uint8_t group_num; // including cm_group
+    // struct ibv_qos_group* cm_group;
+    struct ibv_qos_group* qos_group; // the first group is CM group
+    uint8_t group_num; // including cm_group, there can be only ONE cm_group
     uint64_t total_group_weight;
     uint16_t N;
 };

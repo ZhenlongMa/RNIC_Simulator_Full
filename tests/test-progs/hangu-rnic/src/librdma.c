@@ -494,14 +494,14 @@ void set_all_granularity(struct ibv_context *ctx)
 {
     struct ibv_qos_group *group;
     uint16_t *granularity = (uint16_t *)malloc(sizeof(uint16_t) * (ctx->group_num - 1));
-    uint8_t group_num = ctx->group_num - 1; // exclude CM QP
+    uint8_t group_num = ctx->group_num;
     for (int i = 0; i < group_num; i++)
     {
         group = ctx->qos_group + i;
         group->granularity = (double)group->weight / ctx->total_group_weight * ctx->N / group->total_qp_weight;
         granularity[i] = group->granularity;
-        RDMA_PRINT(librdma, "set all granularity! group id: %d, group weight: %d, total group weight: %ld, group total qp weight: %ld\n",
-            group->id, group->weight, ctx->total_group_weight, group->total_qp_weight);
+        RDMA_PRINT(librdma, "set all granularity! group id: %d, group weight: %d, total group weight: %ld, group total qp weight: %ld, granularity: %d, group num: %d\n",
+            group->id, group->weight, ctx->total_group_weight, group->total_qp_weight, group->granularity, group_num);
     }
     set_qos_group(ctx, ctx->qos_group, group_num, granularity);
 }
