@@ -247,12 +247,15 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
     // int num_qp = resc->num_qp;
     // int num_cq = resc->num_cq;
-    int num_qp;
+    int num_qp = 0;
     int qos_group_num = ctx->group_num - 1;
+    num_qp++;
     for (int i = 0; i < qos_group_num; i++)
     {
-        num_qp += ctx->qos_group->qp_num;
+        // num_qp += ctx->qos_group->qp_num;
+        num_qp += grp_resc[i]->num_qp;
     }
+    RDMA_PRINT(Server, "into throughput test, num_qp: %d, num_client: %d\n", num_qp, num_client);
     
     struct qp_comm_record record;
     record.qp_data_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client));
