@@ -93,6 +93,10 @@ void HanGuRnic::DescScheduler::qpStatusProc()
         HANGU_PRINT(DescScheduler, "Inactive QP!\n");
         schedule = true;
     }
+    else
+    {
+        HANGU_PRINT(DescScheduler, "Active QP! Do not push QPN into QPN queue!\n");
+    }
     qpStatus->head_ptr += db->num;
 
     // If this QP has no unfinished WQE, schedule WQE prefetch event

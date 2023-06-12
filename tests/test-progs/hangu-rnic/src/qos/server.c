@@ -128,7 +128,9 @@ int svr_post_send (struct rdma_resc *resc, struct ibv_qp *qp, int wr_num, uint32
         
     }
     
+    // RDMA_PRINT(Server, "ready to ibv_post_send! qpn: %d\n", qp->qp_num);
     ibv_post_send(resc->ctx, wqe, qp, wr_num);
+    // RDMA_PRINT(Server, "finish ibv_post_send! qpn: %d\n", qp->qp_num);
 
     return 0;
 }
@@ -267,19 +269,23 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
             for (int j = 0; j < resc->num_qp; ++j) {
                 struct ibv_qp *qp = resc->qp[i * resc->num_qp + j];
                 svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode); // (4096 / num_qp) * j
+                RDMA_PRINT(Server, "group %d qp %d initially post send!\n", k, resc->qp[i * resc->num_qp + j]->qp_num);
             }
         }
     }
     
     /* polling for completion */
     do { // snd_cnt < (num_qp * TEST_WR_NUM * num_client)
-        for (int grp_id = 0; grp_id < ctx->group_num - 1; grp_id++)
+        for (int grp_id = 0; grp_id < qos_group_num; grp_id++)
         {
+            RDMA_PRINT(Server, "work on grp[%d]\n", grp_id);
             struct rdma_resc *resc = grp_resc[grp_id];
             struct cpl_desc **desc = resc->desc;
             int num_cq = resc->num_cq;
             for (int i = 0; i < num_cq; ++i) {
+                RDMA_PRINT(Server, "ready to poll cq! cqn: %d\n", resc->cq[i]->cq_num);
                 int res = ibv_poll_cpl(resc->cq[i], desc, MAX_CPL_NUM);
+                RDMA_PRINT(Server, "finish polling cq! cqn: %d\n", resc->cq[i]->cq_num);
                 if (res) {
                     if (*start_time == 0) {
                         *start_time = get_time(resc->ctx);
@@ -290,8 +296,18 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                             record.cqe_count[desc[j]->qp_num]++;
                             if (record.cqe_count[desc[j]->qp_num] % wr_num == 0)
                             {
-                                uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
-                                svr_post_send(resc, resc->qp[qp_ptr], wr_num, offset, op_mode); // (4096 / num_qp) * (qp_ptr % num_qp)
+                                struct ibv_qp* qp;
+                                for (int m = 0; m < resc->num_qp; m++)
+                                {
+                                    if (desc[j]->qp_num == resc->qp[m]->qp_num)
+                                    {
+                                        qp = resc->qp[m];
+                                    }
+                                }
+                                // uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
+                                // RDMA_PRINT(Server, "ready to post send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
+                                svr_post_send(resc, qp, wr_num, offset, op_mode);
+                                // RDMA_PRINT(Server, "finish posting send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
                             }
                         }
                         else
@@ -301,6 +317,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                     }
                 }
             }
+            RDMA_PRINT(Server, "group %d post send!\n", grp_id);
         }
         *end_time = get_time(ctx);
         *con_time = *end_time - *start_time;
