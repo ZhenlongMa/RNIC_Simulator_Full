@@ -107,7 +107,7 @@ class HanGuDriver final : public EmulatedDriver {
 
     /* -------ICM resources {begin}------- */
     /* we use one entry to store one page */
-    std::unordered_map<Addr, Addr> icmAddrmap; // <icm vaddr page, icm paddr>
+    std::unordered_map<Addr, Addr> icmAddrmap; // Global ICM space address mapping <icm vaddr page, icm paddr>
     
     void initIcm(PortProxy& portProxy, uint8_t qpcNumLog, 
             uint8_t cqcNumLog, uint8_t mptNumLog, uint8_t mttNumLog);
@@ -174,6 +174,11 @@ class HanGuDriver final : public EmulatedDriver {
     // std::unordered_map<uint32_t, uint8_t> qpGroup;
     // std::unordered_map<uint32_t, uint8_t> qpWeight;
     /* -------QoS Group resources {end}------- */
+
+    /* ------------TQ resources {begin}---------- */
+    RescMeta tqMeta;
+    void allocTq();
+    /* ------------TQ resources {end}------------ */
 
     /* -------mailbox {begin} ------- */
 

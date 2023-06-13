@@ -219,10 +219,13 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
 
             allocQpc(args);
 
+            // allocate space for QP context
             if (!isIcmMapped(qpcMeta, args->qp_num + args->batch_size - 1)) {
                 Addr icmVPage = allocIcm (process, qpcMeta, args->qp_num);
                 writeIcm(virt_proxy, HanGuRnicDef::ICMTYPE_QPC, qpcMeta, icmVPage);
             }
+
+            // TODO: allocate space for TQ
 
             HANGU_PRINT(HanGuDriver, " ioctl : HGKFD_IOC_ALLOC_QP, qp_num: 0x%x(%d), batch_size %d\n", args->qp_num, RESC_LIM_MASK&args->qp_num, args->batch_size);
 
@@ -412,6 +415,9 @@ HanGuDriver::allocIcm(Process *process, RescMeta &rescMeta, Addr index) {
     return icmVPage;
 }
 
+/**
+ * @note write ICM address translation into RNIC
+*/
 void
 HanGuDriver::writeIcm(PortProxy& portProxy, uint8_t rescType, RescMeta &rescMeta, Addr icmVPage) {
 

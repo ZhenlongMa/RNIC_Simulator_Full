@@ -137,6 +137,7 @@ struct InitResc {
     uint64_t cqcBase;
     uint64_t mptBase;
     uint64_t mttBase;
+    uint64_t tqBase;
 };
 // const uint32_t MBOX_INIT_SZ = 0x20;
 
@@ -150,6 +151,7 @@ const uint8_t ICMTYPE_MPT = 0x01;
 const uint8_t ICMTYPE_MTT = 0x02;
 const uint8_t ICMTYPE_QPC = 0x03;
 const uint8_t ICMTYPE_CQC = 0x04;
+const uint8_t ICMTYPE_TQ  = 0x05;
 
 /* WRITE_MTT */
 struct MttResc {
