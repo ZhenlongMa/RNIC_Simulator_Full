@@ -391,15 +391,25 @@ void HanGuRnic::DescScheduler::wqeProc()
             }
             rNic->txdescRspFifo.pop();
         }
+        // if (qpStatus->tail_ptr != qpStatus->head_ptr)
+        // {
+        //     while (leastPriorityQpnQue.size() >= LEAST_QPN_QUE_CAP)
+        //     {
+        //         leastPriorityQpnQue.pop();
+        //     }
+        //     leastPriorityQpnQue.push(qpStatus->qpn);
+        //     qpStatus->in_least_que = 1;
+        //     HANGU_PRINT(DescScheduler, "push back QPN into least priority queue! qpn: %d\n", qpStatus->qpn);
+        //     if (!getPrefetchQpnEvent.scheduled())
+        //     {
+        //         rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+        //     }
+        // }
         if (qpStatus->tail_ptr != qpStatus->head_ptr)
         {
-            while (leastPriorityQpnQue.size() >= LEAST_QPN_QUE_CAP)
-            {
-                leastPriorityQpnQue.pop();
-            }
-            leastPriorityQpnQue.push(qpStatus->qpn);
-            qpStatus->in_least_que = 1;
-            HANGU_PRINT(DescScheduler, "push back QPN into least priority queue! qpn: %d\n", qpStatus->qpn);
+            lowPriorityQpnQue.push(qpStatus->qpn);
+            // qpStatus->in_least_que = 1;
+            HANGU_PRINT(DescScheduler, "push back QPN into low priority queue! qpn: %d\n", qpStatus->qpn);
             if (!getPrefetchQpnEvent.scheduled())
             {
                 rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
@@ -517,8 +527,9 @@ void HanGuRnic::DescScheduler::rxUpdate()
         // assert(status->fetch_offset + len <= status->wnd_end);
         if (status->tail_ptr < status->head_ptr)
         {
-            lowPriorityQpnQue.push(status->qpn);
-            schedule = true;
+            // lowPriorityQpnQue.push(status->qpn);
+            // schedule = true;
+            schedule = false;
         }
         else if (status->tail_ptr == status->head_ptr)
         {

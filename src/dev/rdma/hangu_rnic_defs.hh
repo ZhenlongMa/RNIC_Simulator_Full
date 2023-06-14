@@ -47,7 +47,7 @@
         } while (0)
 #endif
 
-#define QPN_NUM   (512 * 3)
+// #define QPN_NUM   (512 * 3)
 
 #define MAX_PREFETCH_NUM 8
 #define MAX_COMMIT_SZ 4096
