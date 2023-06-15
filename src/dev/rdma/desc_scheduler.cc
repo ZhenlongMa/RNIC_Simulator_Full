@@ -157,7 +157,8 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
             uint32_t qpn = lowPriorityQpnQue.front();
             lowPriorityQpnQue.pop();
             wqePrefetchQpStatusRReqQue.push(qpn);
-            HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: %d\n", qpn);
+            qpStatusTable[qpn]->in_que--;
+            HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: %d, in que: %d\n", qpn, qpStatusTable[qpn]->in_que);
         }
     }
     // else if (leastPriorityQpnQue.size() > 0)
@@ -388,6 +389,10 @@ void HanGuRnic::DescScheduler::wqeProc()
                 }
 
                 lowPriorityDescQue.push(subDesc);
+                qpStatus->in_que++;
+                assert(qpStatus->in_que == 1);
+                // assert(qpStatus->in_que == 0);
+
                 subDescNum++;
             }
             rNic->txdescRspFifo.pop();

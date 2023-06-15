@@ -92,7 +92,7 @@ int svr_fill_mr (struct ibv_mr *mr, uint32_t offset) {
     return 0;
 }
 
-int svr_post_send (struct rdma_resc *resc, struct ibv_qp *qp, int wr_num, uint32_t offset, uint8_t op_mode) {
+int svr_post_send (struct rdma_resc *resc, struct ibv_qp *qp, int wr_num, uint32_t offset, uint8_t op_mode, uint32_t msg_size) {
 
     // RDMA_PRINT(Server, "enter svr_post_send %d\n", wr_num);
     struct ibv_wqe wqe[TEST_WR_NUM];
@@ -101,7 +101,8 @@ int svr_post_send (struct rdma_resc *resc, struct ibv_qp *qp, int wr_num, uint32
     if (op_mode == OPMODE_RDMA_WRITE) {
 
         for (int i = 0; i < wr_num; ++i) {
-            wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
+            // wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
+            wqe[i].length = msg_size;
             wqe[i].mr = local_mr;
             wqe[i].offset = offset;
 
@@ -158,7 +159,7 @@ double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode) {
             struct ibv_qp *qp = resc->qp[i * num_qp + j];
 
             start_time = get_time(resc->ctx);
-            svr_post_send(resc, resc->qp[i * num_qp + j], LATENCY_WR_NUM, 0, op_mode);
+            svr_post_send(resc, resc->qp[i * num_qp + j], LATENCY_WR_NUM, 0, op_mode, sizeof(TRANS_WRDMA_DATA) * 16 * 128);
 
             polling = 1;
             while (polling) {
@@ -271,7 +272,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
         for (int i = 0; i < num_client; ++i) {
             for (int j = 0; j < resc->num_qp; ++j) {
                 struct ibv_qp *qp = resc->qp[i * resc->num_qp + j];
-                svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode); // (4096 / num_qp) * j
+                svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, sizeof(TRANS_WRDMA_DATA) * 16 * 128); // (4096 / num_qp) * j
                 RDMA_PRINT(Server, "group %d qp %d initially post send!\n", k, resc->qp[i * resc->num_qp + j]->qp_num);
             }
         }
@@ -309,7 +310,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                                 }
                                 // uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
                                 // RDMA_PRINT(Server, "ready to post send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
-                                svr_post_send(resc, qp, wr_num, offset, op_mode);
+                                svr_post_send(resc, qp, wr_num, offset, op_mode, sizeof(TRANS_WRDMA_DATA) * 16 * 128);
                                 // RDMA_PRINT(Server, "finish posting send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
                             }
                         }
