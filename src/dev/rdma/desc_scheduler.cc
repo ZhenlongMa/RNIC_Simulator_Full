@@ -90,8 +90,9 @@ void HanGuRnic::DescScheduler::qpStatusProc()
         // TODO: high pirority queue is not supported yet!
         lowPriorityQpnQue.push(db->qpn);
         // totalWeight += qpStatus->weight;
-        HANGU_PRINT(DescScheduler, "Inactive QP!\n");
         schedule = true;
+        qpStatus->in_que++;
+        HANGU_PRINT(DescScheduler, "Inactive QP! qpn: %d, in que: %d\n", db->qpn, qpStatus->in_que);
     }
     else
     {
@@ -128,10 +129,10 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
     bool allowNewWQE;
     bool allowNewHWQE;
     bool allowNewLWQE;
-    assert(highPriorityQpnQue.size() || lowPriorityQpnQue.size() || leastPriorityQpnQue.size());
+    assert(highPriorityQpnQue.size() || lowPriorityQpnQue.size());
     allowNewHWQE = highPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
     allowNewLWQE = lowPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
-    allowNewWQE = (allowNewHWQE && highPriorityQpnQue.size()) || (allowNewLWQE && (lowPriorityQpnQue.size() || leastPriorityQpnQue.size()));
+    allowNewWQE = (allowNewHWQE && highPriorityQpnQue.size()) || (allowNewLWQE && (lowPriorityQpnQue.size()));
 
     if (!allowNewWQE)
     {
@@ -159,16 +160,16 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
             HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: %d\n", qpn);
         }
     }
-    else if (leastPriorityQpnQue.size() > 0)
-    {
-        HANGU_PRINT(DescScheduler, "Least priority QPN queue size: %d!\n", leastPriorityQpnQue.size());
-        uint32_t qpn = leastPriorityQpnQue.front();
-        leastPriorityQpnQue.pop();
-        wqePrefetchQpStatusRReqQue.push(qpn);
-        HANGU_PRINT(DescScheduler, "Least priority QPN fetched! qpn: %d\n", qpn);
-    }
+    // else if (leastPriorityQpnQue.size() > 0)
+    // {
+    //     HANGU_PRINT(DescScheduler, "Least priority QPN queue size: %d!\n", leastPriorityQpnQue.size());
+    //     uint32_t qpn = leastPriorityQpnQue.front();
+    //     leastPriorityQpnQue.pop();
+    //     wqePrefetchQpStatusRReqQue.push(qpn);
+    //     HANGU_PRINT(DescScheduler, "Least priority QPN fetched! qpn: %d\n", qpn);
+    // }
 
-    if (leastPriorityQpnQue.size() == 0 && lowPriorityQpnQue.size() == 0 && highPriorityQpnQue.size() == 0)
+    if (lowPriorityQpnQue.size() == 0 && highPriorityQpnQue.size() == 0)
     {
         HANGU_PRINT(DescScheduler, "Empty QPN queue!\n");
     }

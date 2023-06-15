@@ -705,6 +705,7 @@ struct QPStatusItem
         this->wnd_end               = 0;
         // this->current_msg_offset    = 0;
         this->fetch_lock            = 0;
+        this->in_que                = 0;
         assert(service_type != QP_TYPE_RD);
         switch (service_type)
         {
@@ -741,6 +742,7 @@ struct QPStatusItem
     uint8_t perf; // This segment indicates whether the performance exceeds or is lower than expected
     uint8_t group_id;
     uint8_t in_least_que; // This segment indicates the existance in the least priority queue
+    uint8_t in_que; // This segment indicates the existance in the low priority queue
     // This indicates whether it is allowed to fetch WQEs for this QP. 
     // Lock it when send WQE read request; unlock it when WQE splitting is finished.
     uint8_t fetch_lock; 

@@ -286,16 +286,16 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
             struct cpl_desc **desc = resc->desc;
             int num_cq = resc->num_cq;
             for (int i = 0; i < num_cq; ++i) {
-                RDMA_PRINT(Server, "ready to poll cq! cqn: %d\n", resc->cq[i]->cq_num);
+                // RDMA_PRINT(Server, "ready to poll cq! cqn: %d\n", resc->cq[i]->cq_num);
                 int res = ibv_poll_cpl(resc->cq[i], desc, MAX_CPL_NUM);
-                RDMA_PRINT(Server, "finish polling cq! cqn: %d\n", resc->cq[i]->cq_num);
+                // RDMA_PRINT(Server, "finish polling cq! cqn: %d\n", resc->cq[i]->cq_num);
                 if (res) {
                     if (*start_time == 0) {
                         *start_time = get_time(resc->ctx);
                     }
+                    *snd_cnt += res;
                     for (int j = 0; j < res; ++j) {
                         if (desc[j]->trans_type == ibv_type[op_mode]) {
-                            *snd_cnt += 1;
                             record.cqe_count[desc[j]->qp_num]++;
                             if (record.cqe_count[desc[j]->qp_num] % wr_num == 0)
                             {
