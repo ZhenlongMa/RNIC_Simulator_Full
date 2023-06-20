@@ -78,6 +78,7 @@ def main():
     debug +="HanGuRnic,CxtResc,DmaEngine,"
     debug +="DescScheduler"
 
+    # add server program
     test_prog = "'tests/test-progs/hangu-rnic/src/qos/server"
     opt = "'-s " + str(svr_lid) + " -t " + str(num_nodes - 1) + " -m " + str(params.op_mode)
 

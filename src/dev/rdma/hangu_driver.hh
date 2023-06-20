@@ -101,10 +101,6 @@ class HanGuDriver final : public EmulatedDriver {
     uint32_t allocResc(uint8_t rescType, RescMeta &rescMeta);
     /* ------- Resc {end} ------- */
 
-    /* -------- Group {begin} ------------ */
-    uint8_t groupNum;
-    /* -------- Group {end} -------------- */
-
     /* -------ICM resources {begin}------- */
     /* we use one entry to store one page */
     std::unordered_map<Addr, Addr> icmAddrmap; // Global ICM space address mapping <icm vaddr page, icm paddr>
@@ -168,11 +164,30 @@ class HanGuDriver final : public EmulatedDriver {
     /* -------QPC resources {end}------- */
 
     /* -------QoS Group resources {begin}------- */
+    struct groupInfo
+    {
+        uint8_t groupID;
+        // uint32_t qpWeightSum;
+        std::unordered_map<uint32_t, uint8_t> qpWeight;
+        uint32_t granularity;
+        uint16_t weight;
+    };
+    
+    // struct qpInfo
+    // {
+    //     uint8_t qpWeight;
+    // };
     void setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args);
     void allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args);
-    // std::unordered_map<uint8_t, uint16_t> groupWeight;
-    // std::unordered_map<uint32_t, uint8_t> qpGroup;
-    // std::unordered_map<uint32_t, uint8_t> qpWeight;
+    void updateGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_update_group_args> &args);
+    
+    std::unordered_map<uint32_t, uint8_t> qpGroup;
+    std::unordered_map<uint32_t, uint8_t> qpWeight;
+    std::unordered_map<uint8_t, struct groupInfo> groupTable;
+    uint32_t bigN;
+    uint8_t groupNum;
+
+
     /* -------QoS Group resources {end}------- */
 
     /* ------------TQ resources {begin}---------- */

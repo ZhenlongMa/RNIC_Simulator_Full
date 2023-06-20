@@ -168,9 +168,9 @@ struct ibv_context {
     /* QoS Group */
     // struct ibv_qos_group* cm_group;
     struct ibv_qos_group* qos_group; // the first group is CM group
-    uint8_t group_num; // including cm_group, there can be only ONE cm_group
-    uint64_t total_group_weight;
-    uint16_t N;
+    uint8_t group_num; // amount of QoS group, including cm_group, there can be only ONE cm_group
+    // uint64_t total_group_weight;
+    // uint16_t N;
 };
 
 struct ibv_mtt {
@@ -377,9 +377,9 @@ struct ibv_qos_group
 {
     uint8_t id;
     uint8_t weight;
-    uint16_t granularity;
+    // uint16_t granularity;
     struct ibv_qp **qp;
-    uint64_t total_qp_weight;
+    // uint64_t total_qp_weight;
     uint16_t qp_num; // amount of QPs registered in this group
 };
 
@@ -402,7 +402,7 @@ int ibv_poll_cpl(struct ibv_cq *cq, struct cpl_desc **desc, int max_num);
 int cpu_sync(struct ibv_context *context);
 
 struct ibv_qos_group* create_qos_group(struct ibv_context *context, int weight);
-int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint8_t group_num, uint16_t *granularity);
+int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint8_t group_num, uint16_t *weight);
 
 void trans_wait(struct ibv_context *context);
 

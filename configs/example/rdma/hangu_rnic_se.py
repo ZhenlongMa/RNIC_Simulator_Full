@@ -87,7 +87,7 @@ def get_processes(options, system, rdma_driver, idx, node_num=0):
     # print(pargs.split())
 
     process = Process(pid = 100 + idx)
-    process.executable = workloads[0]
+    process.executable = workloads[0] # the location of the program
     process.cwd = os.getcwd()
     process.cmd = [workloads[0]] + pargs.split() + ['-c', str(idx)]
     process.drivers = [rdma_driver]
@@ -167,8 +167,7 @@ def config_rnic(system, options, node_num):
     system.intrctrl = IntrControl()
 
 
-def make_hangu_nic_system(options, CPUClass, test_mem_mode, \
-                        node_num):
+def make_hangu_nic_system(options, CPUClass, test_mem_mode, node_id):
 
     system = System(cpu = [CPUClass(socket_id=i, cpu_id=i, numThreads=1, syscallRetryLatency=200) for i in range(options.num_cpus)],
                     mem_mode = test_mem_mode,
@@ -209,14 +208,14 @@ def make_hangu_nic_system(options, CPUClass, test_mem_mode, \
     config_filesystem(system, options)
 
     # Configure RDMA NIC
-    config_rnic(system, options, node_num)
+    config_rnic(system, options, node_id)
 
     if options.cmd:
         
         for i in range(options.num_cpus):
             rdma_driver = HanGuDriver(filename="hangu_rnic"+str(i))
             rdma_driver.device = system.platform.rdma_nic
-            process = get_processes(options, system, rdma_driver, i, node_num)
+            process = get_processes(options, system, rdma_driver, i, node_id)
             system.cpu[i].workload = process
             system.cpu[i].createThreads()
     else:
@@ -296,6 +295,7 @@ def main():
         rnic_sys.append(make_hangu_nic_system(options, CPUClass, test_mem_mode, i))
 
     root = make_root_system(rnic_sys, options.ethernet_linkspeed)
+    # root: the whole system including all nodes
     Simulation.run(options, root, root.svrsys, FutureClass)
 
 if __name__ == "__m5_main__":

@@ -27,15 +27,6 @@ int svr_update_qps(struct rdma_resc *resc) {
     }
     ibv_modify_batch_qp(resc->ctx, resc->qp[0], resc->num_qp * resc->num_rem);
 
-    /* update the sum of QP weight in this group */
-    int group_qp_total_weight = 0;
-    for (int i = 0; i < resc->num_qp * resc->num_rem; i++)
-    {
-        struct ibv_qp *qp = resc->qp[i];
-        group_qp_total_weight += qp->weight;
-    }
-    resc->qos_group[0]->total_qp_weight = group_qp_total_weight;
-
     return 0;
 }
 
@@ -263,7 +254,8 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     record.cqe_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client));
     memset(record.qp_data_count, 0, sizeof(uint64_t) * (num_qp * num_client));
     memset(record.cqe_count, 0, sizeof(uint64_t) * (num_qp * num_client));
-    int wr_num = 5;
+    int wr_num = 10;
+    uint32_t msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
     
     /* Start to post all the QPs at beginning */
     for (int k = 0; k < qos_group_num; k++) // exclude CM group
@@ -272,7 +264,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
         for (int i = 0; i < num_client; ++i) {
             for (int j = 0; j < resc->num_qp; ++j) {
                 struct ibv_qp *qp = resc->qp[i * resc->num_qp + j];
-                svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, sizeof(TRANS_WRDMA_DATA) * 16 * 128); // (4096 / num_qp) * j
+                svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, msg_size); // (4096 / num_qp) * j
                 RDMA_PRINT(Server, "group %d qp %d initially post send!\n", k, resc->qp[i * resc->num_qp + j]->qp_num);
             }
         }
@@ -298,7 +290,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                     for (int j = 0; j < res; ++j) {
                         if (desc[j]->trans_type == ibv_type[op_mode]) {
                             record.cqe_count[desc[j]->qp_num]++;
-                            if (record.cqe_count[desc[j]->qp_num] % wr_num == 0)
+                            if (record.cqe_count[desc[j]->qp_num] % wr_num == 3)
                             {
                                 struct ibv_qp* qp;
                                 for (int m = 0; m < resc->num_qp; m++)
@@ -310,7 +302,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                                 }
                                 // uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
                                 // RDMA_PRINT(Server, "ready to post send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
-                                svr_post_send(resc, qp, wr_num, offset, op_mode, sizeof(TRANS_WRDMA_DATA) * 16 * 128);
+                                svr_post_send(resc, qp, wr_num, offset, op_mode, msg_size);
                                 // RDMA_PRINT(Server, "finish posting send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
                             }
                         }
@@ -346,7 +338,8 @@ struct rdma_resc *set_group_resource(struct ibv_context *ctx, int num_mr, int nu
     uint32_t offset;
     struct rdma_resc *resc = rdma_resc_init(ctx, num_mr, num_cq, num_qp, llid, num_client);
     RDMA_PRINT(Server, "group resource initialized!\n");
-    struct ibv_qos_group *group = create_comm_group(resc->ctx, grp_weight);
+    // struct ibv_qos_group *group = create_comm_group(resc->ctx, grp_weight);
+    struct ibv_qos_group *group = create_qos_group(ctx, grp_weight);
     RDMA_PRINT(Server, "group created! group id: %d, group weight: %d\n", group->id, group->weight);
     resc->qos_group[0] = group;
 
@@ -430,6 +423,7 @@ int main (int argc, char **argv) {
     sprintf(id_name, "%d", svr_lid);
     RDMA_PRINT(Server, "llid is %hd\n", svr_lid);
     RDMA_PRINT(Server, "num_client %d\n", num_client);
+    RDMA_PRINT(Server, "wqe size: %ld\n", sizeof(struct ibv_wqe));
 
     int num_mr = 1;
     int num_cq = TEST_CQ_NUM;

@@ -187,6 +187,7 @@ struct kfd_ioctl_set_group_args {
     uint8_t group_num;
     uint8_t group_id[MAX_GROUP_NUM];
     uint16_t granularity[MAX_GROUP_NUM];
+    uint16_t weight[MAX_GROUP_NUM];
 };
 
 struct kfd_ioctl_alloc_group_args {
@@ -195,6 +196,12 @@ struct kfd_ioctl_alloc_group_args {
     
     /* Output */
     uint8_t group_id[MAX_GROUP_NUM];
+};
+
+struct kfd_ioctl_update_group_args {
+    /* Input */
+    uint8_t group_id;
+    uint16_t granularity;
 };
 
 
@@ -242,6 +249,9 @@ struct kfd_ioctl_alloc_group_args {
 
 #define HGKFD_IOC_ALLOC_GROUP \
         HGKFD_IOWR(0x0d, struct kfd_ioctl_alloc_group_args)
+
+#define HGKFD_IOC_UPDATE_GROUP \
+        HGKFD_IOWR(0x0e, struct kfd_ioctl_update_group_args)
 
 #define HGKFD_COMMAND_START    0x01
 #define HGKFD_COMMAND_END      0x0b

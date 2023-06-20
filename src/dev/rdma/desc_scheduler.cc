@@ -96,7 +96,7 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     }
     else
     {
-        HANGU_PRINT(DescScheduler, "Active QP! Do not push QPN into QPN queue!\n");
+        HANGU_PRINT(DescScheduler, "Active QP! Do not push QPN into QPN queue! qpn: %d\n", db->qpn);
     }
     qpStatus->head_ptr += db->num;
 
@@ -255,7 +255,6 @@ void HanGuRnic::DescScheduler::wqePrefetch()
     {
         rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
     }
-    // HANGU_PRINT(DescScheduler, "wqePrefetch out!\n");
 }
 
 /**
@@ -389,10 +388,6 @@ void HanGuRnic::DescScheduler::wqeProc()
                 }
 
                 lowPriorityDescQue.push(subDesc);
-                qpStatus->in_que++;
-                assert(qpStatus->in_que == 1);
-                // assert(qpStatus->in_que == 0);
-
                 subDescNum++;
             }
             rNic->txdescRspFifo.pop();
@@ -414,12 +409,21 @@ void HanGuRnic::DescScheduler::wqeProc()
         if (qpStatus->tail_ptr != qpStatus->head_ptr)
         {
             lowPriorityQpnQue.push(qpStatus->qpn);
+            qpStatus->in_que++;
+            HANGU_PRINT(DescScheduler, "push back qpn into low qpn queue, qpn: %d, inque: %d\n", qpStatus->qpn, qpStatus->in_que);
+            assert(qpStatus->in_que == 1);
+            // assert(qpStatus->in_que == 0);
             // qpStatus->in_least_que = 1;
-            HANGU_PRINT(DescScheduler, "push back QPN into low priority queue! qpn: %d\n", qpStatus->qpn);
+            // HANGU_PRINT(DescScheduler, "push back QPN into low priority queue! qpn: %d\n", qpStatus->qpn);
             if (!getPrefetchQpnEvent.scheduled())
             {
                 rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
             }
+        }
+        else
+        {
+            HANGU_PRINT(DescScheduler, "qp[%d] is idle! in que: %d\n", qpStatus->qpn, qpStatus->in_que);
+            assert(qpStatus->in_que == 0);
         }
     }
     else
@@ -428,6 +432,7 @@ void HanGuRnic::DescScheduler::wqeProc()
     }
 
     // write QPN back to low QPN queue in case of UD and UC QP
+    // TODO: check here
     if ((qpStatus->type == UD_QP || qpStatus->type == UC_QP) && (qpStatus->tail_ptr < qpStatus->head_ptr))
     {
         lowPriorityQpnQue.push(qpStatus->qpn);

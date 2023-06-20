@@ -90,7 +90,7 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
     struct ibv_qos_group *cm_group = create_qos_group(context, 10);
     // int cm_weight = 1024;
     uint16_t *cm_weight = (uint16_t*)malloc(sizeof(uint16_t));
-    *cm_weight = 1024;
+    *cm_weight = 20;
     set_qos_group(context, cm_group, 1, cm_weight);
 
     /* Init communication management */
@@ -119,20 +119,18 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
     context->cm_qp->qkey = QKEY_CM;
 
     context->cm_qp->indicator = BANDWIDTH;
-    context->cm_qp->weight = 1;
+    context->cm_qp->weight = 10;
     context->cm_qp->group_id = cm_group->id;
-    cm_group->total_qp_weight += context->cm_qp->weight;
+    // cm_group->total_qp_weight += context->cm_qp->weight;
     ibv_modify_qp(context, context->cm_qp);
 
     HGRNIC_PRINT("CM QP created! QPN: %d\n", context->cm_qp->qp_num);
-    HGRNIC_PRINT("CM group created! group_id: %d, group weight: %d, total qp weight: %ld\n", cm_group->id, cm_group->weight, cm_group->total_qp_weight);
+    HGRNIC_PRINT("CM group created! group_id: %d, group weight: %d\n", cm_group->id, cm_group->weight);
 
     context->cm_rcv_posted_off = RCV_WR_BASE;
     context->cm_rcv_acked_off  = RCV_WR_BASE;
     context->cm_snd_off        = SND_WR_BASE;
     context->cm_rcv_num        = 0;
-
-    context->N = BIGN;
 
     HGRNIC_PRINT(" Exit ibv_open_device: out!\n");
     return 0;
@@ -314,6 +312,9 @@ int ibv_modify_batch_qp(struct ibv_context *context, struct ibv_qp *qp, uint32_t
     }
     free(qpc_args);
     
+    // update all QP granularity
+    update_all_group_granularity(context);
+    
     HGRNIC_PRINT(" ibv_modify_batch_qp: out!\n");
     return 0;
 }
@@ -353,6 +354,10 @@ int ibv_modify_qp(struct ibv_context *context, struct ibv_qp *qp) {
     HGRNIC_PRINT(" ibv_modify_qp! qpn 0x%x, indicator: %d, weight: %d, group: %d\n", 
                 qp->qp_num, qp->indicator, qp->weight, qp->group_id);
     free(qpc_args);
+
+    // update group granularity
+    update_all_group_granularity(context);
+    
     return 0;
 }
 
@@ -631,6 +636,9 @@ int ibv_poll_cpl(struct ibv_cq *cq, struct cpl_desc **desc, int max_num) {
     return cnt;
 }
 
+/**
+ * @note create one QoS group
+*/
 struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight)
 {
     context->group_num++;
@@ -644,17 +652,19 @@ struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight)
     struct ibv_qos_group *new_group = context->qos_group + (context->group_num - 1);
     new_group->weight = weight;
     new_group->id = args->group_id[0];
-    context->total_group_weight += weight;
-    HGRNIC_PRINT("QoS group created! id: %d, weight: %d, total group weight: %ld\n", args->group_id[0], weight, context->total_group_weight);
-    // TODO: set granularity here
+    // context->total_group_weight += weight;
+    HGRNIC_PRINT("QoS group created! id: %d, weight: %d\n", args->group_id[0], weight);
+    uint16_t *weight_temp = (uint16_t*)malloc(sizeof(uint16_t));
+    *weight_temp = weight;
+    set_qos_group(context, new_group, 1, weight_temp);
+    free(weight_temp);
     return new_group;
 }
 
 /**
- * @note set QoS group scheduling granularity. When a new group weight is set, all group granularities should be updated; when a QP weight gets
- * updated, the granularity of that group should be updated.
+ * @note set QoS group scheduling weight. This function updates all group granularity
 */
-int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint8_t group_num, uint16_t *granularity)
+int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint8_t group_num, uint16_t *weight)
 {
     struct kfd_ioctl_set_group_args *args = (struct kfd_ioctl_set_group_args *)malloc(sizeof(struct kfd_ioctl_set_group_args));
     struct hghca_context *dvr = (struct hghca_context *)context->dvr;
@@ -662,8 +672,16 @@ int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint
     for (int i = 0; i < args->group_num; i++)
     {
         args->group_id[i] = group[i].id;
-        args->granularity[i] = granularity[i];
-        HGRNIC_PRINT("QoS group granularity set! id: %d, granularity: %d\n", group[i].id, granularity[i]);
+        args->weight[i] = weight[i];
+        HGRNIC_PRINT("QoS group granularity set! id: %d, weight: %d\n", group[i].id, weight[i]);
     }
+    write_cmd(dvr->fd, HGKFD_IOC_SET_GROUP, args);
+}
+
+void update_all_group_granularity(struct ibv_context *context)
+{
+    struct kfd_ioctl_set_group_args *args = (struct kfd_ioctl_set_group_args *)malloc(sizeof(struct kfd_ioctl_set_group_args));
+    struct hghca_context *dvr = (struct hghca_context *)context->dvr;
+    args->group_num = 0;
     write_cmd(dvr->fd, HGKFD_IOC_SET_GROUP, args);
 }
