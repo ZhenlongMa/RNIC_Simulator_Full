@@ -250,7 +250,7 @@ struct kfd_ioctl_update_group_args {
 #define HGKFD_IOC_ALLOC_GROUP \
         HGKFD_IOWR(0x0d, struct kfd_ioctl_alloc_group_args)
 
-#define HGKFD_IOC_UPDATE_GROUP \
+#define HGKFD_IOC_UPDATE_QP_WEIGHT \
         HGKFD_IOWR(0x0e, struct kfd_ioctl_update_group_args)
 
 #define HGKFD_COMMAND_START    0x01

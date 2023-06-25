@@ -403,6 +403,7 @@ int cpu_sync(struct ibv_context *context);
 
 struct ibv_qos_group* create_qos_group(struct ibv_context *context, int weight);
 int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint8_t group_num, uint16_t *weight);
+void update_all_group_granularity(struct ibv_context *context);
 
 void trans_wait(struct ibv_context *context);
 

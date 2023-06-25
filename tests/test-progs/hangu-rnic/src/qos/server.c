@@ -339,7 +339,7 @@ struct rdma_resc *set_group_resource(struct ibv_context *ctx, int num_mr, int nu
     struct rdma_resc *resc = rdma_resc_init(ctx, num_mr, num_cq, num_qp, llid, num_client);
     RDMA_PRINT(Server, "group resource initialized!\n");
     // struct ibv_qos_group *group = create_comm_group(resc->ctx, grp_weight);
-    struct ibv_qos_group *group = create_qos_group(ctx, grp_weight);
+    struct ibv_qos_group *group = create_comm_group(ctx, grp_weight);
     RDMA_PRINT(Server, "group created! group id: %d, group weight: %d\n", group->id, group->weight);
     resc->qos_group[0] = group;
 
@@ -440,7 +440,7 @@ int main (int argc, char **argv) {
     RDMA_PRINT(Server, "group1 resource created!\n");
     struct rdma_resc *grp2_resc = set_group_resource(ib_context, num_mr, num_cq, grp2_num_qp, svr_lid, num_client, grp2_weight);
     RDMA_PRINT(Server, "group2 resource created!\n");
-    set_all_granularity(ib_context);
+    // update_all_group_granularity(ib_context);
 
     /* sync to make sure that we could get start */
     rdma_recv_sync(grp1_resc);

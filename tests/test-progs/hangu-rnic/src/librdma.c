@@ -510,7 +510,8 @@ struct ibv_qos_group *create_comm_group(struct ibv_context *ctx, int group_weigh
 {
     struct ibv_qos_group *group;
     group = create_qos_group(ctx, group_weight);
-    set_all_granularity(ctx);
+    // set_all_granularity(ctx);
+    // update_all_group_granularity(ctx);
     return group;
 }
 

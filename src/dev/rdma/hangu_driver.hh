@@ -172,19 +172,16 @@ class HanGuDriver final : public EmulatedDriver {
         uint32_t granularity;
         uint16_t weight;
     };
-    
-    // struct qpInfo
-    // {
-    //     uint8_t qpWeight;
-    // };
+
     void setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args);
     void allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args);
-    void updateGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_update_group_args> &args);
+    void updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_args> &args);
     
     std::unordered_map<uint32_t, uint8_t> qpGroup;
     std::unordered_map<uint32_t, uint8_t> qpWeight;
     std::unordered_map<uint8_t, struct groupInfo> groupTable;
-    uint32_t bigN;
+    uint32_t groupWeightSum;
+    uint32_t bigN = 16384;
     uint8_t groupNum;
 
 
