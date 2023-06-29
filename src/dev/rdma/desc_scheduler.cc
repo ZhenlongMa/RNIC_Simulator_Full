@@ -271,8 +271,8 @@ void HanGuRnic::DescScheduler::wqeProc()
     TxDescPtr desc;
     uint8_t subDescNum = 0;
 
-    HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: %d, type: %d, group: %d, QP weight: %d\n", 
-        qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight);
+    HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: %d, type: %d, group: %d, QP weight: %d, group granularity: %d\n", 
+        qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
 
     assert(qpStatus->head_ptr >= qpStatus->tail_ptr);
     if (qpStatus->head_ptr == qpStatus->tail_ptr)

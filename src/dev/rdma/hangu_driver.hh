@@ -164,7 +164,7 @@ class HanGuDriver final : public EmulatedDriver {
     /* -------QPC resources {end}------- */
 
     /* -------QoS Group resources {begin}------- */
-    struct groupInfo
+    struct groupUnit
     {
         uint8_t groupID;
         // uint32_t qpWeightSum;
@@ -179,7 +179,7 @@ class HanGuDriver final : public EmulatedDriver {
     
     std::unordered_map<uint32_t, uint8_t> qpGroup;
     std::unordered_map<uint32_t, uint8_t> qpWeight;
-    std::unordered_map<uint8_t, struct groupInfo> groupTable;
+    std::unordered_map<uint8_t, struct groupUnit> groupTable;
     uint32_t groupWeightSum;
     uint32_t bigN = 16384;
     uint8_t groupNum;

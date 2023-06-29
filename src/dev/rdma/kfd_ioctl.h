@@ -186,7 +186,7 @@ struct kfd_ioctl_set_group_args {
     /* Input */
     uint8_t group_num;
     uint8_t group_id[MAX_GROUP_NUM];
-    uint16_t granularity[MAX_GROUP_NUM];
+    // uint16_t granularity[MAX_GROUP_NUM];
     uint16_t weight[MAX_GROUP_NUM];
 };
 

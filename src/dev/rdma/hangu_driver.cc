@@ -257,8 +257,8 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
             args.copyIn(virt_proxy);
             setGroup(virt_proxy, args);
             args.copyOut(virt_proxy);
-            break;
         }
+        break;
         case HGKFD_IOC_ALLOC_GROUP:
         {
             HANGU_PRINT(HanGuDriver, "ioctl: HGKFD_IOC_ALLOC_GROUP\n");
@@ -266,16 +266,16 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
             args.copyIn(virt_proxy);
             allocGroup(virt_proxy, args);
             args.copyOut(virt_proxy);
-            break;
         }
+        break;
         case HGKFD_IOC_UPDATE_QP_WEIGHT:
         {
-            HANGU_PRINT(HanGuDriver, "ioctl: HGKFD_IOC_UPDATE_GROUP\n");
+            HANGU_PRINT(HanGuDriver, "ioctl: HGKFD_IOC_UPDATE_QP_WEIGHT\n");
             TypedBufferArg<kfd_ioctl_write_qpc_args> args(ioc_buf);
             args.copyIn(virt_proxy);
             updateQpWeight(virt_proxy, args);
-            break;
         }
+        break;
         default:
         {
             fatal("%s: bad ioctl %d\n", req);
@@ -449,45 +449,60 @@ HanGuDriver::writeIcm(PortProxy& portProxy, uint8_t rescType, RescMeta &rescMeta
 void HanGuDriver::setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args)
 {
     HANGU_PRINT(HanGuDriver, "into setGroup command in driver! group num: %d, table size: %d\n", groupNum, groupTable.size());
-    HanGuRnicDef::GroupInfo groupInfo[MAX_GROUP_NUM];
+    HanGuRnicDef::GroupInfo group[MAX_GROUP_NUM];
 
     // update weight in group table
     for (int i = 0; i < args->group_num; i++)
     {
         groupTable[args->group_id[i]].weight = args->weight[i];
+        HANGU_PRINT(HanGuDriver, "update group weight! group ID: %d, group weight: %d\n", args->group_id[i], args->weight[i]);
     }
     assert(groupNum == groupTable.size());
+
     // calculate group weight sum
     uint32_t groupWeightSumTemp = 0;
-    for (std::unordered_map<uint8_t, struct groupInfo>::iterator iter = groupTable.begin(); iter != groupTable.end(); iter++)
+    for (std::unordered_map<uint8_t, struct groupUnit>::iterator iter = groupTable.begin(); iter != groupTable.end(); iter++)
     {
         groupWeightSumTemp += iter->second.weight;
     }
     groupWeightSum = groupWeightSumTemp;
 
     // update every group granularity
-    for (std::unordered_map<uint8_t, struct groupInfo>::iterator iter = groupTable.begin(); iter != groupTable.end(); iter++)
+    for (std::unordered_map<uint8_t, struct groupUnit>::iterator iter = groupTable.begin(); iter != groupTable.end(); iter++)
     {
+        assert(iter->first == iter->second.groupID);
         int qpWeightSum = 0;
+
         for (std::unordered_map<uint32_t, uint8_t>::iterator it = iter->second.qpWeight.begin(); it != iter->second.qpWeight.end(); it++)
         {
             qpWeightSum += it->second;
         }
-        iter->second.granularity = (double)iter->second.weight / groupWeightSum * bigN / qpWeightSum;
+
+        if (qpWeightSum == 0)
+        {
+            assert(iter->second.qpWeight.size() == 0);
+            iter->second.granularity = 0;
+        }
+        else
+        {
+            iter->second.granularity = (double)iter->second.weight / groupWeightSum * bigN / qpWeightSum;
+        }
+        HANGU_PRINT(HanGuDriver, "set group update group granularity! group id: %d, granularity: %d, qp weight sum: %d\n", 
+            iter->second.groupID, iter->second.granularity, qpWeightSum);
     }
 
     // write group granularities into hardware
     int i = 0;
-    for (std::unordered_map<uint8_t, struct groupInfo>::iterator iter = groupTable.begin(); iter != groupTable.end(); iter++)
+    for (std::unordered_map<uint8_t, struct groupUnit>::iterator iter = groupTable.begin(); iter != groupTable.end(); iter++)
     {
-        groupInfo[i].groupID = iter->second.groupID;
-        groupInfo[i].granularity = iter->second.granularity;
+        group[i].groupID = iter->second.groupID;
+        group[i].granularity = iter->second.granularity;
         i++;
         HANGU_PRINT(HanGuDriver, "set group granularity! group id: %d, group weight: %d, granularity: %d\n", 
-            groupInfo[i].groupID, iter->second.weight, groupInfo[i].granularity);
+            group[i].groupID, iter->second.weight, group[i].granularity);
     }
 
-    portProxy.writeBlob(mailbox.vaddr, groupInfo, sizeof(HanGuRnicDef::GroupInfo) * groupNum);
+    portProxy.writeBlob(mailbox.vaddr, group, sizeof(HanGuRnicDef::GroupInfo) * groupNum);
     postHcr(portProxy, (uint64_t)mailbox.paddr, 1, groupNum, HanGuRnicDef::SET_GROUP);
 }
 
@@ -500,6 +515,7 @@ void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_allo
     assert(args->group_num == 1);
     args->group_id[0] = groupNum;
     groupNum += args->group_num;
+    groupTable[args->group_id[0]].groupID = args->group_id[0];
     HANGU_PRINT(HanGuDriver, "group allocated! group ID: %d, groupNum: %d\n", args->group_id[0], groupNum);
 }
 
@@ -509,8 +525,8 @@ void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_allo
 void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_args> &args)
 {
     /* put QpcResc into mailbox */
-    HanGuRnicDef::GroupInfo groupInfo[MAX_QPC_BATCH];
-    memset(groupInfo, 0, sizeof(HanGuRnicDef::GroupInfo) * args->batch_size);
+    HanGuRnicDef::GroupInfo group[MAX_QPC_BATCH];
+    memset(group, 0, sizeof(HanGuRnicDef::GroupInfo) * args->batch_size);
     int setGroupNum = 0;
     std::unordered_map<uint8_t, uint8_t> setGroup;
 
@@ -518,9 +534,15 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
     for (uint32_t i = 0; i < args->batch_size; ++i)
     {
         assert(groupTable.find(args->groupID[i]) != groupTable.end());
-        if (groupTable[args->groupID[i]].weight != args->weight[i])
+        HANGU_PRINT(HanGuDriver, "old QP weight: %d, new QP weight: %d\n", groupTable[args->groupID[i]].qpWeight[args->src_qpn[i]], args->weight[i]);
+        // if (groupTable[args->groupID[i]].weight != args->weight[i])
+        if (groupTable[args->groupID[i]].qpWeight[args->src_qpn[i]] != args->weight[i])
         {
-            groupTable[args->groupID[i]].weight = args->weight[i];
+            // groupTable[args->groupID[i]].weight = args->weight[i];
+            // struct groupUnit *group = &(groupTable[args->groupID[i]]);
+            // assert(group->qpWeight.find(args->src_qpn[i]) != group->qpWeight.end());
+            HANGU_PRINT(HanGuDriver, "into loop!\n");
+            groupTable[args->groupID[i]].qpWeight[args->src_qpn[i]] = args->weight[i];
             if (setGroup.find(args->groupID[i]) == setGroup.end())
             {
                 setGroup[args->groupID[i]] = 1;
@@ -528,10 +550,19 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
             }
         }
     }
+    assert(args->batch_size > 0);
+    if (setGroupNum == 0)
+    {
+        HANGU_PRINT(HanGuDriver, "setGroupNum is ZERO!\n");
+        return;
+    }
+    assert(setGroup.size() != 0);
+    // assert(setGroupNum > 0);
+    assert(setGroupNum == setGroup.size());
+    HANGU_PRINT(HanGuDriver, "into update QP weight! setGroupNum: %d\n", setGroupNum);
 
     // update group granularity
     int i = 0;
-    assert(setGroupNum == setGroup.size());
     for (std::unordered_map<uint8_t, uint8_t>::iterator iter = setGroup.begin(); iter != setGroup.end(); iter++)
     {
         assert(iter->second == 1);
@@ -543,13 +574,14 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
             qpWeightSum += it->second;
         }
         groupTable[groupID].granularity = (double)groupTable[groupID].weight / groupWeightSum * bigN / qpWeightSum;
-        groupInfo[i].groupID = groupID;
-        groupInfo[i].granularity = groupTable[groupID].granularity;
-        HANGU_PRINT(HanGuDriver, "update QP weight! Group ID: %d, group weight: %d, group granularity: %d, big N: %d\n", 
-            groupID, groupTable[groupID].weight, groupInfo[i].granularity, bigN);
+        group[i].groupID = groupID;
+        group[i].granularity = groupTable[groupID].granularity;
+        HANGU_PRINT(HanGuDriver, "update granularity when update QP weight! Group ID: %d, group weight: %d, group granularity: %d, big N: %d\n", 
+            groupID, groupTable[groupID].weight, group[i].granularity, bigN);
+        i++;
     }
 
-    portProxy.writeBlob(mailbox.vaddr, groupInfo, sizeof(HanGuRnicDef::GroupInfo) * setGroupNum);
+    portProxy.writeBlob(mailbox.vaddr, group, sizeof(HanGuRnicDef::GroupInfo) * setGroupNum);
     postHcr(portProxy, (uint64_t)mailbox.paddr, 1, setGroupNum, HanGuRnicDef::SET_GROUP);
 }
 /* --------------------------- Group {end}---------------------------- */
@@ -708,12 +740,12 @@ HanGuDriver::writeQpc(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_a
     }
 
     // update group table
-    for (uint32_t i = 0; i < args->batch_size; ++i) 
-    {
-        groupTable[args->groupID[i]].qpWeight[args->src_qpn[i]] = args->weight[i];
-    }
-
-    // update QP weight sum
+    // for (uint32_t i = 0; i < args->batch_size; ++i) 
+    // {
+    //     groupTable[args->groupID[i]].qpWeight[args->src_qpn[i]] = args->weight[i];
+    //     HANGU_PRINT(HanGuDriver, "update QP weight: qpn: %d, weight: %d, group: %d\n", 
+    //         qpcResc[i].srcQpn, qpcResc[i].perfWeight, qpcResc[i].groupID);
+    // }
 
 
     HANGU_PRINT(HanGuDriver, " writeQpc: args->batch_size: %d\n", args->batch_size);

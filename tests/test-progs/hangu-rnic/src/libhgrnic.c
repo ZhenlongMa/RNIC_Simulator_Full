@@ -87,11 +87,13 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
     free(args);
 
     /* create group for CM */
-    struct ibv_qos_group *cm_group = create_qos_group(context, 10);
+    int cm_group_weight = 10;
+    struct ibv_qos_group *cm_group = create_qos_group(context, cm_group_weight);
     // int cm_weight = 1024;
-    uint16_t *cm_weight = (uint16_t*)malloc(sizeof(uint16_t));
-    *cm_weight = 20;
-    set_qos_group(context, cm_group, 1, cm_weight);
+    // uint16_t *cm_weight = (uint16_t*)malloc(sizeof(uint16_t));
+    // *cm_weight = 20;
+    // set_qos_group(context, cm_group, 1, cm_weight);
+    // free(cm_weight);
 
     /* Init communication management */
     struct ibv_mr_init_attr mr_attr;
@@ -356,6 +358,7 @@ int ibv_modify_qp(struct ibv_context *context, struct ibv_qp *qp) {
                 qp->qp_num, qp->indicator, qp->weight, qp->group_id);
     write_cmd(dvr->fd, HGKFD_IOC_UPDATE_QP_WEIGHT, qpc_args);
     free(qpc_args);
+    HGRNIC_PRINT(" ibv_modify_qp out! qpn: %d\n", qp->qp_num);
 
     // update group granularity
     // update_all_group_granularity(context);
