@@ -176,6 +176,7 @@ class HanGuDriver final : public EmulatedDriver {
     void setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args);
     void allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args);
     void updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_args> &args);
+    void printQoS();
     
     std::unordered_map<uint32_t, uint8_t> qpGroup;
     std::unordered_map<uint32_t, uint8_t> qpWeight;
