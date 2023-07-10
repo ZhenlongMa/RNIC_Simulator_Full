@@ -21,8 +21,8 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->group_id = resc->qos_group[0]->id;
         qp->indicator = BW_QP;
         qp->weight = 2;
-        RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d\n", 
-                qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num, i);
+        RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d, group id: %d\n", 
+                qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num, i, qp->group_id);
         // ibv_modify_qp(resc->ctx, qp);
     }
     ibv_modify_batch_qp(resc->ctx, resc->qp[0], resc->num_qp * resc->num_rem);
@@ -254,8 +254,9 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     record.cqe_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client));
     memset(record.qp_data_count, 0, sizeof(uint64_t) * (num_qp * num_client));
     memset(record.cqe_count, 0, sizeof(uint64_t) * (num_qp * num_client));
-    int wr_num = 10;
-    uint32_t msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
+    int wr_num = 50;
+    // uint32_t msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
+    uint32_t msg_size = sizeof(TRANS_WRDMA_DATA);
     
     /* Start to post all the QPs at beginning */
     for (int k = 0; k < qos_group_num; k++) // exclude CM group
@@ -265,10 +266,14 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
             for (int j = 0; j < resc->num_qp; ++j) {
                 struct ibv_qp *qp = resc->qp[i * resc->num_qp + j];
                 svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, msg_size); // (4096 / num_qp) * j
-                RDMA_PRINT(Server, "group %d qp %d initially post send!\n", k, resc->qp[i * resc->num_qp + j]->qp_num);
+                RDMA_PRINT(Server, "group %d qp 0x%x initially post send!\n", k, resc->qp[i * resc->num_qp + j]->qp_num);
             }
         }
     }
+
+    // int *a = (int *)1233;
+    // int b = 1029;
+    // memset(a, b, 1);
     
     /* polling for completion */
     do { // snd_cnt < (num_qp * TEST_WR_NUM * num_client)
@@ -331,6 +336,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
 
 /**
  * @note create group resource and establish connection with remote side
+ * @param num_qp: amount of QP for each remote node
 */
 struct rdma_resc *set_group_resource(struct ibv_context *ctx, int num_mr, int num_cq, int num_qp, uint16_t llid, int num_rem, int grp_weight)
 {
@@ -424,13 +430,14 @@ int main (int argc, char **argv) {
     RDMA_PRINT(Server, "llid is %hd\n", svr_lid);
     RDMA_PRINT(Server, "num_client %d\n", num_client);
     RDMA_PRINT(Server, "wqe size: %ld\n", sizeof(struct ibv_wqe));
+    RDMA_PRINT(Server, "desc size: %ld\n", sizeof(struct send_desc));
 
     int num_mr = 1;
     int num_cq = TEST_CQ_NUM;
     int grp1_num_qp = 2;
     int grp2_num_qp = 1;
     int grp1_weight = 15;
-    int grp2_weight = 2;
+    int grp2_weight = 20;
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));;
 
     /* device initialization */

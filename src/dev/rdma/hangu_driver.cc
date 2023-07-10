@@ -25,7 +25,7 @@
 
 
 HanGuDriver::HanGuDriver(Params *p)
-  : EmulatedDriver(p), device(p->device) {
+  : EmulatedDriver(p), device(p->device), groupNum(0) {
     // HANGU_PRINT(HanGuDriver, "HanGu RNIC driver.\n");
 }
 
@@ -528,6 +528,7 @@ void HanGuDriver::printQoS()
 */
 void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args)
 {
+    HANGU_PRINT(HanGuDriver, "into allocGroup! groupNum: %d, args->group_num: %d\n", groupNum, args->group_num);
     postHcr(portProxy, (uint64_t)mailbox.paddr, 1, args->group_num, HanGuRnicDef::ALLOC_GROUP);
     assert(args->group_num == 1);
     args->group_id[0] = groupNum;
