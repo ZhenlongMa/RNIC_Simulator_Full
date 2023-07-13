@@ -7,7 +7,7 @@
 
 #define TEST_QP_NUM   1
 #define TEST_CQ_NUM ((TEST_QP_NUM / (300 / num_client) ) + 1)
-#define TEST_WR_NUM 10
+// #define TEST_WR_NUM 10
 #define LATENCY_WR_NUM 1
 
 #define S  (1000UL * MS)

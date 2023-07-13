@@ -86,7 +86,7 @@ int svr_fill_mr (struct ibv_mr *mr, uint32_t offset) {
 int svr_post_send (struct rdma_resc *resc, struct ibv_qp *qp, int wr_num, uint32_t offset, uint8_t op_mode, uint32_t msg_size) {
 
     // RDMA_PRINT(Server, "enter svr_post_send %d\n", wr_num);
-    struct ibv_wqe wqe[TEST_WR_NUM];
+    struct ibv_wqe wqe[THPT_WR_NUM];
     struct ibv_mr *local_mr = (resc->mr)[0];
     
     if (op_mode == OPMODE_RDMA_WRITE) {
@@ -254,7 +254,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     record.cqe_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client));
     memset(record.qp_data_count, 0, sizeof(uint64_t) * (num_qp * num_client));
     memset(record.cqe_count, 0, sizeof(uint64_t) * (num_qp * num_client));
-    int wr_num = 50;
+    int wr_num = THPT_WR_NUM;
     // uint32_t msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
     uint32_t msg_size = sizeof(TRANS_WRDMA_DATA);
     
