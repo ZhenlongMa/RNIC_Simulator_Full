@@ -168,8 +168,8 @@ int main (int argc, char **argv) {
 
     // int num_mr = 1;
     // int num_cq = TEST_CQ_NUM;
-    int grp1_num_qp = 2;
-    int grp2_num_qp = 1;
+    int grp1_num_qp = 20;
+    int grp2_num_qp = 10;
     int grp1_weight = 3;
     int grp2_weight = 2;
 

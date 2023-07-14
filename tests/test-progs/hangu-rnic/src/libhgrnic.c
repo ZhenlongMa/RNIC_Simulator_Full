@@ -126,7 +126,8 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
     // cm_group->total_qp_weight += context->cm_qp->weight;
     ibv_modify_qp(context, context->cm_qp);
 
-    HGRNIC_PRINT("CM QP created! QPN: %d\n", context->cm_qp->qp_num);
+    HGRNIC_PRINT("CM QP created! QPN: %d, indicator: %d, weight: %d, group id: %d\n", 
+        context->cm_qp->qp_num, context->cm_qp->indicator, context->cm_qp->weight, context->cm_qp->group_id);
     HGRNIC_PRINT("CM group created! group_id: %d, group weight: %d\n", cm_group->id, cm_group->weight);
 
     context->cm_rcv_posted_off = RCV_WR_BASE;
@@ -353,9 +354,9 @@ int ibv_modify_qp(struct ibv_context *context, struct ibv_qp *qp) {
     qpc_args->indicator[0]  = qp->indicator;
     qpc_args->weight[0]     = qp->weight;
     qpc_args->groupID[0]    = qp->group_id;
-    write_cmd(dvr->fd, HGKFD_IOC_WRITE_QPC, qpc_args);
     HGRNIC_PRINT(" ibv_modify_qp! qpn 0x%x, indicator: %d, weight: %d, group: %d\n", 
                 qp->qp_num, qp->indicator, qp->weight, qp->group_id);
+    write_cmd(dvr->fd, HGKFD_IOC_WRITE_QPC, qpc_args);
     write_cmd(dvr->fd, HGKFD_IOC_UPDATE_QP_WEIGHT, qpc_args);
     free(qpc_args);
     HGRNIC_PRINT(" ibv_modify_qp out! qpn: %d\n", qp->qp_num);
@@ -632,7 +633,7 @@ int ibv_poll_cpl(struct ibv_cq *cq, struct cpl_desc **desc, int max_num) {
             if (cq->offset + sizeof(struct cpl_desc) > cq->mr->length) {
                 cq->offset = 0;
             }
-            // HGRNIC_PRINT("poll cpl! cq offset: 0x%h\n");
+            HGRNIC_PRINT("poll cpl! cqn: %d, cq offset: 0x%x, qpn: %d\n", cq->cq_num, cq->offset, cq_desc->qp_num);
         } else {
             break;
         }

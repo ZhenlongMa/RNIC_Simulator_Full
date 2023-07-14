@@ -551,9 +551,9 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
     // modify QP weight in group table and record the groups to be updated
     for (uint32_t i = 0; i < args->batch_size; ++i)
     {
-        assert(groupTable.find(args->groupID[i]) != groupTable.end());
         HANGU_PRINT(HanGuDriver, "qpn: %d, old QP weight: %d, new QP weight: %d, group ID: %d\n", 
             args->src_qpn[i], groupTable[args->groupID[i]].qpWeight[args->src_qpn[i]], args->weight[i], args->groupID[i]);
+        assert(groupTable.find(args->groupID[i]) != groupTable.end());
         // if (groupTable[args->groupID[i]].weight != args->weight[i])
         if (groupTable[args->groupID[i]].qpWeight[args->src_qpn[i]] != args->weight[i])
         {

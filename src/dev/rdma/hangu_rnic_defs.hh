@@ -260,12 +260,12 @@ struct TxDesc {
         return (this->flags & WR_FLAG_SIGNALED) != 0;
     }
 
-    void setSignal()
+    void setCompleteSignal()
     {
         this->flags = this->flags | (1 << 31);
     }
 
-    void cancelSignal()
+    void cancelCompleteSignal()
     {
         this->flags = this->flags & ~(1 << 31);
     }

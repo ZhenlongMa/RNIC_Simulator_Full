@@ -270,10 +270,6 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
             }
         }
     }
-
-    // int *a = (int *)1233;
-    // int b = 1029;
-    // memset(a, b, 1);
     
     /* polling for completion */
     do { // snd_cnt < (num_qp * TEST_WR_NUM * num_client)
@@ -286,7 +282,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
             for (int i = 0; i < num_cq; ++i) {
                 // RDMA_PRINT(Server, "ready to poll cq! cqn: %d\n", resc->cq[i]->cq_num);
                 int res = ibv_poll_cpl(resc->cq[i], desc, MAX_CPL_NUM);
-                // RDMA_PRINT(Server, "finish polling cq! cqn: %d\n", resc->cq[i]->cq_num);
+                RDMA_PRINT(Server, "finish polling cq! cqn: %d, cqe num: %d\n", resc->cq[i]->cq_num, res);
                 if (res) {
                     if (*start_time == 0) {
                         *start_time = get_time(resc->ctx);
@@ -306,9 +302,9 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                                     }
                                 }
                                 // uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
-                                // RDMA_PRINT(Server, "ready to post send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
+                                RDMA_PRINT(Server, "ready to post send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
                                 svr_post_send(resc, qp, wr_num, offset, op_mode, msg_size);
-                                // RDMA_PRINT(Server, "finish posting send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
+                                RDMA_PRINT(Server, "finish posting send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
                             }
                         }
                         else
@@ -434,8 +430,8 @@ int main (int argc, char **argv) {
 
     int num_mr = 1;
     int num_cq = TEST_CQ_NUM;
-    int grp1_num_qp = 2;
-    int grp2_num_qp = 1;
+    int grp1_num_qp = 20;
+    int grp2_num_qp = 10;
     int grp1_weight = 15;
     int grp2_weight = 20;
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));;
