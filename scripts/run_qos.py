@@ -5,7 +5,7 @@ import sys
 SERVER_LID  = 10
 
 NUM_CPUS  = 1
-CPU_CLK   = "2GHz"
+CPU_CLK   = "4GHz"
 EN_SPEED  = "100Gbps"
 PCI_SPEED = "128Gbps"
 

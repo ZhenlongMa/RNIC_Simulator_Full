@@ -562,14 +562,14 @@ int ibv_post_send(struct ibv_context *context, struct ibv_wqe *wqe, struct ibv_q
             qp->snd_wqe_offset = 0; /* SQ MR is allocated in page, so 
                                      * the start address (offset) is 0 */
             
-            HGRNIC_PRINT(" 1db_low is 0x%x, db_high is 0x%x\n", db_low, db_high);
+            // HGRNIC_PRINT(" 1db_low is 0x%x, db_high is 0x%x\n", db_low, db_high);
         }
 
         // uint8_t *u8_tmp = (uint8_t *)tx_desc;
         // for (int i = 0; i < sizeof(struct send_desc); ++i) {
         //     HGRNIC_PRINT(" data[%d] 0x%x\n", i, u8_tmp[i]);
         // }
-        HGRNIC_PRINT("WQE opcode: %d\n", tx_desc->opcode);
+        // HGRNIC_PRINT("WQE opcode: %d\n", tx_desc->opcode);
     }
 
     if (snd_cnt) {
@@ -633,7 +633,7 @@ int ibv_poll_cpl(struct ibv_cq *cq, struct cpl_desc **desc, int max_num) {
             if (cq->offset + sizeof(struct cpl_desc) > cq->mr->length) {
                 cq->offset = 0;
             }
-            HGRNIC_PRINT("poll cpl! cqn: %d, cq offset: 0x%x, qpn: %d\n", cq->cq_num, cq->offset, cq_desc->qp_num);
+            // HGRNIC_PRINT("poll cpl! cqn: %d, cq offset: 0x%x, qpn: %d\n", cq->cq_num, cq->offset, cq_desc->qp_num);
         } else {
             break;
         }

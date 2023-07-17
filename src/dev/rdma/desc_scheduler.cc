@@ -368,12 +368,21 @@ void HanGuRnic::DescScheduler::wqeProc()
                     HANGU_PRINT(DescScheduler, "qpn: %d, tail pointer to update: %d, head pointer: %d\n", qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr);
                     assert(qpStatus->tail_ptr < qpStatus->head_ptr);
                     qpStatus->tail_ptr++;
-                    subDesc->setSignal();
+                    // if the original WQE is signaled, signal the sub WQE
+                    if (desc->isSignaled())
+                    {
+                        subDesc->setCompleteSignal();
+                        HANGU_PRINT(DescScheduler, "Signal the sub desc! QPN: %d, flag: 0x%x\n", qpStatus->qpn, subDesc->flags);
+                    }
+                    else
+                    {
+                        HANGU_PRINT(DescScheduler, "Do not signal the sub desc because WQE is unsignaled! QPN: %d, flag: 0x%x\n", qpStatus->qpn, subDesc->flags);
+                    }
                     qpStatus->fetch_offset = 0;
                 }
                 else
                 {
-                    subDesc->cancelSignal();
+                    subDesc->cancelCompleteSignal();
                     qpStatus->fetch_offset += subDesc->len;
                     HANGU_PRINT(DescScheduler, "Do not signal the sub desc! QPN: %d, flag: 0x%x\n", qpStatus->qpn, subDesc->flags);
                 }
