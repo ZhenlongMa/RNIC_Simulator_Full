@@ -183,7 +183,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
         // num_qp += ctx->qos_group->qp_num;
         num_qp += grp_resc[i]->num_qp;
     }
-    RDMA_PRINT(Server, "into throughput test, num_qp: %d, num_client: %d\n", num_qp, num_client);
+    RDMA_PRINT(Server, "into throughput test, num_qp: %d, num_client: %d, qos_group_num: %d\n", num_qp, num_client, qos_group_num);
     
     struct qp_comm_record record;
     record.qp_data_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client));
@@ -193,18 +193,18 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     int wr_num;
     uint32_t msg_size;
 
-    // if (cpu_id == 0)
-    // {
-    //     wr_num = BW_WR_NUM;
-    //     msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
-    // }
-    // else 
-    // {
-    //     wr_num = THPT_WR_NUM;
-    //     msg_size = sizeof(TRANS_WRDMA_DATA);
-    // }
-    wr_num = THPT_WR_NUM;
-    msg_size = sizeof(TRANS_WRDMA_DATA);
+    if (cpu_id == 0)
+    {
+        wr_num = BW_WR_NUM;
+        msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
+    }
+    else 
+    {
+        wr_num = THPT_WR_NUM;
+        msg_size = sizeof(TRANS_WRDMA_DATA);
+    }
+    // wr_num = THPT_WR_NUM;
+    // msg_size = sizeof(TRANS_WRDMA_DATA);
     RDMA_PRINT(Server, "set wr num and msg size! cpu id: %d, wr num: %d, msg size: %d\n", cpu_id, wr_num, msg_size);
     
     /* Start to post all the QPs at beginning */
@@ -224,7 +224,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     do { // snd_cnt < (num_qp * TEST_WR_NUM * num_client)
         for (int grp_id = 0; grp_id < qos_group_num; grp_id++)
         {
-            RDMA_PRINT(Server, "work on grp[%d]\n", grp_id);
+            // RDMA_PRINT(Server, "work on grp[%d]\n", grp_id);
             struct rdma_resc *resc = grp_resc[grp_id];
             struct cpl_desc **desc = resc->desc;
             int num_cq = resc->num_cq;
@@ -264,7 +264,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
         }
         *end_time = get_time(ctx);
         *con_time = *end_time - *start_time;
-        RDMA_PRINT(Server, "con_time: %ld/%lu\n", *con_time, 40UL * MS);
+        // RDMA_PRINT(Server, "con_time: %ld/%lu\n", *con_time, 40UL * MS);
     } while ((*con_time < 10UL * MS) || (*start_time == 0));
 
     int cqe_sum = 0;
@@ -385,25 +385,25 @@ int main (int argc, char **argv) {
     int grp2_weight;
 
     // CPU 0 is for large message
-    // if (cpu_id == 0)
-    // {
-    //     grp1_num_qp = 1;
-    //     grp2_num_qp = 1;
-    //     grp1_weight = 15;
-    //     grp2_weight = 20;
-    // }
-    // else
-    // {
-    //     grp1_num_qp = 2;
-    //     grp2_num_qp = 1;
-    //     grp1_weight = 15;
-    //     grp2_weight = 20;
-    // }
-    grp1_num_qp = 2;
-    grp2_num_qp = 1;
-    grp1_weight = 15;
-    grp2_weight = 20;
-    struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));;
+    if (cpu_id == 0)
+    {
+        grp1_num_qp = 1;
+        grp2_num_qp = 1;
+        grp1_weight = 15;
+        grp2_weight = 20;
+    }
+    else
+    {
+        grp1_num_qp = 2;
+        grp2_num_qp = 1;
+        grp1_weight = 15;
+        grp2_weight = 20;
+    }
+    // grp1_num_qp = 2;
+    // grp2_num_qp = 1;
+    // grp1_weight = 15;
+    // grp2_weight = 20;
+    struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
 
     /* device initialization */
     ibv_open_device(ib_context, svr_lid);

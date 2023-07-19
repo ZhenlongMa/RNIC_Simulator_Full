@@ -36,7 +36,7 @@ void HanGuRnic::DescScheduler::qpcRspProc()
     assert(rNic->qpcModule.txQpAddrRspFifo.size());
     qpc = rNic->qpcModule.txQpAddrRspFifo.front();
     rNic->qpcModule.txQpAddrRspFifo.pop();
-    HANGU_PRINT(DescScheduler, "QPC Response received by DescScheduler! QPN: %d, index: %d\n", qpc->num, qpc->idx);
+    HANGU_PRINT(DescScheduler, "QPC Response received by DescScheduler! QPN: 0x%x, index: %d\n", qpc->num, qpc->idx);
     assert(rNic->doorbellVector[qpc->idx] != nullptr);
     DoorbellPtr db = rNic->doorbellVector[qpc->idx];
     rNic->df2ccuIdxFifo.push(qpc->idx);
@@ -53,7 +53,7 @@ void HanGuRnic::DescScheduler::qpcRspProc()
     qpStatus = qpStatusTable[db->qpn];
     std::pair<DoorbellPtr, QPStatusPtr> qpStatusDbPair(db, qpStatus);
     dbQpStatusRspQue.push(qpStatusDbPair);
-    HANGU_PRINT(DescScheduler, "QP status doorbell pair sent to QP status proc! QP number: %d, desc num: %d\n", qpStatus->qpn, db->num);
+    HANGU_PRINT(DescScheduler, "QP status doorbell pair sent to QP status proc! QP number: 0x%x, desc num: %d\n", qpStatus->qpn, db->num);
     if (!qpStatusRspEvent.scheduled())
     {
         rNic->schedule(qpStatusRspEvent, curTick() + rNic->clockPeriod());
@@ -81,7 +81,7 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     // delete this line in the future
     assert(db->qpn == qpStatus->qpn);
     assert(qpStatus->type == BW_QP || qpStatus->type == UD_QP);
-    HANGU_PRINT(DescScheduler, "Before updating head. qpn: 0x%x, head: 0x%x, tail:  0x%x\n", 
+    HANGU_PRINT(DescScheduler, "Before updating head. qpn: 0x%x, head: %d, tail:  %d\n", 
         qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr);
     if (qpStatus->head_ptr == qpStatus->tail_ptr) // WARNING: consider corner case!
     {
@@ -92,11 +92,11 @@ void HanGuRnic::DescScheduler::qpStatusProc()
         // totalWeight += qpStatus->weight;
         schedule = true;
         qpStatus->in_que++;
-        HANGU_PRINT(DescScheduler, "Inactive QP! qpn: %d, in que: %d\n", db->qpn, qpStatus->in_que);
+        HANGU_PRINT(DescScheduler, "Inactive QP! qpn: 0x%x, in que: %d\n", db->qpn, qpStatus->in_que);
     }
     else
     {
-        HANGU_PRINT(DescScheduler, "Active QP! Do not push QPN into QPN queue! qpn: %d\n", db->qpn);
+        HANGU_PRINT(DescScheduler, "Active QP! Do not push QPN into QPN queue! qpn: 0x%x\n", db->qpn);
     }
     qpStatus->head_ptr += db->num;
 
@@ -109,7 +109,7 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     // update QP status
     // WARNING: QP status update could lead to QP death
     qpStatusTable[qpStatus->qpn]->head_ptr = qpStatus->head_ptr;
-    HANGU_PRINT(DescScheduler, "QP[%d] status updated!\n", qpStatus->qpn);
+    HANGU_PRINT(DescScheduler, "QP[0x%x] status updated!\n", qpStatus->qpn);
 
     if (dbQpStatusRspQue.size())
     {
