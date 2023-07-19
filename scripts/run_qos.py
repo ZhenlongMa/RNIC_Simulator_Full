@@ -4,7 +4,7 @@ import sys
 
 SERVER_LID  = 10
 
-NUM_CPUS  = 1
+NUM_CPUS  = 6
 CPU_CLK   = "4GHz"
 EN_SPEED  = "100Gbps"
 PCI_SPEED = "128Gbps"
@@ -55,8 +55,12 @@ def execute_program(debug, test_prog, option, params):
         # "cd ../tests/test-progs/hangu-rnic/src && make",
         # "cd ../ && scons build/X86/gem5.opt"
     ]
+    # record start time
+    cmd_list.append("echo $(date +%Y-%m-%d)")
     # run simulation
     cmd_list.append(cmd_run_sim(debug, test_prog, option, params))
+    #record end time
+    cmd_list.append("echo $(date +%Y-%m-%d)")
 
     # execute cmd_list sequentially
     for cmd in cmd_list:

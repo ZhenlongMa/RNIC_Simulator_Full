@@ -514,11 +514,12 @@ void HanGuDriver::printQoS()
     HANGU_PRINT(HanGuDriver, "print QoS info! group num: %d\n", groupTable.size());
     for (std::unordered_map<uint8_t, struct groupUnit>::iterator iter = groupTable.begin(); iter != groupTable.end(); iter++)
     {
+        HANGU_PRINT(HanGuDriver, "---------------------------\n");
         HANGU_PRINT(HanGuDriver, "group[%d] info! group id: %d, group weight: %d, granularity: %d\n", 
             iter->first, iter->second.groupID, iter->second.weight, iter->second.granularity);
         for (std::unordered_map<uint32_t, uint8_t>::iterator it = iter->second.qpWeight.begin(); it != iter->second.qpWeight.end(); it++)
         {
-            HANGU_PRINT(HanGuDriver, "QP weight! qpn: %d, qp weight: %d\n", it->first, it->second);
+            HANGU_PRINT(HanGuDriver, "QP weight! qpn: 0x%x, qp weight: %d\n", it->first, it->second);
         }
     }
 }
@@ -551,7 +552,7 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
     // modify QP weight in group table and record the groups to be updated
     for (uint32_t i = 0; i < args->batch_size; ++i)
     {
-        HANGU_PRINT(HanGuDriver, "qpn: %d, old QP weight: %d, new QP weight: %d, group ID: %d\n", 
+        HANGU_PRINT(HanGuDriver, "qpn: 0x%x, old QP weight: %d, new QP weight: %d, group ID: %d\n", 
             args->src_qpn[i], groupTable[args->groupID[i]].qpWeight[args->src_qpn[i]], args->weight[i], args->groupID[i]);
         assert(groupTable.find(args->groupID[i]) != groupTable.end());
         // if (groupTable[args->groupID[i]].weight != args->weight[i])
@@ -595,8 +596,8 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
         groupTable[groupID].granularity = (double)groupTable[groupID].weight / groupWeightSum * bigN / qpWeightSum;
         group[i].groupID = groupID;
         group[i].granularity = groupTable[groupID].granularity;
-        HANGU_PRINT(HanGuDriver, "update granularity when update QP weight! Group ID: %d, group weight: %d, group granularity: %d, big N: %d\n", 
-            groupID, groupTable[groupID].weight, group[i].granularity, bigN);
+        HANGU_PRINT(HanGuDriver, "update granularity when update QP weight! Group ID: %d, group weight: %d, group granularity: %d, big N: %d, group weight sum: %d, qp weight sum: %d\n", 
+            groupID, groupTable[groupID].weight, group[i].granularity, bigN, groupWeightSum, qpWeightSum);
         i++;
     }
 
