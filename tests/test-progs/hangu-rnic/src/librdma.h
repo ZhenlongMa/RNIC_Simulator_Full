@@ -110,6 +110,7 @@ struct rdma_resc {
     struct cpl_desc **desc;
 
     struct ibv_qos_group **qos_group;
+    struct ibv_wqe *wqe;
 };
 
 // struct rdma_cr_cpl_cnt {

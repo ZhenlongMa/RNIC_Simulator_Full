@@ -171,13 +171,52 @@ double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode) {
     return ((con_time * 1.0) / (num_qp * num_client * 1000.0));
 }
 
+void generate_wqe(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, uint32_t offset, int wr_num)
+{
+    resc->wqe = (struct ibv_wqe *)malloc(sizeof(struct ibv_wqe) * THPT_WR_NUM);
+    struct ibv_mr *local_mr = (resc->mr)[0];
+
+    if (op_mode == OPMODE_RDMA_WRITE) 
+    {
+        for (int i = 0; i < wr_num; ++i) 
+        {
+            // wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
+            resc->wqe[i].length = msg_size;
+            resc->wqe[i].mr = local_mr;
+            resc->wqe[i].offset = offset;
+
+            /* Add RDMA Write element */
+            resc->wqe[i].trans_type = IBV_TYPE_RDMA_WRITE;
+            resc->wqe[i].flag       = (i == wr_num - 1) ? WR_FLAG_SIGNALED : 0;
+            resc->wqe[i].rdma.raddr = resc->rinfo->raddr + (sizeof(TRANS_WRDMA_DATA) - 1) * i + offset;
+            resc->wqe[i].rdma.rkey  = resc->rinfo->rkey;
+        }
+    } 
+    else if (op_mode == OPMODE_RDMA_READ) 
+    {
+        for (int i = 0; i < wr_num; ++i) 
+        {
+            resc->wqe[i].length = sizeof(TRANS_RRDMA_DATA);
+            resc->wqe[i].mr = local_mr;
+            resc->wqe[i].offset = (sizeof(TRANS_RRDMA_DATA) - 1) * i + offset;
+
+            /* Add RDMA Read element */
+            resc->wqe[i].trans_type = IBV_TYPE_RDMA_READ;
+            resc->wqe[i].flag       = (i == wr_num - 1) ? WR_FLAG_SIGNALED : 0;
+            resc->wqe[i].rdma.raddr = resc->rinfo->raddr + offset;
+            resc->wqe[i].rdma.rkey  = resc->rinfo->rkey;
+        }
+        
+    }
+}
+
 double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uint8_t op_mode, uint32_t offset, uint64_t *start_time, uint64_t *end_time, uint64_t *con_time, uint64_t *snd_cnt) {
     uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
     // int num_qp = resc->num_qp;
     // int num_cq = resc->num_cq;
     int num_qp = 0;
     int qos_group_num = ctx->group_num - 1;
-    num_qp++;
+    // num_qp++;
     for (int i = 0; i < qos_group_num; i++)
     {
         // num_qp += ctx->qos_group->qp_num;
@@ -193,29 +232,37 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     int wr_num;
     uint32_t msg_size;
 
-    if (cpu_id == 0)
-    {
-        wr_num = BW_WR_NUM;
-        msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
-    }
-    else 
-    {
-        wr_num = THPT_WR_NUM;
-        msg_size = sizeof(TRANS_WRDMA_DATA);
-    }
-    // wr_num = THPT_WR_NUM;
-    // msg_size = sizeof(TRANS_WRDMA_DATA);
+    // if (cpu_id == 0)
+    // {
+    //     wr_num = BW_WR_NUM;
+    //     msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
+    // }
+    // else 
+    // {
+    //     wr_num = THPT_WR_NUM;
+    //     msg_size = sizeof(TRANS_WRDMA_DATA);
+    // }
+    wr_num = THPT_WR_NUM;
+    msg_size = sizeof(TRANS_WRDMA_DATA);
     RDMA_PRINT(Server, "set wr num and msg size! cpu id: %d, wr num: %d, msg size: %d\n", cpu_id, wr_num, msg_size);
     
+    // generate WQE
+    for (int i = 0; i < qos_group_num; i++)
+    {
+        generate_wqe(grp_resc[i], op_mode, msg_size, offset, wr_num);
+    }
+
     /* Start to post all the QPs at beginning */
     for (int k = 0; k < qos_group_num; k++) // exclude CM group
     {
         struct rdma_resc *resc = grp_resc[k];
         for (int i = 0; i < num_client; ++i) {
             for (int j = 0; j < resc->num_qp; ++j) {
-                struct ibv_qp *qp = resc->qp[i * resc->num_qp + j];
-                svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, msg_size); // (4096 / num_qp) * j
+                // struct ibv_qp *qp = resc->qp[i * resc->num_qp + j];
+                // svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, msg_size); // (4096 / num_qp) * j
                 // RDMA_PRINT(Server, "group %d qp 0x%x initially post send!\n", k, resc->qp[i * resc->num_qp + j]->qp_num);
+                // svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, msg_size);
+                ibv_post_send(resc->ctx, resc->wqe, resc->qp[i * resc->num_qp + j], wr_num);
             }
         }
     }
@@ -250,7 +297,8 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                             }
                             // uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
                             // RDMA_PRINT(Server, "ready to post send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
-                            svr_post_send(resc, qp, wr_num, offset, op_mode, msg_size);
+                            // svr_post_send(resc, qp, wr_num, offset, op_mode, msg_size);
+                            ibv_post_send(resc->ctx, resc->wqe, qp, wr_num);
                             // RDMA_PRINT(Server, "finish posting send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
                         }
                         else
@@ -385,24 +433,24 @@ int main (int argc, char **argv) {
     int grp2_weight;
 
     // CPU 0 is for large message
-    if (cpu_id == 0)
-    {
-        grp1_num_qp = 1;
-        grp2_num_qp = 1;
-        grp1_weight = 15;
-        grp2_weight = 20;
-    }
-    else
-    {
-        grp1_num_qp = 2;
-        grp2_num_qp = 1;
-        grp1_weight = 15;
-        grp2_weight = 20;
-    }
-    // grp1_num_qp = 2;
-    // grp2_num_qp = 1;
-    // grp1_weight = 15;
-    // grp2_weight = 20;
+    // if (cpu_id == 0)
+    // {
+    //     grp1_num_qp = 1;
+    //     grp2_num_qp = 1;
+    //     grp1_weight = 15;
+    //     grp2_weight = 20;
+    // }
+    // else
+    // {
+    //     grp1_num_qp = 2;
+    //     grp2_num_qp = 1;
+    //     grp1_weight = 15;
+    //     grp2_weight = 20;
+    // }
+    grp1_num_qp = 2;
+    grp2_num_qp = 1;
+    grp1_weight = 15;
+    grp2_weight = 20;
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
 
     /* device initialization */

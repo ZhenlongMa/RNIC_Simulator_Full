@@ -56,11 +56,11 @@ def execute_program(debug, test_prog, option, params):
         # "cd ../ && scons build/X86/gem5.opt"
     ]
     # record start time
-    cmd_list.append("echo $(date +%Y-%m-%d)")
+    cmd_list.append("echo $(date +%Y-%m-%d/%H:%M:%S)")
     # run simulation
     cmd_list.append(cmd_run_sim(debug, test_prog, option, params))
     #record end time
-    cmd_list.append("echo $(date +%Y-%m-%d)")
+    cmd_list.append("echo $(date +%Y-%m-%d/%H:%M:%S)")
 
     # execute cmd_list sequentially
     for cmd in cmd_list:

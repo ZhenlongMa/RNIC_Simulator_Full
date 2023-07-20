@@ -460,7 +460,7 @@ HanGuRnic::doorbellProc () {
     qpAddrReq->txQpcRsp = new QpcResc;
     qpcModule.postQpcReq(qpAddrReq);
 
-    HANGU_PRINT(CcuEngine, " CCU.doorbellProc: db.qpn %d df2ccuIdxFifo.size %d idx %d\n", 
+    HANGU_PRINT(CcuEngine, " CCU.doorbellProc: db.qpn: 0x%x, df2ccuIdxFifo.size %d idx %d\n", 
             dbell->qpn, df2ccuIdxFifo.size(), idx);
 
     /* If there still has elem in fifo, schedule myself again */
