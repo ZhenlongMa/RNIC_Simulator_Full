@@ -271,7 +271,7 @@ void HanGuRnic::DescScheduler::wqeProc()
     TxDescPtr desc;
     uint8_t subDescNum = 0;
 
-    HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: %d, type: %d, group: %d, QP weight: %d, group granularity: %d\n", 
+    HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: 0x%x, type: %d, group: %d, QP weight: %d, group granularity: %d\n", 
         qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
 
     assert(qpStatus->head_ptr >= qpStatus->tail_ptr);
@@ -330,7 +330,7 @@ void HanGuRnic::DescScheduler::wqeProc()
         uint32_t procSize = 0; // data size been processed in this schedule period
         uint32_t batchSize; // the size of data that should be transmitted in this schedule period
         batchSize = qpStatus->weight * groupTable[qpStatus->group_id];
-        assert(batchSize != 0);
+        assert(batchSize > 0);
         for (int i = 0; i < descNum; i++)
         {
             HANGU_PRINT(DescScheduler, "new BW/UD desc received by wqe proc! qpn: 0x%x\n", qpStatus->qpn);
@@ -338,8 +338,8 @@ void HanGuRnic::DescScheduler::wqeProc()
             if (procSize < batchSize)
             {
                 TxDescPtr desc = rNic->txdescRspFifo.front();
-                HANGU_PRINT(DescScheduler, "WQE splitting! qpn: 0x%x, fetch offset: %d, current desc len: %d, batch size: %d, descNum: %d\n", 
-                    qpStatus->qpn, qpStatus->fetch_offset, desc->len, batchSize, descNum);
+                HANGU_PRINT(DescScheduler, "WQE splitting! qpn: 0x%x, fetch offset: %d, current desc len: %d, batch size: %d, descNum: %d, group granularity: %d\n", 
+                    qpStatus->qpn, qpStatus->fetch_offset, desc->len, batchSize, descNum, groupTable[qpStatus->group_id]);
                 assert(qpStatus->fetch_offset < desc->len);
                 HANGU_PRINT(DescScheduler, "ready to split WQE! qpn: 0x%x, tail pointer: %d, head pointer: %d, fetch offset: 0x%x\n", 
                     qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr, qpStatus->fetch_offset);
@@ -481,7 +481,8 @@ void HanGuRnic::DescScheduler::launchWQE()
     // get pseudo doorbell
     DoorbellPtr doorbell = wqeProcToLaunchWqeQue.front();
     rNic->rdmaEngine.df2ddFifo.push(doorbell); 
-    HANGU_PRINT(DescScheduler, "pseudo doorbell get by launchWQE, QPN: 0x%x, num: %d, type: %d\n", doorbell->qpn, doorbell->num, doorbell->opcode);
+    HANGU_PRINT(DescScheduler, "pseudo doorbell get by launchWQE, QPN: 0x%x, num: %d, type: %d, desc launch queue size: %d\n", 
+        doorbell->qpn, doorbell->num, doorbell->opcode, rNic->txDescLaunchQue.size());
     wqeProcToLaunchWqeQue.pop();
 
     if (doorbell->opcode == BW_QP || doorbell->opcode == UC_QP || doorbell->opcode == UD_QP)

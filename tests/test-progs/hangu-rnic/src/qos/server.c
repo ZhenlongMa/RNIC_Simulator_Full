@@ -232,19 +232,21 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     int wr_num;
     uint32_t msg_size;
 
-    // if (cpu_id == 0)
-    // {
-    //     wr_num = BW_WR_NUM;
-    //     msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
-    // }
-    // else 
-    // {
-    //     wr_num = THPT_WR_NUM;
-    //     msg_size = sizeof(TRANS_WRDMA_DATA);
-    // }
-    wr_num = THPT_WR_NUM;
-    msg_size = sizeof(TRANS_WRDMA_DATA);
-    RDMA_PRINT(Server, "set wr num and msg size! cpu id: %d, wr num: %d, msg size: %d\n", cpu_id, wr_num, msg_size);
+    if (cpu_id == 0)
+    {
+        wr_num = BW_WR_NUM;
+        msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
+        RDMA_PRINT(Server, "large message! CPU: %d, write num: %d, message size: %d\n", cpu_id, wr_num, msg_size);
+    }
+    else 
+    {
+        wr_num = THPT_WR_NUM;
+        msg_size = sizeof(TRANS_WRDMA_DATA);
+        RDMA_PRINT(Server, "small message! CPU: %d, write num: %d, message size: %d\n", cpu_id, wr_num, msg_size);
+    }
+    // wr_num = THPT_WR_NUM;
+    // msg_size = sizeof(TRANS_WRDMA_DATA);
+    // RDMA_PRINT(Server, "set wr num and msg size! cpu id: %d, wr num: %d, msg size: %d\n", cpu_id, wr_num, msg_size);
     
     // generate WQE
     for (int i = 0; i < qos_group_num; i++)
@@ -260,7 +262,6 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
             for (int j = 0; j < resc->num_qp; ++j) {
                 // struct ibv_qp *qp = resc->qp[i * resc->num_qp + j];
                 // svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, msg_size); // (4096 / num_qp) * j
-                // RDMA_PRINT(Server, "group %d qp 0x%x initially post send!\n", k, resc->qp[i * resc->num_qp + j]->qp_num);
                 // svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, msg_size);
                 ibv_post_send(resc->ctx, resc->wqe, resc->qp[i * resc->num_qp + j], wr_num);
             }
@@ -276,9 +277,8 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
             struct cpl_desc **desc = resc->desc;
             int num_cq = resc->num_cq;
             for (int i = 0; i < num_cq; ++i) {
-                // RDMA_PRINT(Server, "ready to poll cq! cqn: %d\n", resc->cq[i]->cq_num);
                 int res = ibv_poll_cpl(resc->cq[i], desc, MAX_CPL_NUM);
-                // RDMA_PRINT(Server, "finish polling cq! cqn: %d, cqe num: %d\n", resc->cq[i]->cq_num, res);
+                // RDMA_PRINT(Server, "cpu[%d] get cqe num: %d\n", cpu_id, res);
                 if (res) {
                     if (*start_time == 0) {
                         *start_time = get_time(resc->ctx);
@@ -296,10 +296,8 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                                 }
                             }
                             // uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
-                            // RDMA_PRINT(Server, "ready to post send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
                             // svr_post_send(resc, qp, wr_num, offset, op_mode, msg_size);
                             ibv_post_send(resc->ctx, resc->wqe, qp, wr_num);
-                            // RDMA_PRINT(Server, "finish posting send! qpn: %d, qpn: %d\n", desc[j]->qp_num, qp->qp_num);
                         }
                         else
                         {
@@ -308,11 +306,9 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                     }
                 }
             }
-            // RDMA_PRINT(Server, "group %d post send!\n", grp_id);
         }
         *end_time = get_time(ctx);
         *con_time = *end_time - *start_time;
-        // RDMA_PRINT(Server, "con_time: %ld/%lu\n", *con_time, 40UL * MS);
     } while ((*con_time < 10UL * MS) || (*start_time == 0));
 
     int cqe_sum = 0;
@@ -433,24 +429,24 @@ int main (int argc, char **argv) {
     int grp2_weight;
 
     // CPU 0 is for large message
-    // if (cpu_id == 0)
-    // {
-    //     grp1_num_qp = 1;
-    //     grp2_num_qp = 1;
-    //     grp1_weight = 15;
-    //     grp2_weight = 20;
-    // }
-    // else
-    // {
-    //     grp1_num_qp = 2;
-    //     grp2_num_qp = 1;
-    //     grp1_weight = 15;
-    //     grp2_weight = 20;
-    // }
-    grp1_num_qp = 2;
-    grp2_num_qp = 1;
-    grp1_weight = 15;
-    grp2_weight = 20;
+    if (cpu_id == 0)
+    {
+        grp1_num_qp = 1;
+        grp2_num_qp = 1;
+        grp1_weight = 15;
+        grp2_weight = 20;
+    }
+    else
+    {
+        grp1_num_qp = 2;
+        grp2_num_qp = 1;
+        grp1_weight = 15;
+        grp2_weight = 20;
+    }
+    // grp1_num_qp = 2;
+    // grp2_num_qp = 1;
+    // grp1_weight = 15;
+    // grp2_weight = 20;
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
 
     /* device initialization */

@@ -184,8 +184,6 @@ class HanGuDriver final : public EmulatedDriver {
     uint32_t groupWeightSum;
     uint32_t bigN = 16384;
     uint8_t groupNum;
-
-
     /* -------QoS Group resources {end}------- */
 
     /* ------------TQ resources {begin}---------- */
