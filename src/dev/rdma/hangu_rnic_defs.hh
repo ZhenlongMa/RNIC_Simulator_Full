@@ -641,6 +641,8 @@ struct Regs : public Serializable {
     };
     DOORBELL db;
 
+    uint64_t qosShareAddr = 0;
+
 
     uint64_t mptBase;
     uint64_t mttBase;

@@ -139,7 +139,7 @@ HanGuRnic::read(PacketPtr pkt) {
     assert(bar == 0);
 
     /* Only 32bit accesses allowed */
-    assert(pkt->getSize() == 4);
+    // assert(pkt->getSize() == 4);
 
     // HANGU_PRINT(PioEngine, " Read device addr 0x%x, pioDelay: %d\n", daddr, pioDelay);
 
@@ -150,7 +150,12 @@ HanGuRnic::read(PacketPtr pkt) {
         pkt->setLE<uint32_t>(regs.cmdCtrl.go()<<31 | regs.cmdCtrl.op());
     } else if (daddr == 0x20) {/* Access `sync` reg */
         pkt->setLE<uint32_t>(syncSucc);
-    } else {
+    } 
+    else if (daddr == 0x30)
+    {
+        pkt->setLE<uint64_t>(regs.qosShareAddr);
+    }
+    else {
         pkt->setLE<uint32_t>(0);
     }
 
@@ -228,7 +233,14 @@ HanGuRnic::write(PacketPtr pkt) {
         }
 
         HANGU_PRINT(HanGuRnic, " PioEngine.write: sync bit end, value %#X, syncCnt %d\n", pkt->getLE<uint32_t>(), syncCnt); 
-    } else {
+    } 
+    else if (daddr == 0x30 && pkt->getSize() == sizeof(uint64_t))
+    {
+        // write shared parameter address
+        regs.qosShareAddr = pkt->getLE<uint64_t>();
+        HANGU_PRINT(HanGuRnic, "QoS shared address set: 0x%s\n", regs.qosShareAddr);
+    }
+    else {
         panic("Write request to unknown address : %#x && size 0x%x\n", daddr, pkt->getSize());
     }
 

@@ -176,14 +176,27 @@ class HanGuDriver final : public EmulatedDriver {
     void setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args);
     void allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args);
     void updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_args> &args);
-    void printQoS();
+    void printQoS(PortProxy& portProxy);
+    void initQoS(PortProxy& portProxy, Process* process);
     
     std::unordered_map<uint32_t, uint8_t> qpGroup;
-    std::unordered_map<uint32_t, uint8_t> qpWeight;
+    // std::unordered_map<uint32_t, uint8_t> qpWeight;
     std::unordered_map<uint8_t, struct groupUnit> groupTable;
-    uint32_t groupWeightSum;
-    uint32_t bigN = 16384;
-    uint8_t groupNum;
+    // uint32_t groupWeightSum;
+    // uint32_t bigN = 16384;
+    // uint8_t groupNum;
+    Addr qosShareParamAddr;
+    const int NOffset = 0;
+    const int groupNumOffset = 16;
+    const int groupWeightSumOffset = 32;
+    const int groupWeightOffset = 256;
+    const int groupQPWeightSumOffset = 512;
+    const int groupGranularityOffset = 1536;
+    const int barShareAddrOffset = 0x30;
+    const int barShareAddrFlagOffset = 0x40;
+    const int qosSharePageNum = 1;
+
+    // #define QOS_SHARING_PAGE_NUM 4
     /* -------QoS Group resources {end}------- */
 
     /* ------------TQ resources {begin}---------- */
