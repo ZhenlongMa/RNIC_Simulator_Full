@@ -166,11 +166,11 @@ class HanGuDriver final : public EmulatedDriver {
     /* -------QoS Group resources {begin}------- */
     struct groupUnit
     {
-        uint8_t groupID;
+        // uint8_t groupID;
         // uint32_t qpWeightSum;
         std::unordered_map<uint32_t, uint8_t> qpWeight;
-        uint32_t granularity;
-        uint16_t weight;
+        // uint32_t granularity;
+        // uint16_t weight;
     };
 
     void setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args);

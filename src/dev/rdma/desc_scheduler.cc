@@ -147,7 +147,7 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
         uint32_t qpn = highPriorityQpnQue.front();
         highPriorityQpnQue.pop();
         wqePrefetchQpStatusRReqQue.push(qpn);
-        HANGU_PRINT(DescScheduler, "High priority QPN fetched! qpn: %d\n", qpn);
+        HANGU_PRINT(DescScheduler, "High priority QPN fetched! qpn: 0x%x\n", qpn);
     }
     else if (lowPriorityQpnQue.size() > 0)
     {
@@ -158,17 +158,9 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
             lowPriorityQpnQue.pop();
             wqePrefetchQpStatusRReqQue.push(qpn);
             qpStatusTable[qpn]->in_que--;
-            HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: %d, in que: %d\n", qpn, qpStatusTable[qpn]->in_que);
+            HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: 0x%x, in que: %d\n", qpn, qpStatusTable[qpn]->in_que);
         }
     }
-    // else if (leastPriorityQpnQue.size() > 0)
-    // {
-    //     HANGU_PRINT(DescScheduler, "Least priority QPN queue size: %d!\n", leastPriorityQpnQue.size());
-    //     uint32_t qpn = leastPriorityQpnQue.front();
-    //     leastPriorityQpnQue.pop();
-    //     wqePrefetchQpStatusRReqQue.push(qpn);
-    //     HANGU_PRINT(DescScheduler, "Least priority QPN fetched! qpn: %d\n", qpn);
-    // }
 
     if (lowPriorityQpnQue.size() == 0 && highPriorityQpnQue.size() == 0)
     {
@@ -419,7 +411,7 @@ void HanGuRnic::DescScheduler::wqeProc()
         {
             lowPriorityQpnQue.push(qpStatus->qpn);
             qpStatus->in_que++;
-            HANGU_PRINT(DescScheduler, "push back qpn into low qpn queue, qpn: 0x%x, inque: %d\n", qpStatus->qpn, qpStatus->in_que);
+            HANGU_PRINT(DescScheduler, "push back qpn into low qpn queue, qpn: 0x%x, in_que: %d\n", qpStatus->qpn, qpStatus->in_que);
             assert(qpStatus->in_que == 1);
             // assert(qpStatus->in_que == 0);
             // qpStatus->in_least_que = 1;
@@ -431,7 +423,7 @@ void HanGuRnic::DescScheduler::wqeProc()
         }
         else
         {
-            HANGU_PRINT(DescScheduler, "qp[0x%x] is idle! in que: %d\n", qpStatus->qpn, qpStatus->in_que);
+            HANGU_PRINT(DescScheduler, "qp[0x%x] is idle! in_que: %d\n", qpStatus->qpn, qpStatus->in_que);
             assert(qpStatus->in_que == 0);
         }
     }

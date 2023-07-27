@@ -264,6 +264,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                 // svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, msg_size); // (4096 / num_qp) * j
                 // svr_post_send(resc, resc->qp[i * resc->num_qp + j], wr_num, offset, op_mode, msg_size);
                 ibv_post_send(resc->ctx, resc->wqe, resc->qp[i * resc->num_qp + j], wr_num);
+                ibv_post_send(resc->ctx, resc->wqe, resc->qp[i * resc->num_qp + j], wr_num);
             }
         }
     }
@@ -434,14 +435,14 @@ int main (int argc, char **argv) {
         grp1_num_qp = 1;
         grp2_num_qp = 1;
         grp1_weight = 15;
-        grp2_weight = 20;
+        grp2_weight = 15;
     }
     else
     {
-        grp1_num_qp = 2;
+        grp1_num_qp = 1;
         grp2_num_qp = 1;
         grp1_weight = 15;
-        grp2_weight = 20;
+        grp2_weight = 15;
     }
     // grp1_num_qp = 2;
     // grp2_num_qp = 1;

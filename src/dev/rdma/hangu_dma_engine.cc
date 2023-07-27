@@ -216,12 +216,12 @@ HanGuRnic::DmaEngine::dmaReadProcessing () {
               case 1 :
                 dmaReq = rnic->descDmaReadFifo.front();
                 rnic->descDmaReadFifo.pop();
-                HANGU_PRINT(DmaEngine, " DMAEngine.dmaRead: Is descDmaReadFifo!\n");
+                HANGU_PRINT(DmaEngine, " DMAEngine.dmaRead: Is descDmaReadFifo! FIFO depth: %d\n", rnic->descDmaReadFifo.size());
                 break;
               case 2 :
                 dmaReq = rnic->dataDmaReadFifo.front();
                 rnic->dataDmaReadFifo.pop();
-                HANGU_PRINT(DmaEngine, " DMAEngine.dmaRead: Is dataDmaReadFifo!\n");
+                HANGU_PRINT(DmaEngine, " DMAEngine.dmaRead: Is dataDmaReadFifo! FIFO depth: %d\n", rnic->dataDmaReadFifo.size());
                 break;
               case 3 :
                 dmaReq = rnic->ccuDmaReadFifo.front();
