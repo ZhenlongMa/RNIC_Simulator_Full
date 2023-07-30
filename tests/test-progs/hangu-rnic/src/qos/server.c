@@ -20,7 +20,14 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->dsubnet.dlid = (i % resc->num_rem) + resc->ctx->lid + 1;
         qp->group_id = resc->qos_group[0]->id;
         qp->indicator = BW_QP;
-        qp->weight = 2;
+        if (cpu_id == 0)
+        {
+            qp->weight = 8;
+        }
+        else
+        {
+            qp->weight = 2;
+        }
         RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d, group id: %d\n", 
                 qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num, i, qp->group_id);
         // ibv_modify_qp(resc->ctx, qp);
@@ -257,6 +264,10 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     /* Start to post all the QPs at beginning */
     for (int k = 0; k < qos_group_num; k++) // exclude CM group
     {
+        if (cpu_id == 0 && k != 0)
+        {
+            continue;
+        }
         struct rdma_resc *resc = grp_resc[k];
         for (int i = 0; i < num_client; ++i) {
             for (int j = 0; j < resc->num_qp; ++j) {

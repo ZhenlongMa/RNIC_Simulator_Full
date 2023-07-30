@@ -158,7 +158,9 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
             lowPriorityQpnQue.pop();
             wqePrefetchQpStatusRReqQue.push(qpn);
             qpStatusTable[qpn]->in_que--;
-            HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: 0x%x, in que: %d\n", qpn, qpStatusTable[qpn]->in_que);
+            qpStatusTable[qpn]->fetch_count++;
+            HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: 0x%x, in que: %d, fetch count: %ld\n", 
+                qpn, qpStatusTable[qpn]->in_que, qpStatusTable[qpn]->fetch_count);
         }
     }
 

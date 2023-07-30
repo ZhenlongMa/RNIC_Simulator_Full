@@ -708,6 +708,7 @@ struct QPStatusItem
         // this->current_msg_offset    = 0;
         this->fetch_lock            = 0;
         this->in_que                = 0;
+        this->fetch_count           = 0;
         assert(service_type != QP_TYPE_RD);
         switch (service_type)
         {
@@ -748,6 +749,7 @@ struct QPStatusItem
     // This indicates whether it is allowed to fetch WQEs for this QP. 
     // Lock it when send WQE read request; unlock it when WQE splitting is finished.
     uint8_t fetch_lock; 
+    uint64_t fetch_count;
 };
 typedef std::shared_ptr<QPStatusItem> QPStatusPtr;
 
