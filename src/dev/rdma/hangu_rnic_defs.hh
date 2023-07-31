@@ -740,7 +740,7 @@ struct QPStatusItem
     // uint32_t current_msg_offset;
     uint32_t key;
     uint8_t weight;
-    uint8_t type;
+    uint8_t type; // 1: latency, 2: bandwidth, 3: rate, 4: UC, 5: UD. In regard to librdma.h
     uint32_t qpn;
     uint8_t perf; // This segment indicates whether the performance exceeds or is lower than expected
     uint8_t group_id;
