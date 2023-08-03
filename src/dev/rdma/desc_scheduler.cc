@@ -198,8 +198,6 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
 void HanGuRnic::DescScheduler::wqePrefetch()
 {
     // HANGU_PRINT(DescScheduler, "wqePrefetch in!\n");
-    // TODO: check wqeFetchInfoQue size
-
     assert(wqePrefetchQpStatusRReqQue.size());
     uint32_t qpn = wqePrefetchQpStatusRReqQue.front();
     wqePrefetchQpStatusRReqQue.pop();
@@ -226,8 +224,8 @@ void HanGuRnic::DescScheduler::wqePrefetch()
         uint32_t tailOffset = qpStatus->tail_ptr % (sqSize / sizeof(TxDesc));
         if (descNum + tailOffset > sqSize / sizeof(TxDesc))
         {
-            // HANGU_PRINT(DescScheduler, "Loopback Send Queue! descNum: %d, tail pointer: %d, tailOffset: %d, sqSize: %d, size of desc: %d\n", 
-            //     descNum, qpStatus->tail_ptr, tailOffset, sqSize, sizeof(TxDesc));
+            HANGU_PRINT(DescScheduler, "Loopback Send Queue! descNum: %d, tail pointer: %d, tailOffset: %d, sqSize: %d, size of desc: %d\n", 
+                descNum, qpStatus->tail_ptr, tailOffset, sqSize, sizeof(TxDesc));
             descNum = sqSize / sizeof(TxDesc) - tailOffset;
             assert(tailOffset + descNum <= sqSize / sizeof(TxDesc));
         }

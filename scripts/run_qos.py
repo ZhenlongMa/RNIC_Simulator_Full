@@ -4,7 +4,7 @@ import sys
 
 SERVER_LID  = 10
 
-NUM_CPUS  = 9
+NUM_CPUS  = 1
 CPU_CLK   = "4GHz"
 EN_SPEED  = "100Gbps"
 PCI_SPEED = "128Gbps"
@@ -72,6 +72,12 @@ def execute_program(debug, test_prog, option, params):
 
 def main():
 
+    if (len(sys.argv) != 2):
+        print("Illegal parameter!")
+        return
+    else:
+        testcase = sys.argv[1]
+
     params = Param(2, 300, 64, WRITE)
 
     num_nodes = params.num_nodes
@@ -83,12 +89,12 @@ def main():
     debug +="DescScheduler"
 
     # add server program
-    test_prog = "'tests/test-progs/hangu-rnic/src/qos/server"
+    test_prog = "'tests/test-progs/hangu-rnic/src/" + testcase + "/server"
     opt = "'-s " + str(svr_lid) + " -t " + str(num_nodes - 1) + " -m " + str(params.op_mode)
 
     # add client program to test_prog
     for i in range(num_nodes - 1):
-        test_prog += ";tests/test-progs/hangu-rnic/src/qos/client"
+        test_prog += ";tests/test-progs/hangu-rnic/src/" + testcase + "/client"
         opt += ";-s " + str(svr_lid) + " -l " + str(svr_lid + i + 1) + " -t " + str(num_nodes - 1) + " -m " + str(params.op_mode)
     test_prog += "'"
     opt += "'"

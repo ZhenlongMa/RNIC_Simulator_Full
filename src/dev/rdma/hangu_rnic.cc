@@ -329,9 +329,9 @@ HanGuRnic::mboxFetchCpl () {
                 qpcReq->txQpcReq->groupID,
                 qpcReq->txQpcReq->qpType);
             // delete this line later
-            HANGU_PRINT(CcuEngine, "write QPC, qpn: %d, indicator: %d, weight: %d\n", 
-                qpcReq->txQpcReq->srcQpn, qpcReq->txQpcReq->indicator, qpcReq->txQpcReq->perfWeight);
-            assert(qpcReq->txQpcReq->indicator == BW_QP);
+            // HANGU_PRINT(CcuEngine, "write QPC, qpn: %d, indicator: %d, weight: %d\n", 
+            //     qpcReq->txQpcReq->srcQpn, qpcReq->txQpcReq->indicator, qpcReq->txQpcReq->perfWeight);
+            // assert(qpcReq->txQpcReq->indicator == BW_QP);
             // descScheduler.qpStatusTable.emplace(qpStatus->qpn, qpStatus);
             createQue.push(qpStatus);
             if (!descScheduler.createQpStatusEvent.scheduled())

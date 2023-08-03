@@ -256,11 +256,6 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
             rnic->schedule(rnic->mrRescModule.transReqEvent, curTick() + rnic->clockPeriod());
         }
 
-        /* We don't schedule it here, cause it should be 
-        * scheduled by Memory Region Module, dmaRrspProcessing */
-        // if (!rgrrEvent.scheduled()) { /* Schedule RdmaEngine.rgrrProcessing */
-        //     rnic->schedule(rgrrEvent, curTick() + rnic->clockPeriod());
-        // }
         break;
       case OPCODE_RDMA_READ:
         /* Schedule rg&rru to start Processing RDMA read. 
@@ -344,12 +339,6 @@ HanGuRnic::RdmaEngine::postTxCpl(uint8_t qpType, uint32_t qpn,
     CxtReqRspPtr cqcRdReq = make_shared<CxtReqRsp>(CXT_RREQ_CQ, CXT_CHNL_TX, cqn);
     cqcRdReq->txCqcRsp = new CqcResc;
     rnic->cqcModule.postCqcReq(cqcRdReq);
-
-    /* We don't schedule it here, cause it should be 
-     * scheduled by CqcModule */
-    // if (!scuEvent.scheduled()) { /* Schedule RdmaEngine.scuProcessing */
-    //     rnic->schedule(scuEvent, curTick() + rnic->clockPeriod());
-    // }
 
     HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.postTxCpl: out!\n");
 }
