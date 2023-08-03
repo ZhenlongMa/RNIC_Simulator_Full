@@ -88,5 +88,5 @@ class HanGuRnic(RdmaNic):
     
     reorder_cap = Param.Int(100, "Number of concurrent request for one qpc req channel")
 
-    link_delay = Param.Latency('1us', "ethernet link delay")
+    link_delay = Param.Latency('100ns', "ethernet link delay")
     cpu_num    = Param.Int(10, "Number of CPUs in this node")

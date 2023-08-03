@@ -19,3 +19,4 @@ struct qp_comm_record
 };
 
 // struct perf_record record;
+void generate_wqe(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, uint32_t offset, int wr_num);

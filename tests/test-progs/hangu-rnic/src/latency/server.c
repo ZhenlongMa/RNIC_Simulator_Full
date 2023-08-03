@@ -139,7 +139,8 @@ static void usage(const char *argv0) {
     printf("  -m, --op-mode=<op_mode>           opcode mode (default 0, which is RDMA Write)\n");
 }
 
-double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode, uint32_t iter_count) {
+double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode, uint32_t iter_count) 
+{
     uint64_t start_time, end_time, con_time = 0;
     struct cpl_desc **desc = resc->desc;
     uint8_t polling;
@@ -147,19 +148,24 @@ double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode, uint32_
     uint64_t* latency_vec;
     latency_vec = (uint64_t*)malloc(sizeof(uint64_t) * iter_count);
 
-    struct *qp = resc->qp[0]; // only use one QP
+    struct ibv_qp *qp = resc->qp[0]; // only use one QP
     generate_wqe(resc, op_mode, sizeof(TRANS_WRDMA_DATA), 0, 1);
 
     for (int k = 0; k < iter_count; k++)
     {
-        for (int i = 0; i < num_client; ++i) {
+        RDMA_PRINT(Server, "latency_test iteration %d\n", k);
+        for (int i = 0; i < num_client; ++i) 
+        {
             start_time = get_time(resc->ctx);
             ibv_post_send(resc->ctx, resc->wqe, qp, LATENCY_WR_NUM);
             polling = 1;
-            while (polling) {
+            while (polling) 
+            {
                 int res = ibv_poll_cpl(qp->cq, desc, MAX_CPL_NUM);
-                for (int j = 0; j < res; ++j) {
-                    if (desc[j]->trans_type == ibv_type[op_mode]) {
+                for (int j = 0; j < res; ++j) 
+                {
+                    if (desc[j]->trans_type == ibv_type[op_mode]) 
+                    {
                         polling = 0;
                         end_time = get_time(resc->ctx);
                         break;
@@ -168,7 +174,6 @@ double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode, uint32_
             }
             con_time += (end_time - start_time);
             RDMA_PRINT(Server, "latency_test consume_time %.2lf ns\n", ((end_time - start_time) / 1000.0));
-            }
         }
     }
     return ((con_time * 1.0) / (num_qp * num_client * 1000.0));
@@ -209,7 +214,6 @@ void generate_wqe(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, ui
             resc->wqe[i].rdma.raddr = resc->rinfo->raddr + offset;
             resc->wqe[i].rdma.rkey  = resc->rinfo->rkey;
         }
-        
     }
 }
 
@@ -357,7 +361,7 @@ int main (int argc, char **argv) {
     grp_resc[1] = grp2_resc;
 
     /* Start Latency test */
-    latency = latency_test(grp1_resc, num_qp, op_mode, 1000);
+    latency = latency_test(grp1_resc, 1, op_mode, 1000);
     RDMA_PRINT(Server, "latency test end!\n");
 
     /* Inform Client that Transmission has completed */

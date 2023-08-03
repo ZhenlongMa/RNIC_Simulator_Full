@@ -80,17 +80,19 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     dbQpStatusRspQue.pop();
     // delete this line in the future
     assert(db->qpn == qpStatus->qpn);
-    assert(qpStatus->type == BW_QP || qpStatus->type == UD_QP);
+    assert(qpStatus->type == BW_QP || qpStatus->type == UD_QP || qpStatus->type == LAT_QP);
     HANGU_PRINT(DescScheduler, "Before updating head. qpn: 0x%x, head: %d, tail:  %d\n", 
         qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr);
 
     if (qpStatus->type == LAT_QP)
     {
+        HANGU_PRINT(DescScheduler, "Inactive QP! high priority qpn: 0x%x, in que: %d, head pointer: %d, tail pointer: %d\n", 
+            db->qpn, qpStatus->in_que, qpStatus->head_ptr, qpStatus->tail_ptr);
         assert(qpStatus->head_ptr == qpStatus->tail_ptr);
         highPriorityQpnQue.push(db->qpn);
         schedule = true;
         qpStatus->in_que++;
-        HANGU_PRINT(DescScheduler, "Inactive QP! high priority qpn: 0x%x, in que: %d\n", db->qpn, qpStatus->in_que);
+        // HANGU_PRINT(DescScheduler, "Inactive QP! high priority qpn: 0x%x, in que: %d\n", db->qpn, qpStatus->in_que);
     }
     else
     {
@@ -299,7 +301,6 @@ void HanGuRnic::DescScheduler::wqeProc()
     if (qpStatus->type == LAT_QP)// warning: modify here
     {
         // For latency sensitive QP, commit all WQEs
-        // assert(0);
         for (int i = 0; i < descNum; i++)
         {
             desc = rNic->txdescRspFifo.front();
@@ -307,6 +308,7 @@ void HanGuRnic::DescScheduler::wqeProc()
             highPriorityDescQue.push(desc);
         }
         qpStatus->tail_ptr += descNum;
+        subDescNum = descNum;
     }
     else if (qpStatus->type == RATE_QP) // WARNING: modify here
     {
@@ -455,7 +457,6 @@ void HanGuRnic::DescScheduler::wqeProc()
     {
         rNic->schedule(wqeRspEvent, curTick() + rNic->clockPeriod());
     }
-    // HANGU_PRINT(DescScheduler, "wqeProc out!\n");
 }
 
 /**
@@ -471,11 +472,11 @@ void HanGuRnic::DescScheduler::launchWQE()
     HANGU_PRINT(DescScheduler, "pseudo doorbell get by launchWQE, QPN: 0x%x, num: %d, type: %d, desc launch queue size: %d\n", 
         doorbell->qpn, doorbell->num, doorbell->opcode, rNic->txDescLaunchQue.size());
     wqeProcToLaunchWqeQue.pop();
+    assert(doorbell->num != 0);
 
     if (doorbell->opcode == LAT_QP)
     {
         assert(highPriorityDescQue.size() >= doorbell->num);
-        assert(doorbell->num != 0);
         for (int i = 0; i < doorbell->num; i++)
         {
             rNic->txDescLaunchQue.push(highPriorityDescQue.front());
@@ -485,7 +486,6 @@ void HanGuRnic::DescScheduler::launchWQE()
     else if (doorbell->opcode == BW_QP || doorbell->opcode == UC_QP || doorbell->opcode == UD_QP)
     {
         assert(lowPriorityDescQue.size() >= doorbell->num);
-        assert(doorbell->num != 0);
         for (int i = 0; i < doorbell->num; i++)
         {
             rNic->txDescLaunchQue.push(lowPriorityDescQue.front());
@@ -527,11 +527,10 @@ void HanGuRnic::DescScheduler::rxUpdate()
     assert(status->type == LAT_QP || status->type == RATE_QP || status->type == BW_QP);
     if (status->type == LAT_QP || status->type == RATE_QP)
     {
-        status->tail_ptr++;
+        // status->tail_ptr++;
         if (status->head_ptr > status->tail_ptr)
         {
-            // TODO: push back QPN
-            schedule = true;
+            schedule = false;
         }
     }
     else if (status->type == BW_QP)
@@ -539,8 +538,6 @@ void HanGuRnic::DescScheduler::rxUpdate()
         // assert(status->fetch_offset + len <= status->wnd_end);
         if (status->tail_ptr < status->head_ptr)
         {
-            // lowPriorityQpnQue.push(status->qpn);
-            // schedule = true;
             schedule = false;
         }
         else if (status->tail_ptr == status->head_ptr)
