@@ -526,7 +526,7 @@ HanGuRnic::ethRxDelay(EthPacketPtr pkt) {
         schedule(ethRxPktProcEvent, sched);
     }
 
-    HANGU_PRINT(HanGuRnic, " ethRxDelay: out! link delay: %d\n", LinkDelay);
+    HANGU_PRINT(HanGuRnic, " ethRxDelay: out! link delay: %d, ethRxDelayFifo size: %d\n", LinkDelay, ethRxDelayFifo.size());
 
     return true;
 }

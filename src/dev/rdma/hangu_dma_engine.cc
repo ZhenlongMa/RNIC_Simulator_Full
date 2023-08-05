@@ -88,12 +88,6 @@ HanGuRnic::DmaEngine::dmaWriteProcessing () {
                 
                 break;
             }
-
-            // if (dmaReq->size == 40) {
-            //     for (int i = 0; i < dmaReq->size; ++i) {
-            //         HANGU_PRINT(DmaEngine, " DMAEngine.dmaWrite: data[%d] is 0x%x\n", i, (dmaReq->data)[i]);
-            //     }
-            // }
             
             // unit: ps
             Tick bwDelay = (dmaReq->size + 32) * rnic->pciBandwidth;
@@ -133,7 +127,6 @@ HanGuRnic::DmaEngine::dmaWriteProcessing () {
             return;
         } else {
             ++cnt;
-
             ++writeIdx;
             writeIdx = writeIdx % CHNL_NUM;
         }
@@ -144,8 +137,8 @@ HanGuRnic::DmaEngine::dmaWriteProcessing () {
 void 
 HanGuRnic::DmaEngine::dmaReadCplProcessing() {
 
-    HANGU_PRINT(DmaEngine, " DMAEngine.dmaReadCplProcessing! cplSize %d\n", 
-            dmaRdReq2RspFifo.front()->size);
+    // HANGU_PRINT(DmaEngine, " DMAEngine.dmaReadCplProcessing! cplSize %d\n", 
+    //         dmaRdReq2RspFifo.front()->size);
 
     /* post related cpl pkt to related fifo */
     DmaReqPtr dmaReq = dmaRdReq2RspFifo.front();
@@ -172,7 +165,7 @@ HanGuRnic::DmaEngine::dmaReadCplProcessing() {
         rnic->schedule(dmaReadCplEvent, dmaRdReq2RspFifo.front()->schd);
     }
 
-    HANGU_PRINT(DmaEngine, " DMAEngine.dmaReadCplProcessing: out!\n");
+    // HANGU_PRINT(DmaEngine, " DMAEngine.dmaReadCplProcessing: out!\n");
 }
 
 void 

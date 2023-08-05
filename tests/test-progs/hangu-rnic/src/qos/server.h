@@ -6,6 +6,7 @@
 #define THPT_WR_NUM 50
 #define BW_WR_NUM 5
 // #define LATENCY_WR_NUM 1
+#define TEST_TIME 10UL // nanosecond
 
 struct perf_record
 {
@@ -19,3 +20,5 @@ struct qp_comm_record
 };
 
 // struct perf_record record;
+
+void generate_wqe(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, uint32_t offset, int wr_num);
