@@ -238,6 +238,8 @@ class HanGuRnic : public RdmaNic {
                 // rpu -> rcu
                 std::queue<CqDescPtr> rp2rcFifo;
 
+                int onFlyPacketNum;
+
             public:
 
                 RdmaEngine (HanGuRnic *rnic, const std::string n, uint32_t elemCap)
@@ -250,6 +252,7 @@ class HanGuRnic : public RdmaNic {
                     windowFull(false),
                     messageEnd(true),
                     rs2rpVector(elemCap),
+                    onFlyPacketNum(0),
                     dfuEvent ([this]{ dfuProcessing(); }, n),
                     dduEvent ([this]{ dduProcessing(); }, n),
                     dpuEvent ([this]{ dpuProcessing(); }, n),
@@ -260,7 +263,8 @@ class HanGuRnic : public RdmaNic {
                     rpuEvent ([this]{ rpuProcessing(); }, n),
                     rcvRpuEvent  ([this]{rcvRpuProcessing();  }, n),
                     rdCplRpuEvent([this]{rdCplRpuProcessing();}, n),
-                    rcuEvent([this]{ rcuProcessing();}, n) { 
+                    rcuEvent([this]{ rcuProcessing();}, n)
+                    { 
                         for (uint32_t x = 0; x < elemCap; ++x) {
                             dp2ddIdxFifo.push(x);
                             rp2raIdxFifo.push(x);
@@ -613,6 +617,12 @@ class HanGuRnic : public RdmaNic {
                 void mttReqProcess(uint64_t mttIdx, MrReqRspPtr tptReq);
                 void mttRspProcessing();
                 EventFunctionWrapper mttRspEvent;
+
+                // added by mazhenlong @ 23230805
+                int onFlyDataMrRdReqNum;
+                int onFlyDescMrRdReqNum;
+                int onFlyDataDmaRdReqNum;
+                int onFlyDescDmaRdReqNum;
 
             public:
 

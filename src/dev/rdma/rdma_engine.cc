@@ -208,7 +208,7 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
             (dpuQpc->txQpcRsp->qpType == QP_TYPE_UD)); /* we should only use RC and UD type QP */
 
     /* Get one descriptor entry from RdmaEngine.dduProcessing */
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: num %d, idx %d\n", dpuQpc->num, dpuQpc->idx);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: num 0x%x, idx %d\n", dpuQpc->num, dpuQpc->idx);
     uint8_t idx = dpuQpc->idx;
     assert(dd2dpVector[idx] != nullptr);
     TxDescPtr desc = dd2dpVector[idx];
@@ -237,7 +237,7 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
     dp2rg->qpc  = dpuQpc->txQpcRsp;
     dp2rg->txPkt= txPkt;
     dp2rgFifo.push(dp2rg);
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: Post Desc & QPC to RdmaEngine.rguProcessing qpn: %d. sndPsn %d qpType %d dpuQpc->sz %d\n", 
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: Post Desc & QPC to RdmaEngine.rguProcessing qpn: 0x%x. sndPsn %d qpType %d dpuQpc->sz %d\n", 
             dp2rg->qpc->srcQpn, dp2rg->qpc->sndPsn, dp2rg->qpc->qpType, dpuQpc->sz);
 
     /* Post Data read request to Memory Region Module (TPT) */
@@ -363,9 +363,11 @@ HanGuRnic::RdmaEngine::rruProcessing () {
     uint32_t destQpn = bth->op_destQpn & 0xFFFFFF;
     uint32_t ackPsn  = bth->needAck_psn & 0xFFFFFF;
     ra2rgFifo.pop();
+    onFlyPacketNum--;
     HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rruProcessing:"
-            " Get RX ack data from fifo destQpn %d, ackPsn %d\n", 
-            destQpn, ackPsn);
+            " Get RX ack data from fifo destQpn 0x%x, ackPsn %d, on-fly count: %d\n", 
+            destQpn, ackPsn, onFlyPacketNum);
+    assert(onFlyPacketNum >= 0);
 
     /* Get ACK bounded QP List from Window */
     WinMapElem* winElem;
@@ -603,6 +605,12 @@ HanGuRnic::RdmaEngine::rguProcessing () {
     }
     messageEnd = true; /* Just ignore it now. */
 
+    // update on fly packet number, ONLY FOR RC CONNECTIONS
+    if (needAck)
+    {
+        onFlyPacketNum++;
+    }
+
     /* Update QPC */
     if (qpc->qpType == QP_TYPE_RC) {
         ++qpc->sndPsn;
@@ -793,7 +801,6 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
 void
 HanGuRnic::RdmaEngine::rgrrProcessing () {
 
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.rgrrProcessing\n");
     HANGU_PRINT(RdmaEngine, " RdmaEngine.rgrrProcessing: dp2rgFifo.size %d rnic->txdataRspFifo %d\n", 
             dp2rgFifo.size(), rnic->txdataRspFifo.size());
     HANGU_PRINT(RdmaEngine, " RdmaEngine.rgrrProcessing: isRspRecv %d isReqGen %d windowSize %d\n", 
@@ -887,8 +894,8 @@ HanGuRnic::RdmaEngine::sauProcessing () {
     // for (int i = 0; i < ETH_ADDR_LEN; ++i) {
     //     HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, dmac[%d]: 0x%x smac[%d] 0x%x\n", i, dmac[i], i, smac[i]);
     // }
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, type: %d srv : %d, BW %dps/byte, len %d, bwDelay %d\n", 
-            type, srv, rnic->etherBandwidth, txsauFifo.front()->length, bwDelay);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, type: %d srv : %d, BW %dps/byte, len %d, bwDelay %d, txsauFifo size: %d\n", 
+            type, srv, rnic->etherBandwidth, txsauFifo.front()->length, bwDelay, txsauFifo.size());
 
     if (rnic->etherInt->sendPacket(txsauFifo.front())) {
         

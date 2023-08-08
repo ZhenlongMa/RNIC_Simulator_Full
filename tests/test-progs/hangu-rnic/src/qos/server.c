@@ -19,7 +19,14 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->exp_psn = 0;
         qp->dsubnet.dlid = (i % resc->num_rem) + resc->ctx->lid + 1;
         qp->group_id = resc->qos_group[0]->id;
-        qp->indicator = BW_QP;
+        if (cpu_id == 0)
+        {
+            qp->indicator = LAT_QP;
+        }
+        else
+        {
+            qp->indicator = BW_QP;
+        }
         // if (cpu_id == 0)
         // {
         //     qp->weight = 8;
