@@ -6,7 +6,7 @@
 #define THPT_WR_NUM 50
 #define BW_WR_NUM 5
 // #define LATENCY_WR_NUM 1
-#define TEST_TIME 10UL // nanosecond
+#define TEST_TIME 40UL // nanosecond
 
 struct perf_record
 {

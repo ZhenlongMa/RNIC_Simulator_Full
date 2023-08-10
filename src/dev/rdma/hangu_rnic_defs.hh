@@ -62,6 +62,8 @@
 #define UD_QP 5
 // UC and UD QP above is only used in QoS!
 #define LEAST_QPN_QUE_CAP 64
+#define DESC_REQ_LIMIT 3
+#define DATA_REQ_LIMIT 5
 
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)

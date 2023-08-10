@@ -101,63 +101,69 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
 void
 HanGuRnic::RdmaEngine::dduProcessing () {
     
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing!\n");
+    // HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing!\n");
 
-    /* If there's no valid idx, exit the schedule */
-    if (dp2ddIdxFifo.size() == 0) {
-        HANGU_PRINT(HanGuRnic, " RdmaEngine.dduProcessing: If there's no valid idx, exit the schedule\n");
-        return;
-    }
+    // make sure that on fly data request number does not exceed DATA_REQ_LIMIT
+    if (std::count(dd2dpVector.begin(), dd2dpVector.end(), nullptr) > dd2dpVector.size() - DATA_REQ_LIMIT)
+    {
+        /* If there's no valid idx, exit the schedule */
+        if (dp2ddIdxFifo.size() == 0) {
+            HANGU_PRINT(HanGuRnic, " RdmaEngine.dduProcessing: If there's no valid idx, exit the schedule\n");
+            return;
+        }
 
-    if (this->allowNewDb) {
-        /* Fetch Doorbell from DFU fifo */
-        assert(df2ddFifo.size());
-        assert(this->dduDbell == nullptr);
-        this->dduDbell = df2ddFifo.front();
-        df2ddFifo.pop();
-        this->allowNewDb = false;
-        HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: Get one Doorbell!\n");
-    }
+        if (this->allowNewDb) {
+            /* Fetch Doorbell from DFU fifo */
+            assert(df2ddFifo.size());
+            assert(this->dduDbell == nullptr);
+            this->dduDbell = df2ddFifo.front();
+            df2ddFifo.pop();
+            this->allowNewDb = false;
+            HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: Get one Doorbell!\n");
+        }
 
-    /* Fetch one descriptor from tx descriptor fifo */
-    // assert(rnic->txdescRspFifo.size()); /* TPT calls this function, so 
-    //                                      * txDescFifo should have items */
-    // TxDescPtr txDesc = rnic->txdescRspFifo.front();
-    // rnic->txdescRspFifo.pop();
-    assert(rnic->txDescLaunchQue.size());
-    TxDescPtr txDesc = rnic->txDescLaunchQue.front();
-    rnic->txDescLaunchQue.pop();
+        /* Fetch one descriptor from tx descriptor fifo */
+        // assert(rnic->txdescRspFifo.size()); /* TPT calls this function, so 
+        //                                      * txDescFifo should have items */
+        // TxDescPtr txDesc = rnic->txdescRspFifo.front();
+        // rnic->txdescRspFifo.pop();
+        assert(rnic->txDescLaunchQue.size());
+        TxDescPtr txDesc = rnic->txDescLaunchQue.front();
+        rnic->txDescLaunchQue.pop();
 
-    /* Put one descriptor to waiting Memory */
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: desc->len 0x%x, desc->lkey 0x%x, desc->lvaddr 0x%x, desc->opcode 0x%x, desc->flags 0x%x, dduDbell->qpn 0x%x\n", 
-            txDesc->len, txDesc->lkey, txDesc->lVaddr, txDesc->opcode, txDesc->flags, dduDbell->qpn);
-    HANGU_PRINT(RdmaEngine, "WQE left in queue: %d\n", rnic->txDescLaunchQue.size());
-    uint8_t idx = dp2ddIdxFifo.front();
-    dp2ddIdxFifo.pop();
-    assert(dd2dpVector[idx] == nullptr);
-    dd2dpVector[idx] = txDesc;
-    /* We don't schedule it here, cause it should be 
-     * scheduled by Context Module */
-    // if (!dpuEvent.scheduled()) { /* Schedule RdmaEngine.dpuProcessing */
-    //     rnic->schedule(dpuEvent, curTick() + rnic->clockPeriod());
-    // }
+        /* Put one descriptor to waiting Memory */
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: desc->len 0x%x, desc->lkey 0x%x, desc->lvaddr 0x%x, desc->opcode 0x%x, desc->flags 0x%x, dduDbell->qpn 0x%x\n", 
+                txDesc->len, txDesc->lkey, txDesc->lVaddr, txDesc->opcode, txDesc->flags, dduDbell->qpn);
+        HANGU_PRINT(RdmaEngine, "WQE left in queue: %d\n", rnic->txDescLaunchQue.size());
+        uint8_t idx = dp2ddIdxFifo.front();
+        dp2ddIdxFifo.pop();
+        assert(dd2dpVector[idx] == nullptr);
+        dd2dpVector[idx] = txDesc;
+        /* We don't schedule it here, cause it should be 
+        * scheduled by Context Module */
+        // if (!dpuEvent.scheduled()) { /* Schedule RdmaEngine.dpuProcessing */
+        //     rnic->schedule(dpuEvent, curTick() + rnic->clockPeriod());
+        // }
 
-    /* Post qp read request to QpcModule */
-    CxtReqRspPtr qpcRdReq = make_shared<CxtReqRsp>(CXT_RREQ_QP, CXT_CHNL_TX, dduDbell->qpn, 1, idx); /* dduDbell->num */
-    qpcRdReq->txQpcRsp = new QpcResc;
-    rnic->qpcModule.postQpcReq(qpcRdReq);
+        /* Post qp read request to QpcModule */
+        CxtReqRspPtr qpcRdReq = make_shared<CxtReqRsp>(CXT_RREQ_QP, CXT_CHNL_TX, dduDbell->qpn, 1, idx); /* dduDbell->num */
+        qpcRdReq->txQpcRsp = new QpcResc;
+        rnic->qpcModule.postQpcReq(qpcRdReq);
 
-    /* update allowNewDb */
-    --this->dduDbell->num;
-    if (this->dduDbell->num == 0) {
-        this->allowNewDb = true;
-        this->dduDbell = nullptr;
+        /* update allowNewDb */
+        --this->dduDbell->num;
+        if (this->dduDbell->num == 0) 
+        {
+            this->allowNewDb = true;
+            this->dduDbell = nullptr;
+        }
     }
 
     /* Schedule myself again if there's new descriptor
      * or there remains descriptors to post */
     if (dp2ddIdxFifo.size() && rnic->txDescLaunchQue.size() && 
-            ((allowNewDb && df2ddFifo.size()) || (!allowNewDb))) {
+            ((allowNewDb && df2ddFifo.size()) || (!allowNewDb))) 
+    {
         if (!dduEvent.scheduled()) { /* Schedule myself */
             rnic->schedule(dduEvent, curTick() + rnic->clockPeriod());
         }
@@ -198,75 +204,78 @@ HanGuRnic::RdmaEngine::getRdmaHeadSize (uint8_t opcode, uint8_t qpType) {
 void
 HanGuRnic::RdmaEngine::dpuProcessing () {
 
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing!\n");
+    // HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing!\n");
 
-    /* Get Context from Context Module */
-    assert(rnic->qpcModule.txQpcRspFifo.size());
-    CxtReqRspPtr dpuQpc = rnic->qpcModule.txQpcRspFifo.front();
-    rnic->qpcModule.txQpcRspFifo.pop();
-    assert((dpuQpc->txQpcRsp->qpType == QP_TYPE_RC) ||
-            (dpuQpc->txQpcRsp->qpType == QP_TYPE_UD)); /* we should only use RC and UD type QP */
+    if (dp2rgFifo.size() < DATA_REQ_LIMIT)
+    {
+        /* Get Context from Context Module */
+        assert(rnic->qpcModule.txQpcRspFifo.size());
+        CxtReqRspPtr dpuQpc = rnic->qpcModule.txQpcRspFifo.front();
+        rnic->qpcModule.txQpcRspFifo.pop();
+        assert((dpuQpc->txQpcRsp->qpType == QP_TYPE_RC) ||
+                (dpuQpc->txQpcRsp->qpType == QP_TYPE_UD)); /* we should only use RC and UD type QP */
 
-    /* Get one descriptor entry from RdmaEngine.dduProcessing */
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: num 0x%x, idx %d\n", dpuQpc->num, dpuQpc->idx);
-    uint8_t idx = dpuQpc->idx;
-    assert(dd2dpVector[idx] != nullptr);
-    TxDescPtr desc = dd2dpVector[idx];
-    dd2dpVector[idx] = nullptr;
-    assert(desc->len <= 16384); // TO DO: the final step is to remove this
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing:"
-                " Get descriptor entry from RdmaEngine.dduProcessing, len: %d, lkey: %d, opcode: %d, rkey: %d\n", 
-                desc->len, desc->lkey, desc->opcode, desc->rdmaType.rkey);
+        /* Get one descriptor entry from RdmaEngine.dduProcessing */
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: num 0x%x, idx %d\n", dpuQpc->num, dpuQpc->idx);
+        uint8_t idx = dpuQpc->idx;
+        assert(dd2dpVector[idx] != nullptr);
+        TxDescPtr desc = dd2dpVector[idx];
+        dd2dpVector[idx] = nullptr;
+        assert(desc->len <= 16384); // TO DO: the final step is to remove this
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing:"
+                    " Get descriptor entry from RdmaEngine.dduProcessing, len: %d, lkey: %d, opcode: %d, rkey: %d\n", 
+                    desc->len, desc->lkey, desc->opcode, desc->rdmaType.rkey);
 
-    /* schedule ddu if dp2ddIdxFifo is empty */
-    dp2ddIdxFifo.push(idx);
-    if ((dp2ddIdxFifo.size() == 1) && rnic->txdescRspFifo.size() && 
-            ((allowNewDb && df2ddFifo.size()) || (!allowNewDb))) {
-        if (!dduEvent.scheduled()) {
-            rnic->schedule(dduEvent, curTick() + rnic->clockPeriod());
-        }
-    }
-
-    /* Generate request packet (RDMA read/write, send) */
-    EthPacketPtr txPkt = std::make_shared<EthPacketData>(16384); // TODO: modify size here
-    txPkt->length = ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, dpuQpc->txQpcRsp->qpType); /* ETH_ADDR_LEN * 2 means length of 2 MAC addr */
-
-    /* Post Descriptor & QPC & request packet pointer to RdmaEngine.rguProcessing */
-    DP2RGPtr dp2rg = make_shared<DP2RG>();
-    dp2rg->desc = desc;
-    dp2rg->qpc  = dpuQpc->txQpcRsp;
-    dp2rg->txPkt= txPkt;
-    dp2rgFifo.push(dp2rg);
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: Post Desc & QPC to RdmaEngine.rguProcessing qpn: 0x%x. sndPsn %d qpType %d dpuQpc->sz %d\n", 
-            dp2rg->qpc->srcQpn, dp2rg->qpc->sndPsn, dp2rg->qpc->qpType, dpuQpc->sz);
-
-    /* Post Data read request to Memory Region Module (TPT) */
-    MrReqRspPtr rreq;
-    switch(desc->opcode) {
-      case OPCODE_SEND :
-      case OPCODE_RDMA_WRITE:
-        /* Post Data read request to Data Read Request FIFO.
-         * Fetch data from host memory */
-        HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: Push Data read request to MrRescModule.transReqProcessing: len %d vaddr 0x%x\n", desc->len, desc->lVaddr);
-        rreq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DATA,
-                desc->lkey, desc->len, (uint32_t)(desc->lVaddr&0xFFF));
-        rreq->rdDataRsp = txPkt->data + txPkt->length; /* Address Rsp data (from host memory) should be located */
-        rnic->dataReqFifo.push(rreq);
-        if (!rnic->mrRescModule.transReqEvent.scheduled()) {
-            rnic->schedule(rnic->mrRescModule.transReqEvent, curTick() + rnic->clockPeriod());
+        /* schedule ddu if dp2ddIdxFifo is empty */
+        dp2ddIdxFifo.push(idx);
+        if ((dp2ddIdxFifo.size() == 1) && rnic->txdescRspFifo.size() && 
+                ((allowNewDb && df2ddFifo.size()) || (!allowNewDb))) {
+            if (!dduEvent.scheduled()) {
+                rnic->schedule(dduEvent, curTick() + rnic->clockPeriod());
+            }
         }
 
-        break;
-      case OPCODE_RDMA_READ:
-        /* Schedule rg&rru to start Processing RDMA read. 
-         * Cause RDMA read don't need to read data from host memory */
-        if (!rgrrEvent.scheduled()) { /* Schedule RdmaEngine.rgrrProcessing */
-            rnic->schedule(rgrrEvent, curTick() + rnic->clockPeriod());
+        /* Generate request packet (RDMA read/write, send) */
+        EthPacketPtr txPkt = std::make_shared<EthPacketData>(16384); // TODO: modify size here
+        txPkt->length = ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, dpuQpc->txQpcRsp->qpType); /* ETH_ADDR_LEN * 2 means length of 2 MAC addr */
+
+        /* Post Descriptor & QPC & request packet pointer to RdmaEngine.rguProcessing */
+        DP2RGPtr dp2rg = make_shared<DP2RG>();
+        dp2rg->desc = desc;
+        dp2rg->qpc  = dpuQpc->txQpcRsp;
+        dp2rg->txPkt= txPkt;
+        dp2rgFifo.push(dp2rg);
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: Post Desc & QPC to RdmaEngine.rguProcessing qpn: 0x%x. sndPsn %d qpType %d dpuQpc->sz %d, dp2rgFifo size: %d\n", 
+                dp2rg->qpc->srcQpn, dp2rg->qpc->sndPsn, dp2rg->qpc->qpType, dpuQpc->sz, dp2rgFifo.size());
+
+        /* Post Data read request to Memory Region Module (TPT) */
+        MrReqRspPtr rreq;
+        switch(desc->opcode) {
+        case OPCODE_SEND :
+        case OPCODE_RDMA_WRITE:
+            /* Post Data read request to Data Read Request FIFO.
+            * Fetch data from host memory */
+            // HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: Push Data read request to MrRescModule.transReqProcessing: len %d vaddr 0x%x\n", desc->len, desc->lVaddr);
+            rreq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DATA,
+                    desc->lkey, desc->len, (uint32_t)(desc->lVaddr&0xFFF));
+            rreq->rdDataRsp = txPkt->data + txPkt->length; /* Address Rsp data (from host memory) should be located */
+            rnic->dataReqFifo.push(rreq);
+            if (!rnic->mrRescModule.transReqEvent.scheduled()) {
+                rnic->schedule(rnic->mrRescModule.transReqEvent, curTick() + rnic->clockPeriod());
+            }
+
+            break;
+        case OPCODE_RDMA_READ:
+            /* Schedule rg&rru to start Processing RDMA read. 
+            * Cause RDMA read don't need to read data from host memory */
+            if (!rgrrEvent.scheduled()) { /* Schedule RdmaEngine.rgrrProcessing */
+                rnic->schedule(rgrrEvent, curTick() + rnic->clockPeriod());
+            }
+            break;
+        default:
+            panic("Error! Post wrong descriptor type to send queue. desc->opcode %d\n", desc->opcode);
+            break;
         }
-        break;
-      default:
-        panic("Error! Post wrong descriptor type to send queue. desc->opcode %d\n", desc->opcode);
-        break;
     }
 
     /* Recall myself if there's new descriptor and QPC */
@@ -276,7 +285,7 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
         }
     }
     
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: out!\n");
+    // HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: out!\n");
 }
 
 /**

@@ -345,7 +345,8 @@ class HanGuRnic : public RdmaNic {
                 std::queue<std::pair<DoorbellPtr, QPStatusPtr>> dbQpStatusRspQue;
                 std::queue<uint32_t> wqePrefetchQpStatusRReqQue;
                 std::queue<std::pair<uint32_t, QPStatusPtr>> wqeFetchInfoQue;
-                std::queue<DoorbellPtr> wqeProcToLaunchWqeQue;
+                std::queue<DoorbellPtr> wqeProcToLaunchWqeQueH;
+                std::queue<DoorbellPtr> wqeProcToLaunchWqeQueL;
                 EventFunctionWrapper qpStatusRspEvent;
                 // EventFunctionWrapper rxUpdateEvent;
                 // EventFunctionWrapper qpStatusReqEvent;
