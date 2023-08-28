@@ -61,9 +61,15 @@
 #define UC_QP 4
 #define UD_QP 5
 // UC and UD QP above is only used in QoS!
+
+// QoS related parameters
 #define LEAST_QPN_QUE_CAP 64
 #define DESC_REQ_LIMIT 5
 #define DATA_REQ_LIMIT 6
+#define RGU_SAU_LIM 1
+#define BIGN 16384
+#define WINDOW_CAP 20
+#define MAX_SUBWQE_SIZE 1024
 
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)

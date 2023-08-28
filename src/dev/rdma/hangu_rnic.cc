@@ -534,7 +534,7 @@ HanGuRnic::ethRxDelay(EthPacketPtr pkt) {
 void
 HanGuRnic::ethRxPktProc() {
 
-    HANGU_PRINT(HanGuRnic, " ethRxPktProc!\n");
+    HANGU_PRINT(HanGuRnic, " ethRxPktProc! ethRxDelayFifo size: %d\n", ethRxDelayFifo.size());
     
     /* get pkt from ethRxDelay */
     EthPacketPtr pkt = ethRxDelayFifo.front().first;
@@ -552,8 +552,8 @@ HanGuRnic::ethRxPktProc() {
         } else if (type == PKT_TRANS_RWRITE_ONLY) {
             RETH *reth = (RETH *)(pkt->data + PKT_BTH_SZ + ETH_ADDR_LEN * 2);
             HANGU_PRINT(HanGuRnic, " ethRxPktProc:"
-                    " Receiving packet from wire, RDMA Write data: %s, len %d, raddr 0x%x, rkey 0x%x op_destQpn %d\n", 
-                    (char *)(pkt->data + sizeof(BTH) + sizeof(RETH) + ETH_ADDR_LEN * 2), reth->len, reth->rVaddr_l, reth->rKey, ((BTH *)pkt->data)->op_destQpn);
+                    " Receiving packet from wire, RDMA Write data: %s, len %d, raddr 0x%x, rkey 0x%x op_destQpn 0x%x\n", 
+                    (char *)(pkt->data + sizeof(BTH) + sizeof(RETH) + ETH_ADDR_LEN * 2), reth->len, reth->rVaddr_l, reth->rKey, ((BTH *)(pkt->data + ETH_ADDR_LEN * 2))->op_destQpn);
             // for (int i = 0; i < reth->len; ++i) {
             //     HANGU_PRINT(HanGuRnic, " ethRxPkt: data[%d] 0x%x\n", i, (pkt->data)[sizeof(BTH) + sizeof(RETH) + ETH_ADDR_LEN * 2 + i]);
             // }

@@ -378,6 +378,11 @@ HanGuRnic::RdmaEngine::rruProcessing () {
             destQpn, ackPsn, onFlyPacketNum);
     assert(onFlyPacketNum >= 0);
 
+    if (rnic->descScheduler.qpStatusTable[destQpn]->type == LAT_QP)
+    {
+        HANGU_PRINT(RdmaEngine, "receive ack, qpn: 0x%x, curtick: %ld\n", destQpn, curTick());
+    }
+
     /* Get ACK bounded QP List from Window */
     WinMapElem* winElem;
     if (sndWindowList.find(destQpn) == sndWindowList.end()) {
@@ -497,6 +502,11 @@ HanGuRnic::RdmaEngine::rguProcessing () {
 
     HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.%s!\n", __func__);
 
+    if (txsauFifo.size() > RGU_SAU_LIM)
+    {
+        return;
+    }
+
     /* Get Descriptor & QPC & packet pointer 
      * from RdmaEngine.dpuProcessing */
     assert(dp2rgFifo.size());
@@ -505,9 +515,14 @@ HanGuRnic::RdmaEngine::rguProcessing () {
     QpcResc *qpc = tmp->qpc;
     EthPacketPtr txPkt = tmp->txPkt;
     dp2rgFifo.pop();
+
+    if (rnic->descScheduler.qpStatusTable[qpc->srcQpn]->type == LAT_QP)
+    {
+        HANGU_PRINT(RdmaEngine, "data received! qpn: 0x%x, curtick: %ld\n", qpc->srcQpn, curTick());
+    }
     
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: qpType %d, WQE type: %d, qpn %d sndPsn %d sndWqeOffset %d\n", 
-            qpc->qpType, desc->opcode, qpc->srcQpn, qpc->sndPsn, qpc->sndWqeOffset);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: qpType %d, WQE type: %d, qpn: 0x%x, dst qpn: 0x%x, sndPsn %d sndWqeOffset %d\n", 
+            qpc->qpType, desc->opcode, qpc->srcQpn, qpc->destQpn, qpc->sndPsn, qpc->sndWqeOffset);
 
     /* Get Request Data (send & RDMA write) 
      * from MrRescModule.dmaRrspProcessing. */
@@ -810,10 +825,10 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
 void
 HanGuRnic::RdmaEngine::rgrrProcessing () {
 
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.rgrrProcessing: dp2rgFifo.size %d rnic->txdataRspFifo %d\n", 
-            dp2rgFifo.size(), rnic->txdataRspFifo.size());
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.rgrrProcessing: isRspRecv %d isReqGen %d windowSize %d\n", 
-            isRspRecv(), isReqGen(), windowSize);
+    // HANGU_PRINT(RdmaEngine, " RdmaEngine.rgrrProcessing: dp2rgFifo.size %d rnic->txdataRspFifo %d\n", 
+    //         dp2rgFifo.size(), rnic->txdataRspFifo.size());
+    // HANGU_PRINT(RdmaEngine, " RdmaEngine.rgrrProcessing: isRspRecv %d isReqGen %d windowSize %d\n", 
+    //         isRspRecv(), isReqGen(), windowSize);
     
     /* Rsp has higher priority than req generation, 
      * in case of dead lock. */
@@ -903,8 +918,8 @@ HanGuRnic::RdmaEngine::sauProcessing () {
     // for (int i = 0; i < ETH_ADDR_LEN; ++i) {
     //     HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, dmac[%d]: 0x%x smac[%d] 0x%x\n", i, dmac[i], i, smac[i]);
     // }
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, type: %d srv : %d, BW %dps/byte, len %d, bwDelay %d, txsauFifo size: %d\n", 
-            type, srv, rnic->etherBandwidth, txsauFifo.front()->length, bwDelay, txsauFifo.size());
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, type: %d, srv: %d, op_destQpn: 0x%x, BW %dps/byte, len %d, bwDelay %d, txsauFifo size: %d\n", 
+            type, srv, bth->op_destQpn, rnic->etherBandwidth, txsauFifo.front()->length, bwDelay, txsauFifo.size());
 
     if (rnic->etherInt->sendPacket(txsauFifo.front())) {
         
@@ -923,9 +938,20 @@ HanGuRnic::RdmaEngine::sauProcessing () {
     // } else {
     //     rnic->schedule(sauEvent, curTick() + bwDelay);
     // }
-    if (txsauFifo.size()) {
-        if (!sauEvent.scheduled()) {
-            rnic->schedule(sauEvent, curTick() + rnic->clockPeriod());
+    // if (txsauFifo.size()) {
+    //     if (!sauEvent.scheduled()) {
+    //         rnic->schedule(sauEvent, curTick() + rnic->clockPeriod());
+    //     }
+    // }
+    if (txsauFifo.size())
+    {
+        if (sauEvent.scheduled())
+        {
+            rnic->reschedule(sauEvent, curTick() + bwDelay);
+        }
+        else
+        {
+            rnic->schedule(sauEvent, curTick() + bwDelay);
         }
     }
 
@@ -952,7 +978,7 @@ HanGuRnic::RdmaEngine::rauProcessing () {
     //     HANGU_PRINT(RdmaEngine, " RdmaEngine.rauProcessing: data[%d]: 0x%x\n", i, (rxPkt->data)[i]);
     // }
 
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.rauProcessing: op_destQpn: 0x%x\n", bth->op_destQpn);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.rauProcessing: op_destQpn: 0x%x, rxFifo size: %d\n", bth->op_destQpn, rnic->rxFifo.size());
     
     
     if (((bth->op_destQpn >> 24) & 0x1F) == PKT_TRANS_ACK) { /* ACK packet, transform to RG&RRU */
@@ -966,7 +992,7 @@ HanGuRnic::RdmaEngine::rauProcessing () {
             rnic->schedule(rgrrEvent, curTick() + rnic->clockPeriod());
         }
 
-        HANGU_PRINT(RdmaEngine, " RdmaEngine.rauProcessing: Receive ACK packet, pass to RdmaEngine.RGRRU.rruProcessing!\n");
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.rauProcessing: Receive ACK packet, pass to RdmaEngine.RGRRU.rruProcessing! rxFifo size: %d\n", rnic->rxFifo.size());
 
     } else if (rp2raIdxFifo.size()) { /* Incomming request packet, pass to RPU */
         
@@ -1144,7 +1170,7 @@ HanGuRnic::RdmaEngine::wrRpuProcessing (EthPacketPtr rxPkt, QpcResc* qpc) {
     if (!rnic->mrRescModule.transReqEvent.scheduled()) {
         rnic->schedule(rnic->mrRescModule.transReqEvent, curTick() + rnic->clockPeriod());
     }
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.RPU.wrRPU: Write data back to memory through TPT\n");
+    // HANGU_PRINT(RdmaEngine, " RdmaEngine.RPU.wrRPU: Write data back to memory through TPT\n");
     HANGU_PRINT(RdmaEngine, " RdmaEngine.RPU.wrRPU: Recved RDMA write data: %s, rkey: 0x%x, len %d, rvaddr 0x%x\n", 
             dataWreq->wrDataReq, reth->rKey, reth->len, reth->rVaddr_l);
 
@@ -1165,7 +1191,7 @@ HanGuRnic::RdmaEngine::wrRpuProcessing (EthPacketPtr rxPkt, QpcResc* qpc) {
         bthOp = ((qpc->qpType << 5) | PKT_TRANS_ACK) << 24;
         ((BTH *) pktPtr)->op_destQpn = bthOp | qpc->destQpn;
         ((BTH *) pktPtr)->needAck_psn =  qpc->expPsn;
-        HANGU_PRINT(RdmaEngine, "wrRpuProcessing: src QPN: %d, dst QPN: %d, expPsn: 0x%x\n", qpc->srcQpn, qpc->destQpn, qpc->expPsn);
+        HANGU_PRINT(RdmaEngine, "wrRpuProcessing: src QPN: 0x%x, dst QPN: 0x%x, expPsn: 0x%x\n", qpc->srcQpn, qpc->destQpn, qpc->expPsn);
         pktPtr += PKT_BTH_SZ;
 
         /* Add AETH header */

@@ -248,7 +248,7 @@ class HanGuRnic : public RdmaNic {
                     allowNewDb(true),
                     dd2dpVector(elemCap),
                     windowSize(0),
-                    windowCap(100),
+                    windowCap(WINDOW_CAP),
                     windowFull(false),
                     messageEnd(true),
                     rs2rpVector(elemCap),
@@ -335,7 +335,6 @@ class HanGuRnic : public RdmaNic {
                 uint16_t sqSize;
                 uint16_t rqSize;
                 // uint8_t onFlyDescReqNum;
-                std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
                 std::queue<uint32_t> highPriorityQpnQue;
                 std::queue<uint32_t> lowPriorityQpnQue;
                 std::queue<uint32_t> leastPriorityQpnQue;
@@ -360,6 +359,7 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper qpcRspEvent;
                 EventFunctionWrapper wqeRspEvent;
                 std::unordered_map<uint8_t, uint16_t> groupTable;
+                std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
                 std::string name()
                 {
                     return _name;

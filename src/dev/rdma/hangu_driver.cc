@@ -466,8 +466,8 @@ void HanGuDriver::initQoS(PortProxy& portProxy, Process* process)
         process->pTable->map(qosShareParamAddr, sharePhysAddr, (qosSharePageNum << 12), false);
 
         // qosShareParamAddr = sharePhysAddr;
-        uint32_t N = 163840;
-        portProxy.writeBlob(qosShareParamAddr, &N, sizeof(uint32_t));
+        uint32_t N = BIGN;
+        portProxy.writeBlob(qosShareParamAddr + NOffset, &N, sizeof(uint32_t));
         uint16_t groupNum = 0;
         portProxy.writeBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint16_t));
     }

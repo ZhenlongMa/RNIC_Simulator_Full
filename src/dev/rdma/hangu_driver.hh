@@ -186,15 +186,16 @@ class HanGuDriver final : public EmulatedDriver {
     // uint32_t bigN = 16384;
     // uint8_t groupNum;
     Addr qosShareParamAddr;
-    const int NOffset = 0;
-    const int groupNumOffset = 16;
-    const int groupWeightSumOffset = 32;
-    const int groupWeightOffset = 256;
-    const int groupQPWeightSumOffset = 512;
-    const int groupGranularityOffset = 1536;
-    const int barShareAddrOffset = 0x30;
-    const int barShareAddrFlagOffset = 0x40;
-    const int qosSharePageNum = 1;
+    const int NOffset                   = 0;
+    const int groupNumOffset            = 16;
+    const int groupWeightSumOffset      = 32;
+    const int groupWeightOffset         = 256;
+    const int groupQPWeightSumOffset    = 512;
+    const int groupGranularityOffset    = 1536;
+    const int barShareAddrOffset        = 0x30;
+    const int barShareAddrFlagOffset    = 0x40;
+    const int qosSharePageNum           = 1;
+    int qpNum;
 
     // #define QOS_SHARING_PAGE_NUM 4
     /* -------QoS Group resources {end}------- */

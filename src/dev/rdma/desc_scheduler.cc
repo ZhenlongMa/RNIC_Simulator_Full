@@ -86,8 +86,8 @@ void HanGuRnic::DescScheduler::qpStatusProc()
 
     if (qpStatus->type == LAT_QP)
     {
-        HANGU_PRINT(DescScheduler, "Inactive QP! high priority qpn: 0x%x, in que: %d, head pointer: %d, tail pointer: %d\n", 
-            db->qpn, qpStatus->in_que, qpStatus->head_ptr, qpStatus->tail_ptr);
+        HANGU_PRINT(DescScheduler, "Inactive QP! high priority qpn: 0x%x, in que: %d, head pointer: %d, tail pointer: %d, curtick: %ld\n", 
+            db->qpn, qpStatus->in_que, qpStatus->head_ptr, qpStatus->tail_ptr, curTick());
         assert(qpStatus->head_ptr == qpStatus->tail_ptr);
         highPriorityQpnQue.push(db->qpn);
         schedule = true;
@@ -161,8 +161,8 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
             wqePrefetchQpStatusRReqQue.push(qpn);
             qpStatusTable[qpn]->in_que--;
             qpStatusTable[qpn]->fetch_count++;
-            HANGU_PRINT(DescScheduler, "High priority QPN fetched! qpn: 0x%x, fetch count: %d\n", 
-                qpn, qpStatusTable[qpn]->fetch_count++);
+            HANGU_PRINT(DescScheduler, "High priority QPN fetched! qpn: 0x%x, fetch count: %d, curtick: %ld\n", 
+                qpn, qpStatusTable[qpn]->fetch_count++, curTick());
         }
         else if (lowPriorityQpnQue.size() > 0)
         {
@@ -219,6 +219,10 @@ void HanGuRnic::DescScheduler::wqePrefetch()
                 qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr, qpStatus->fetch_offset);
             HANGU_PRINT(DescScheduler, "QP num: 0x%x, type: %d, group ID: %d, weight: %d, group granularity: %d\n", 
                 qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
+            if (qpStatus->type == LAT_QP)
+            {
+                HANGU_PRINT(DescScheduler, "wqe prefetch! qpn: 0x%x, curtick: %ld\n", qpStatus->qpn, curTick());
+            }
             
             if (qpStatus->head_ptr - qpStatus->tail_ptr > MAX_PREFETCH_NUM)
             {
@@ -317,6 +321,7 @@ void HanGuRnic::DescScheduler::wqeProc()
         }
         qpStatus->tail_ptr += descNum;
         subDescNum = descNum;
+        HANGU_PRINT(DescScheduler, "received WQE response! qpn: 0x%x, curtick: %ld\n", qpStatus->qpn, curTick());
     }
     else if (qpStatus->type == RATE_QP) // WARNING: modify here
     {
@@ -545,7 +550,7 @@ void HanGuRnic::DescScheduler::rxUpdate()
     bool schedule = false; 
     rNic->updateQue.pop();
     QPStatusPtr status = qpStatusTable[qpn];
-    HANGU_PRINT(DescScheduler, "rx received! qpn: %d, len: %d\n", qpn, len);
+    HANGU_PRINT(DescScheduler, "rx received! qpn: 0x%x, len: %d\n", qpn, len);
     HANGU_PRINT(DescScheduler, "rx received! type: %d, head_ptr: 0x%x, tail_ptr: 0x%x\n", status->type, status->head_ptr, status->tail_ptr);
     assert(status->type == LAT_QP || status->type == RATE_QP || status->type == BW_QP);
     if (status->type == LAT_QP || status->type == RATE_QP)
@@ -569,7 +574,7 @@ void HanGuRnic::DescScheduler::rxUpdate()
         }
         else
         {
-            panic("tail pointer exceeds head pointer! qpn: %d", status->qpn);
+            panic("tail pointer exceeds head pointer! qpn: 0x%x", status->qpn);
         }
     }
 
