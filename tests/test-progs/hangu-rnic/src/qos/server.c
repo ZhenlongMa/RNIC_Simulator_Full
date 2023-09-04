@@ -19,7 +19,7 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->exp_psn = 0;
         qp->dsubnet.dlid = (i % resc->num_rem) + resc->ctx->lid + 1;
         qp->group_id = resc->qos_group[0]->id;
-        if (cpu_id == 0)
+        if (judge_latency(cpu_id) == LAT_QP)
         {
             qp->indicator = LAT_QP;
         }
@@ -43,6 +43,19 @@ int svr_update_qps(struct rdma_resc *resc) {
     ibv_modify_batch_qp(resc->ctx, resc->qp[0], resc->num_qp * resc->num_rem);
 
     return 0;
+}
+
+int judge_latency(uint8_t cpu_id)
+{
+    switch(cpu_id)
+    {
+        case 0:
+            return BW_QP;
+            break;
+        default:
+            return LAT_QP;
+            break;
+    }
 }
 
 int svr_update_info(struct rdma_resc *resc) {
@@ -153,43 +166,6 @@ static void usage(const char *argv0) {
     printf("  -c, --cpu-id=<cpu_id>             id of the cpu (default 0)\n");
     printf("  -m, --op-mode=<op_mode>           opcode mode (default 0, which is RDMA Write)\n");
 }
-
-// double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode, uint32_t iter_count) {
-//     uint64_t start_time, end_time, con_time = 0;
-//     struct cpl_desc **desc = resc->desc;
-//     uint8_t polling;
-//     uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
-//     uint64_t* latency_vec;
-//     latency_vec = (uint64_t*)malloc(sizeof(uint64_t) * iter_count);
-
-//     for (int k = 0; k < iter_count; k++)
-//     {
-//         for (int i = 0; i < num_client; ++i) {
-//             for (int j = 0; j < num_qp; ++j) {
-//                 struct ibv_qp *qp = resc->qp[i * num_qp + j];
-
-//                 start_time = get_time(resc->ctx);
-//                 svr_post_send(resc, resc->qp[i * num_qp + j], LATENCY_WR_NUM, 0, op_mode, sizeof(TRANS_WRDMA_DATA));
-
-//                 polling = 1;
-//                 while (polling) {
-//                     int res = ibv_poll_cpl(qp->cq, desc, MAX_CPL_NUM);
-//                     for (int j  = 0; j < res; ++j) {
-//                         if (desc[j]->trans_type == ibv_type[op_mode]) {
-//                             polling = 0;
-//                             end_time = get_time(resc->ctx);
-//                             break;
-//                         }
-//                     }
-//                 }
-//                 con_time += (end_time - start_time);
-//                 RDMA_PRINT(Server, "latency_test consume_time %.2lf ns\n", ((end_time - start_time) / 1000.0));
-//             }
-//         }
-//     }
-
-//     return ((con_time * 1.0) / (num_qp * num_client * 1000.0));
-// }
 
 double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode, uint32_t iter_count) 
 {
@@ -496,8 +472,7 @@ int main (int argc, char **argv) {
     int grp1_weight;
     int grp2_weight;
 
-    // CPU 0 is for large message
-    if (cpu_id == 0)
+    if (judge_latency(cpu_id) == LAT_QP)
     {
         grp1_num_qp = 1;
         grp2_num_qp = 1;
@@ -540,7 +515,7 @@ int main (int argc, char **argv) {
     grp_resc[0] = grp1_resc;
     grp_resc[1] = grp2_resc;
 
-    if (cpu_id == 0)
+    if (judge_latency(cpu_id) == LAT_QP)
     {
         /* Start Latency test */
         latency = latency_test(grp1_resc, 1, op_mode, 1000);

@@ -360,16 +360,26 @@ void HanGuRnic::DescScheduler::wqeProc()
                 TxDescPtr desc = rNic->txdescRspFifo.front();
                 HANGU_PRINT(DescScheduler, "WQE splitting! qpn: 0x%x, fetch offset: %d, current desc len: %d, batch size: %d, descNum: %d, group granularity: %d\n", 
                     qpStatus->qpn, qpStatus->fetch_offset, desc->len, batchSize, descNum, groupTable[qpStatus->group_id]);
-                assert(qpStatus->fetch_offset < desc->len);
                 HANGU_PRINT(DescScheduler, "ready to split WQE! qpn: 0x%x, tail pointer: %d, head pointer: %d, fetch offset: 0x%x\n", 
                     qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr, qpStatus->fetch_offset);
                 assert(qpStatus->tail_ptr < qpStatus->head_ptr);
+                assert(qpStatus->fetch_offset < desc->len);
+
+                // if (batchSize - procSize < MAX_SUBWQE_SIZE)
+                // {
+
+                // }
+                // else
+                // {
+
+                // }
 
                 TxDescPtr subDesc = make_shared<TxDesc>(desc);
+
                 subDesc->opcode = desc->opcode;
-                // WARNING: SEND/RECV are currently not supported!
                 subDesc->lVaddr = desc->lVaddr + qpStatus->fetch_offset;
                 subDesc->rdmaType.rVaddr_l = desc->rdmaType.rVaddr_l + qpStatus->fetch_offset;
+
                 // set submessage length
                 if (desc->len - qpStatus->fetch_offset > batchSize - procSize)
                 {
@@ -385,18 +395,18 @@ void HanGuRnic::DescScheduler::wqeProc()
                 if (qpStatus->fetch_offset + subDesc->len >= desc->len)
                 {
                     // update tail pointer
-                    HANGU_PRINT(DescScheduler, "qpn: 0x%x, tail pointer to update: %d, head pointer: %d\n", qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr);
+                    // HANGU_PRINT(DescScheduler, "qpn: 0x%x, tail pointer to update: %d, head pointer: %d\n", qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr);
                     assert(qpStatus->tail_ptr < qpStatus->head_ptr);
                     qpStatus->tail_ptr++;
                     // if the original WQE is signaled, signal the sub WQE
                     if (desc->isSignaled())
                     {
                         subDesc->setCompleteSignal();
-                        HANGU_PRINT(DescScheduler, "Signal the sub desc! QPN: 0x%x, flag: 0x%x\n", qpStatus->qpn, subDesc->flags);
+                        // HANGU_PRINT(DescScheduler, "Signal the sub desc! QPN: 0x%x, flag: 0x%x\n", qpStatus->qpn, subDesc->flags);
                     }
                     else
                     {
-                        HANGU_PRINT(DescScheduler, "Do not signal the sub desc because WQE is unsignaled! QPN: 0x%x, flag: 0x%x\n", qpStatus->qpn, subDesc->flags);
+                        // HANGU_PRINT(DescScheduler, "Do not signal the sub desc because WQE is unsignaled! QPN: 0x%x, flag: 0x%x\n", qpStatus->qpn, subDesc->flags);
                     }
                     qpStatus->fetch_offset = 0;
                 }
@@ -409,12 +419,6 @@ void HanGuRnic::DescScheduler::wqeProc()
                 procSize += subDesc->len;
                 HANGU_PRINT(DescScheduler, "finish WQE split: type: %d, sub WQE length: %d, qpn: 0x%x, descNum: %d, sub WQE flag: 0x%x\n", 
                     qpStatus->type, subDesc->len, qpStatus->qpn, descNum, subDesc->flags);
-
-                // if this is the last sub WQE in this period, mark it as prefetch queue update
-                if (procSize >= batchSize || i + 1 >= descNum)
-                {
-                    subDesc->setQueUpdate();
-                }
 
                 lowPriorityDescQue.push(subDesc);
                 subDescNum++;

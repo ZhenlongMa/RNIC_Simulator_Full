@@ -67,7 +67,7 @@
 #define DESC_REQ_LIMIT 5
 #define DATA_REQ_LIMIT 6
 #define RGU_SAU_LIM 1
-#define BIGN 16384
+#define BIGN 8192
 #define WINDOW_CAP 20
 #define MAX_SUBWQE_SIZE 1024
 
@@ -268,25 +268,27 @@ struct TxDesc {
         return (this->flags & WR_FLAG_SIGNALED) != 0;
     }
 
+    // set that this WQE needs completion (32nd bit)
     void setCompleteSignal()
     {
         this->flags = this->flags | (1 << 31);
     }
 
+    // cancel the completion signal of this WQE
     void cancelCompleteSignal()
     {
         this->flags = this->flags & ~(1 << 31);
     }
 
-    bool isQueUpdate()
-    {
-        return (this->flags & (1 << 30));
-    }
+    // bool isQueUpdate()
+    // {
+    //     return (this->flags & (1 << 30));
+    // }
 
-    void setQueUpdate()
-    {
-        this->flags = this->flags | (1 << 30);
-    }
+    // void setQueUpdate()
+    // {
+    //     this->flags = this->flags | (1 << 30);
+    // }
 
     uint32_t len;
     uint32_t lkey;
