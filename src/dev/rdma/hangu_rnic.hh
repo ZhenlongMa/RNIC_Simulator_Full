@@ -321,20 +321,16 @@ class HanGuRnic : public RdmaNic {
             private:
                 HanGuRnic *rNic;
                 std::string _name;
-                uint32_t totalWeight;
                 void qpcRspProc();
                 void qpStatusProc();
-                // void qpStatusReqProc();
                 void wqePrefetchSchedule();
                 void wqePrefetch();
                 void wqeProc();
                 void rxUpdate();
-                // void commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue);
                 void launchWQE();
                 void createQpStatus();
                 uint16_t sqSize;
                 uint16_t rqSize;
-                // uint8_t onFlyDescReqNum;
                 std::queue<uint32_t> highPriorityQpnQue;
                 std::queue<uint32_t> lowPriorityQpnQue;
                 std::queue<uint32_t> leastPriorityQpnQue;
@@ -347,10 +343,8 @@ class HanGuRnic : public RdmaNic {
                 std::queue<DoorbellPtr> wqeProcToLaunchWqeQueH;
                 std::queue<DoorbellPtr> wqeProcToLaunchWqeQueL;
                 EventFunctionWrapper qpStatusRspEvent;
-                // EventFunctionWrapper rxUpdateEvent;
-                // EventFunctionWrapper qpStatusReqEvent;
                 EventFunctionWrapper wqePrefetchEvent;
-                EventFunctionWrapper getPrefetchQpnEvent;
+                EventFunctionWrapper wqePrefetchScheduleEvent;
                 EventFunctionWrapper launchWqeEvent;
             public:
                 DescScheduler(HanGuRnic *rNic, std::string name);

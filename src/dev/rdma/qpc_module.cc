@@ -1,11 +1,7 @@
-
 #include "dev/rdma/hangu_rnic.hh"
-
-
 #include <algorithm>
 #include <memory>
 #include <queue>
-
 #include "base/inet.hh"
 #include "base/trace.hh"
 #include "base/random.hh"
@@ -25,14 +21,12 @@ using namespace std;
 ///////////////////////////// HanGuRnic::QpcModule {begin}//////////////////////////////
 bool 
 HanGuRnic::QpcModule::postQpcReq(CxtReqRspPtr qpcReq) {
-
     assert( (qpcReq->type == CXT_WREQ_QP) || 
             (qpcReq->type == CXT_RREQ_QP) || 
             (qpcReq->type == CXT_RREQ_SQ) ||
             (qpcReq->type == CXT_CREQ_QP));
     assert( (qpcReq->chnl == CXT_CHNL_TX) || 
             (qpcReq->chnl == CXT_CHNL_RX));
-
     if (qpcReq->type == CXT_CREQ_QP) {
         ccuQpcWreqFifo.push(qpcReq);
     } else if (qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_SQ) {
@@ -44,11 +38,9 @@ HanGuRnic::QpcModule::postQpcReq(CxtReqRspPtr qpcReq) {
     } else {
         panic("[QpcModule.postQpcReq] invalid chnl %d or type %d", qpcReq->chnl, qpcReq->type);
     }
-
     if (!qpcReqProcEvent.scheduled()) { /* Schedule qpcReqProc() */
         rnic->schedule(qpcReqProcEvent, curTick() + rnic->clockPeriod());
     }
-
     return true;
 }
 
@@ -117,17 +109,13 @@ HanGuRnic::QpcModule::hitProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
 
 bool 
 HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
-
     HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc!\n");
-
     /* Lookup qpnHashMap to learn that if there's 
      * pending elem for this qpn in this channel. */
-    if (qpnHashMap.find(qpcReq->num) != qpnHashMap.end()) { /* related qpn is fond in qpnHashMap */
+    if (qpnHashMap.find(qpcReq->num) != qpnHashMap.end()) { /* related qpn is found in qpnHashMap, check if pending */
         qpnHashMap[qpcReq->num]->reqCnt += 1;
-
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: related qpn is found in qpnHashMap qpn %d idx %d\n", 
                 qpcReq->num, qpcReq->idx);
-
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnMap.size() %d get_size() %d\n", 
                 qpnHashMap.size(), pendStruct.get_size());
         /* save req to pending fifo */
@@ -135,34 +123,26 @@ HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
         pendStruct.push_elem(pElem);
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnMap.size() %d get_size() %d\n", 
                 qpnHashMap.size(), pendStruct.get_size());
-
         return true;
     }
-
     /* Lookup QPC in QPC Cache */
     if (qpcCache.lookupHit(qpcReq->num)) { /* cache hit, and return related rsp to related fifo */
-
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: cache hit, qpn %d\n", qpcReq->num);
-
         hitProc(chnlNum, qpcReq);
     } else { /* cache miss */
-
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: cache miss, qpn %d, rtnCnt %d\n", qpcReq->num, rtnCnt);
-
         /* save req to pending fifo */
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnMap.size() %d get_size() %d\n", 
                 qpnHashMap.size(), pendStruct.get_size());
-        PendingElemPtr pElem = make_shared<PendingElem>(qpcReq->idx, chnlNum, qpcReq, true); // new PendingElem(qpcReq->idx, chnlNum, qpcReq, true);
+        PendingElemPtr pElem = make_shared<PendingElem>(qpcReq->idx, chnlNum, qpcReq, true);
         pendStruct.push_elem(pElem);
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnMap.size() %d get_size() %d\n", 
                 qpnHashMap.size(), pendStruct.get_size());
-
         /* write an entry to qpnHashMap */
         QpnInfoPtr qpnInfo = make_shared<QpnInfo>(qpcReq->num); // new QpnInfo(qpcReq->num);
         qpnHashMap.emplace(qpcReq->num, qpnInfo);
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnHashMap.size %d rtnCnt %d\n", qpnHashMap.size(), rtnCnt);
     }
-
     HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: out!\n");
     return true;
 }
@@ -184,15 +164,12 @@ HanGuRnic::QpcModule::qpcCreate() {
 
 void 
 HanGuRnic::QpcModule::qpcAccess() {
-
     uint8_t CHNL_NUM = 3;
     bool isEmpty[CHNL_NUM];
     isEmpty[0] = txQpAddrRreqFifo.empty();
     isEmpty[1] = txQpcRreqFifo.empty();
     isEmpty[2] = rxQpcRreqFifo.empty();
-
     HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.qpcAccess: empty[0] %d empty[1] %d empty[2] %d\n", isEmpty[0], isEmpty[1], isEmpty[2]);
-
     CxtReqRspPtr qpcReq;
     for (uint8_t cnt = 0; cnt < CHNL_NUM; ++cnt) {
         if (isEmpty[this->chnlIdx] == false) {
@@ -201,36 +178,28 @@ HanGuRnic::QpcModule::qpcAccess() {
                 qpcReq = txQpAddrRreqFifo.front();
                 txQpAddrRreqFifo.pop();
                 assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_SQ);
-                
                 break;
               case 1:
                 qpcReq = txQpcRreqFifo.front();
                 txQpcRreqFifo.pop();
                 assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_QP);
-                
                 break;
               case 2:
                 qpcReq = rxQpcRreqFifo.front();
                 rxQpcRreqFifo.pop();
                 assert(qpcReq->chnl == CXT_CHNL_RX && qpcReq->type == CXT_RREQ_QP);
-                
                 break;
               default:
                 panic("[QpcModule.qpcReqProc.qpcAccess] chnlIdx error! %d", this->chnlIdx);
-                
                 break;
             }
-
             HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.qpcAccess: qpn: %d, chnlIdx %d, idx %d rtnCnt %d\n", 
                     qpcReq->num, this->chnlIdx, qpcReq->idx, rtnCnt);
             assert((qpcReq->num & QPN_MASK) <= QPN_NUM);
-
             readProc(this->chnlIdx, qpcReq);
-
             /* Point to next chnl */
             ++this->chnlIdx;
             this->chnlIdx = this->chnlIdx % CHNL_NUM;
-
             HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.qpcAccess: out!\n");
             return;
         } else {
@@ -303,45 +272,33 @@ HanGuRnic::QpcModule::loadMem(CxtReqRspPtr qpcReq) {
 
 uint8_t 
 HanGuRnic::QpcModule::checkNoDmaElem(PendingElemPtr pElem, uint8_t chnlNum, uint32_t qpn) {
-
     HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc.checkNoDmaElem!\n");
     QpnInfoPtr qInfo = qpnHashMap[qpn];
     assert(qInfo->reqCnt);
-
     /* check if qpn attached to this elem is in cache */
     if (qpcCache.lookupHit(qpn)) { /* cache hit */
-
         HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc.checkNoDmaElem: qpcCache.lookupHit. qInfo->reqCnt %d\n", qInfo->reqCnt);
-
         /* update qpnHashMap, and delete invalid elem in qpnMap */
         qInfo->reqCnt -= 1;
         if (qInfo->reqCnt == 0) {
             --rtnCnt;
             qpnHashMap.erase(qpn);
         }
-
         /* return rsp to qpcRspFifo */
         hitProc(chnlNum, pElem->reqPkt);
-
         /* update pendingFifo */
         pendStruct.succ_elem_check();
-
         return 0;
     } else if (qInfo->isReturned) { /* cache miss && accordingly qpc is returned */
-
         HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc.checkNoDmaElem: cache miss && accordingly qpc is returned\n");
-
         /* delete isReturned && --rtnCnt */
         qInfo->reqRePosted();
         --rtnCnt;
-        
         /* repost this request to pendingFifo */
         pElem->has_dma = 1; /* This request needs to post dma read request this time */
         pendStruct.push_elem_check(pElem);
-
         return 0;
     }
-
     return 1;
 }
 
@@ -352,69 +309,54 @@ HanGuRnic::QpcModule::isRspValidRun() {
 
 void 
 HanGuRnic::QpcModule::qpcRspProc() {
-
     HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc! rtnCnt %d qpnMap.size %d get_size() %d\n", 
             rtnCnt, qpnHashMap.size(), pendStruct.get_size());
     assert(rtnCnt <= qpnHashMap.size());
     assert(rtnCnt <= pendStruct.get_size());
-    
     for (auto &item : qpnHashMap) {
         uint32_t   key = item.first;
         QpnInfoPtr val = item.second;
         HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc: key %d qpn %d reqCnt %d\n\n", 
                 key, val->qpn, val->reqCnt);
     }
-
     if (rnic->qpcDmaRdCplFifo.size()) { /* processing dmaRsp pkt */
-
         HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc: processing dmaRsp pkt!\n");
-
         PendingElemPtr pElem = pendStruct.front_elem();
         uint32_t qpn = pElem->reqPkt->num;
         uint8_t  chnlNum = pElem->chnl;
         QpnInfoPtr qInfo = qpnHashMap[qpn];
-
         if (pElem->has_dma) {
             /* pop the dmaPkt */
             rnic->qpcDmaRdCplFifo.pop();
-
             /* update isReturned && rtnCnt */
             qInfo->firstReqReturned();
             ++rtnCnt;
             qInfo->reqCnt -= 1;
-
             /* write loaded qpc entry to qpc cache */
             writeOne(pElem->reqPkt);
-
             /* return rsp to qpcRspFifo */
             hitProc(chnlNum, pElem->reqPkt);
-
             HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc: rtnCnt %d get_size() %d, qpnHashMap.size() %d, qInfo->reqCnt %d\n", 
                     rtnCnt, pendStruct.get_size(), qpnHashMap.size(), qInfo->reqCnt);
-
             /* delete invalid elem in qpnHashMap */
             if (qInfo->reqCnt == 0) {
                 --rtnCnt;
                 qpnHashMap.erase(qpn);
             }
-
             /* remove elem in pendingFifo */
             PendingElemPtr tmp = pendStruct.pop_elem();
         } else {
             /* remove the elem in pendingFifo. No matter if we process it, it cannot be placed 
              * to the head of the pendingFifo again. */
             PendingElemPtr tmp = pendStruct.pop_elem();
-
             uint8_t rtn = checkNoDmaElem(pElem, chnlNum, qpn);
             if (rtn != 0) {
                 panic("[QpcModule.qpcRspProc] Error!");
             }
         }
     } else if (isRspValidRun()) {
-
         if (pendStruct.get_pending_size()) { /* there's elem in pending fifo */
             HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc: processing check pendingElem!\n");
-
             PendingElemPtr cpElem = pendStruct.get_elem_check();
             uint32_t qpn = cpElem->reqPkt->num;
             uint8_t chnlNum = cpElem->chnl;
@@ -431,7 +373,6 @@ HanGuRnic::QpcModule::qpcRspProc() {
             HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc: pendingfifo has not been parpared for processing, maybe next cycle!\n");
         }
     }
-
     /* if there's under checked elem in pending fifo, 
      * schedule myself again */
     if (isRspValidRun()) {
@@ -439,7 +380,6 @@ HanGuRnic::QpcModule::qpcRspProc() {
             rnic->schedule(qpcRspProcEvent, curTick() + rnic->clockPeriod());
         }
     }
-
     HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc: out! rtnCnt %d qpnMap.size %d get_size() %d\n", 
             rtnCnt, qpnHashMap.size(), pendStruct.get_size());
     assert(!(rtnCnt && (pendStruct.get_size() == 0)));
@@ -457,17 +397,13 @@ HanGuRnic::QpcModule::isReqValidRun() {
 
 void
 HanGuRnic::QpcModule::qpcReqProc() {
-
     HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc!\n");
-
     if (ccuQpcWreqFifo.size()) {
         qpcCreate(); /* execute qpc entry create */
     } else {
         qpcAccess(); /* execute qpc entry read || write */
     }
-
     HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc: out!\n");
-
     /* Schedule myself again if there still has elem in fifo */
     if (isReqValidRun()) {
         if (!qpcReqProcEvent.scheduled()) { /* schedule myself */

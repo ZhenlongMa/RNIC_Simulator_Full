@@ -12,10 +12,9 @@ using namespace std;
 HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name):
     rNic(rNic),
     _name(name),
-    totalWeight(0),
     qpStatusRspEvent([this]{qpStatusProc();}, name),
     wqePrefetchEvent([this]{wqePrefetch();}, name),
-    getPrefetchQpnEvent([this]{wqePrefetchSchedule();}, name),
+    wqePrefetchScheduleEvent([this]{wqePrefetchSchedule();}, name),
     launchWqeEvent([this]{launchWQE();}, name),
     updateEvent([this]{rxUpdate();}, name),
     createQpStatusEvent([this]{createQpStatus();}, name),
@@ -42,9 +41,7 @@ void HanGuRnic::DescScheduler::qpcRspProc()
     rNic->df2ccuIdxFifo.push(qpc->idx);
     rNic->doorbellVector[qpc->idx] = nullptr;
     assert(db->qpn == qpc->txQpcRsp->srcQpn);
-
     sqSize = pow(2, qpc->txQpcRsp->sqSizeLog);
-
     QPStatusPtr qpStatus;
     if (qpStatusTable.find(db->qpn) == qpStatusTable.end())
     {
@@ -113,9 +110,9 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     qpStatus->head_ptr += db->num;
 
     // If this QP has no unfinished WQE, schedule WQE prefetch event
-    if (!getPrefetchQpnEvent.scheduled() && schedule)
+    if (!wqePrefetchEvent.scheduled() && schedule)
     {
-        rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+        rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
     }
 
     // update QP status
@@ -191,9 +188,9 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
     }
 
     if ((highPriorityQpnQue.size() || lowPriorityQpnQue.size() || leastPriorityQpnQue.size()) 
-        && !getPrefetchQpnEvent.scheduled())
+        && !wqePrefetchScheduleEvent.scheduled())
     {
-        rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+        rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
     }
 }
 
@@ -204,14 +201,12 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
 void HanGuRnic::DescScheduler::wqePrefetch()
 {
     // HANGU_PRINT(DescScheduler, "wqePrefetch in!\n");
-
     if (wqeFetchInfoQue.size() < DESC_REQ_LIMIT)
     {
         assert(wqePrefetchQpStatusRReqQue.size());
         uint32_t qpn = wqePrefetchQpStatusRReqQue.front();
         wqePrefetchQpStatusRReqQue.pop();
         QPStatusPtr qpStatus = qpStatusTable[qpn];
-
         if (qpStatus->fetch_lock == 0)
         {
             uint32_t descNum;
@@ -223,7 +218,6 @@ void HanGuRnic::DescScheduler::wqePrefetch()
             {
                 HANGU_PRINT(DescScheduler, "wqe prefetch! qpn: 0x%x, curtick: %ld\n", qpStatus->qpn, curTick());
             }
-            
             if (qpStatus->head_ptr - qpStatus->tail_ptr > MAX_PREFETCH_NUM)
             {
                 descNum = MAX_PREFETCH_NUM;
@@ -232,7 +226,6 @@ void HanGuRnic::DescScheduler::wqePrefetch()
             {
                 descNum = qpStatus->head_ptr - qpStatus->tail_ptr;
             }
-
             // In case of going back in circular queue
             uint32_t tailOffset = qpStatus->tail_ptr % (sqSize / sizeof(TxDesc));
             if (descNum + tailOffset > sqSize / sizeof(TxDesc))
@@ -242,12 +235,10 @@ void HanGuRnic::DescScheduler::wqePrefetch()
                 descNum = sqSize / sizeof(TxDesc) - tailOffset;
                 assert(tailOffset + descNum <= sqSize / sizeof(TxDesc));
             }
-
             if (descNum != 0)
             {
                 MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
                     qpStatus->key, descNum * sizeof(TxDesc), qpStatus->tail_ptr * sizeof(TxDesc) % sqSize);
-
                 descReq->txDescRsp = new TxDesc[descNum];
                 rNic->descReqFifo.push(descReq);
                 std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
@@ -269,7 +260,6 @@ void HanGuRnic::DescScheduler::wqePrefetch()
             HANGU_PRINT(DescScheduler, "Fetch locked! QPN: %d\n", qpStatus->qpn);
         }
     }
-
     if (wqePrefetchQpStatusRReqQue.size() && !wqePrefetchEvent.scheduled())
     {
         rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
