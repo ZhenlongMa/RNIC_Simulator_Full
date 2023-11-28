@@ -19,14 +19,14 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->exp_psn = 0;
         qp->dsubnet.dlid = (i % resc->num_rem) + resc->ctx->lid + 1;
         qp->group_id = resc->qos_group[0]->id;
-        if (judge_latency(cpu_id) == LAT_QP)
-        {
-            qp->indicator = LAT_QP;
-        }
-        else
-        {
-            qp->indicator = BW_QP;
-        }
+        // if (judge_latency(cpu_id) == LAT_QP)
+        // {
+        //     qp->indicator = LAT_QP;
+        // }
+        // else
+        // {
+        //     qp->indicator = BW_QP;
+        // }
         // if (cpu_id == 0)
         // {
         //     qp->weight = 8;
@@ -47,6 +47,7 @@ int svr_update_qps(struct rdma_resc *resc) {
 
 int judge_latency(uint8_t cpu_id)
 {
+    return BW_QP;
     switch(cpu_id)
     {
         case 0:
@@ -173,10 +174,8 @@ double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode, uint32_
     struct cpl_desc **desc = resc->desc;
     uint8_t polling;
     uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
-    uint64_t* latency_vec;
     uint64_t test_start_time;
     uint64_t test_end_time;
-    latency_vec = (uint64_t*)malloc(sizeof(uint64_t) * iter_count);
 
     struct ibv_qp *qp = resc->qp[0]; // only use one QP
     generate_wqe(resc, op_mode, sizeof(TRANS_WRDMA_DATA), 0, 1);
@@ -188,8 +187,6 @@ double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode, uint32_
     while(test_end_time - test_start_time < TEST_TIME * MS)
     {
         k++;
-    // for (int k = 0; k < iter_count; k++)
-    // {
         RDMA_PRINT(Server, "latency_test iteration %d\n", k);
         for (int i = 0; i < num_client; ++i) 
         {
@@ -278,21 +275,18 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     int wr_num;
     uint32_t msg_size;
 
-    // if (cpu_id == 0)
-    // {
-    //     wr_num = BW_WR_NUM;
-    //     msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
-    //     RDMA_PRINT(Server, "large message! CPU: %d, write num: %d, message size: %d\n", cpu_id, wr_num, msg_size);
-    // }
-    // else 
-    // {
-    //     wr_num = THPT_WR_NUM;
-    //     msg_size = sizeof(TRANS_WRDMA_DATA);
-    //     RDMA_PRINT(Server, "small message! CPU: %d, write num: %d, message size: %d\n", cpu_id, wr_num, msg_size);
-    // }
-    wr_num = BW_WR_NUM;
-    msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
-    RDMA_PRINT(Server, "set wr num and msg size! cpu id: %d, wr num: %d, msg size: %d\n", cpu_id, wr_num, msg_size);
+    if (cpu_id == 0)
+    {
+        wr_num = BW_WR_NUM;
+        msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
+        RDMA_PRINT(Server, "large message! CPU: %d, write num: %d, message size: %d\n", cpu_id, wr_num, msg_size);
+    }
+    else 
+    {
+        wr_num = THPT_WR_NUM;
+        msg_size = sizeof(TRANS_WRDMA_DATA);
+        RDMA_PRINT(Server, "small message! CPU: %d, write num: %d, message size: %d\n", cpu_id, wr_num, msg_size);
+    }
     
     // generate WQE
     for (int i = 0; i < qos_group_num; i++)
@@ -387,8 +381,6 @@ struct rdma_resc *set_group_resource(struct ibv_context *ctx, int num_mr, int nu
 
     RDMA_PRINT(Server, "Server finishes connection!\n");
 
-    // set_group_granularity(resc);
-
     /* If this is RDMA WRITE, write data to mr, preparing for server writting */
     if (op_mode == OPMODE_RDMA_WRITE) {
         offset = 0;
@@ -472,24 +464,24 @@ int main (int argc, char **argv) {
     int grp1_weight;
     int grp2_weight;
 
-    if (judge_latency(cpu_id) == LAT_QP)
-    {
-        grp1_num_qp = 1;
-        grp2_num_qp = 1;
-        grp1_weight = 15;
-        grp2_weight = 15;
-    }
-    else
-    {
-        grp1_num_qp = 1;
-        grp2_num_qp = 1;
-        grp1_weight = 15;
-        grp2_weight = 15;
-    }
-    // grp1_num_qp = 2;
-    // grp2_num_qp = 1;
-    // grp1_weight = 15;
-    // grp2_weight = 20;
+    // if (judge_latency(cpu_id) == LAT_QP)
+    // {
+    //     grp1_num_qp = 1;
+    //     grp2_num_qp = 1;
+    //     grp1_weight = 15;
+    //     grp2_weight = 15;
+    // }
+    // else
+    // {
+    //     grp1_num_qp = 1;
+    //     grp2_num_qp = 1;
+    //     grp1_weight = 15;
+    //     grp2_weight = 15;
+    // }
+    grp1_num_qp = 1;
+    grp2_num_qp = 1;
+    grp1_weight = 15;
+    grp2_weight = 20;
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
 
     /* device initialization */
@@ -499,7 +491,6 @@ int main (int argc, char **argv) {
     RDMA_PRINT(Server, "group1 resource created!\n");
     struct rdma_resc *grp2_resc = set_group_resource(ib_context, num_mr, num_cq, grp2_num_qp, svr_lid, num_client, grp2_weight);
     RDMA_PRINT(Server, "group2 resource created!\n");
-    // update_all_group_granularity(ib_context);
 
     /* sync to make sure that we could get start */
     rdma_recv_sync(grp1_resc);
@@ -543,8 +534,6 @@ int main (int argc, char **argv) {
 
     /* close the fd */
     RDMA_PRINT(Server, "fd : %d\n", ((struct hghca_context*)ib_context->dvr)->fd);
-    // close(((struct hghca_context*)resc->ctx->dvr)->fd);
     close(((struct hghca_context*)ib_context->dvr)->fd);
-    
     return 0;
 }

@@ -191,11 +191,6 @@ int main (int argc, char **argv) {
     clt_update_info(resc2, svr_lid);
     RDMA_PRINT(Client, "clt_connect_qps 2 end\n");
 
-    /* If this is RDMA READ, write data to mr, preparing for server reading */
-    // if (op_mode == OPMODE_RDMA_READ) {
-    //     clt_fill_mr(resc->mr[0], 0);
-    // }
-
     /* sync to make sure that we could get start */
     rdma_send_sync(resc1);
     RDMA_PRINT(Client, "ready for server send RDMA write\n");
@@ -203,18 +198,9 @@ int main (int argc, char **argv) {
     /* Wait for Completion of rdma write processing */
     rdma_send_sync(resc1);
 
-    // if (op_mode == OPMODE_RDMA_WRITE) {
-    //     uint32_t offset = 0; // (4096 / num_qp);
-    //     // for (int i = 0; i < num_qp; ++i) {
-    //     //     RDMA_PRINT(Client, "QP[%d], RDMA Write data is %s\n", i, (char *)(resc->mr[0]->addr + offset * i));
-    //     // }
-    //     RDMA_PRINT(Client, "QP, RDMA Write data is %s\n", (char *)(resc1->mr[0]->addr + offset));
-    // }
-
     /* close the fd */
     RDMA_PRINT(Client, "fd : %d\n", ((struct hghca_context*)resc1->ctx->dvr)->fd);
     close(((struct hghca_context*)resc1->ctx->dvr)->fd);
     
     return 0;
-    
 }

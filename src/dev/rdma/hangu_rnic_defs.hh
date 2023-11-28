@@ -767,19 +767,7 @@ struct GroupInfo
 {
     uint8_t groupID;
     uint16_t granularity;
-    // GroupInfo(uint8_t groupID, uint16_t granularity)
-    // {
-    //     this->groupID = groupID;
-    //     this->granularity = granularity;
-    // }
-    // GroupInfo()
-    // {}
 };
-
-// struct AllGroupInfo
-// {
-//     uint16_t granularity[MAX_GROUP_NUM];
-// };
 
 
 } // namespace HanGuRnicDef
