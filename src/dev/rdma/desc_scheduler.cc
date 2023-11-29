@@ -110,9 +110,9 @@ void HanGuRnic::DescScheduler::qpStatusProc()
     qpStatus->head_ptr += db->num;
 
     // If this QP has no unfinished WQE, schedule WQE prefetch event
-    if (!wqePrefetchEvent.scheduled() && schedule)
+    if (!wqePrefetchScheduleEvent.scheduled() && schedule)
     {
-        rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
+        rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
     }
 
     // update QP status
@@ -421,9 +421,9 @@ void HanGuRnic::DescScheduler::wqeProc()
             qpStatus->in_que++;
             HANGU_PRINT(DescScheduler, "push back qpn into low qpn queue, qpn: 0x%x, in_que: %d\n", qpStatus->qpn, qpStatus->in_que);
             assert(qpStatus->in_que == 1);
-            if (!getPrefetchQpnEvent.scheduled())
+            if (!wqePrefetchEvent.scheduled())
             {
-                rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+                rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
             }
         }
         else
@@ -442,9 +442,9 @@ void HanGuRnic::DescScheduler::wqeProc()
     {
         lowPriorityQpnQue.push(qpStatus->qpn);
         HANGU_PRINT(DescScheduler, "UD or UC QP prefetch: type: %d\n", qpStatus->type);
-        if (!getPrefetchQpnEvent.scheduled())
+        if (!wqePrefetchScheduleEvent.scheduled())
         {
-            rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+            rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
         }
     }
 
@@ -572,9 +572,9 @@ void HanGuRnic::DescScheduler::rxUpdate()
         }
     }
 
-    if (!getPrefetchQpnEvent.scheduled() && schedule)
+    if (!wqePrefetchEvent.scheduled() && schedule)
     {
-        rNic->schedule(getPrefetchQpnEvent, curTick() + rNic->clockPeriod());
+        rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
     }
     
     if (rNic->updateQue.size() && !updateEvent.scheduled())

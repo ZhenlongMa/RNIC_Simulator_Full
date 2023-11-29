@@ -29,63 +29,63 @@ HanGuRnic::RdmaEngine::txDescLenSel (uint8_t num) {
     return (uint32_t)num;
 }
 
-// /**
-//  * @brief Descriptor fetching Unit
-//  * Post descriptor read request and recv relatived QPC information
-//  * Pass useful information to DDU.
-//  */
-// void
-// HanGuRnic::RdmaEngine::dfuProcessing () {
+/**
+ * @brief Descriptor fetching Unit
+ * Post descriptor read request and recv relatived QPC information
+ * Pass useful information to DDU.
+ */
+void
+HanGuRnic::RdmaEngine::dfuProcessing () {
 
-//     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing!\n");
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing!\n");
 
-//     /* read qpc sq addr */
-//     assert(rnic->qpcModule.txQpAddrRspFifo.size());
-//     CxtReqRspPtr qpcRsp = rnic->qpcModule.txQpAddrRspFifo.front();
-//     uint8_t idx = qpcRsp->idx;
-//     rnic->qpcModule.txQpAddrRspFifo.pop();
+    /* read qpc sq addr */
+    assert(rnic->qpcModule.txQpAddrRspFifo.size());
+    CxtReqRspPtr qpcRsp = rnic->qpcModule.txQpAddrRspFifo.front();
+    uint8_t idx = qpcRsp->idx;
+    rnic->qpcModule.txQpAddrRspFifo.pop();
 
-//     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing: idx %d\n", idx);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing: idx %d\n", idx);
 
-//     /* Get doorbell rrelated to the qpc
-//      * If the index fifo is empty, reschedule ccu.dfu event */
-//     assert(rnic->doorbellVector[idx] != nullptr);
-//     DoorbellPtr dbell = rnic->doorbellVector[idx];
-//     rnic->doorbellVector[idx] = nullptr;
-//     rnic->df2ccuIdxFifo.push(idx);
-//     if ((rnic->df2ccuIdxFifo.size() == 1) && rnic->pio2ccuDbFifo.size()) { 
-//         if (!rnic->doorbellProcEvent.scheduled()) {
-//             rnic->schedule(rnic->doorbellProcEvent, curTick() + rnic->clockPeriod());
-//         }
-//     }
+    /* Get doorbell rrelated to the qpc
+     * If the index fifo is empty, reschedule ccu.dfu event */
+    assert(rnic->doorbellVector[idx] != nullptr);
+    DoorbellPtr dbell = rnic->doorbellVector[idx];
+    rnic->doorbellVector[idx] = nullptr;
+    rnic->df2ccuIdxFifo.push(idx);
+    if ((rnic->df2ccuIdxFifo.size() == 1) && rnic->pio2ccuDbFifo.size()) { 
+        if (!rnic->doorbellProcEvent.scheduled()) {
+            rnic->schedule(rnic->doorbellProcEvent, curTick() + rnic->clockPeriod());
+        }
+    }
 
-//     /* Post doorbell to DDU */
-//     // df2ddFifo.push(dbell);
+    /* Post doorbell to DDU */
+    // df2ddFifo.push(dbell);
 
-//     assert(qpcRsp->txQpcRsp->srcQpn == dbell->qpn);
-//     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing:"
-//             " Post descriptor to MR Module! sndBaselkey: %d, qpn %d, num %d, opcode %d, dbell->offset %d\n", 
-//             qpcRsp->txQpcRsp->sndWqeBaseLkey, dbell->qpn, dbell->num, dbell->opcode, dbell->offset);
+    assert(qpcRsp->txQpcRsp->srcQpn == dbell->qpn);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing:"
+            " Post descriptor to MR Module! sndBaselkey: %d, qpn %d, num %d, opcode %d, dbell->offset %d\n", 
+            qpcRsp->txQpcRsp->sndWqeBaseLkey, dbell->qpn, dbell->num, dbell->opcode, dbell->offset);
 
-//     /* Post Descriptor read request to MR Module */
-//     MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-//             qpcRsp->txQpcRsp->sndWqeBaseLkey, 
-//             txDescLenSel(dbell->num) << 5, dbell->offset);
-//     descReq->txDescRsp = new TxDesc[dbell->num];
-//     rnic->descReqFifo.push(descReq);
-//     if (!rnic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
-//         rnic->schedule(rnic->mrRescModule.transReqEvent, curTick() + rnic->clockPeriod());
-//     }
+    /* Post Descriptor read request to MR Module */
+    MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
+            qpcRsp->txQpcRsp->sndWqeBaseLkey, 
+            txDescLenSel(dbell->num) << 5, dbell->offset);
+    descReq->txDescRsp = new TxDesc[dbell->num];
+    rnic->descReqFifo.push(descReq);
+    if (!rnic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
+        rnic->schedule(rnic->mrRescModule.transReqEvent, curTick() + rnic->clockPeriod());
+    }
     
-//     /* If doorbell fifo & addr fifo has event, schedule myself again. */
-//     if (rnic->qpcModule.txQpAddrRspFifo.size()) {
-//         if (!dfuEvent.scheduled()) { /* Schedule DfuProcessing */
-//             rnic->schedule(dfuEvent, curTick() + rnic->clockPeriod());
-//         }
-//     }
+    /* If doorbell fifo & addr fifo has event, schedule myself again. */
+    if (rnic->qpcModule.txQpAddrRspFifo.size()) {
+        if (!dfuEvent.scheduled()) { /* Schedule DfuProcessing */
+            rnic->schedule(dfuEvent, curTick() + rnic->clockPeriod());
+        }
+    }
 
-//     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing: out!\n");
-// }
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing: out!\n");
+}
 
 /**
  * @note Called by dduEvent, I am scheduled by MrRescModule.dmaRrspProcessing
