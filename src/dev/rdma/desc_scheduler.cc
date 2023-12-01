@@ -134,22 +134,23 @@ void HanGuRnic::DescScheduler::qpStatusProc()
 */
 void HanGuRnic::DescScheduler::wqePrefetchSchedule()
 {
-    if (wqePrefetchQpStatusRReqQue.size() < DESC_REQ_LIMIT)
+    HANGU_PRINT(DescScheduler, "into wqePrefetchSchedule! wqePrefetchQpStatusRReqQue size: %d\n", wqePrefetchQpStatusRReqQue.size());
+    assert(highPriorityQpnQue.size() || lowPriorityQpnQue.size());
+    if (wqePrefetchQpStatusRReqQue.size() < DESC_REQ_LIMIT || 1)
     {
-        bool allowNewWQE;
-        bool allowNewHWQE;
-        bool allowNewLWQE;
-        assert(highPriorityQpnQue.size() || lowPriorityQpnQue.size());
-        allowNewHWQE = highPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
-        allowNewLWQE = lowPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
-        allowNewWQE = (allowNewHWQE && highPriorityQpnQue.size()) || (allowNewLWQE && (lowPriorityQpnQue.size()));
+        // bool allowNewWQE;
+        // bool allowNewHWQE;
+        // bool allowNewLWQE;
+        // allowNewHWQE = highPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
+        // allowNewLWQE = lowPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
+        // allowNewWQE = (allowNewHWQE && highPriorityQpnQue.size()) || (allowNewLWQE && (lowPriorityQpnQue.size()));
 
-        if (!allowNewWQE)
-        {
-            HANGU_PRINT(DescScheduler, "New WQE not allowed! lowPriorityDescQue size: %d, lowPriorityQpnQue size: %d\n", 
-                lowPriorityDescQue.size(), lowPriorityQpnQue.size());
-            return;
-        }
+        // if (!allowNewWQE)
+        // {
+        //     HANGU_PRINT(DescScheduler, "New WQE not allowed! lowPriorityDescQue size: %d, lowPriorityQpnQue size: %d\n", 
+        //         lowPriorityDescQue.size(), lowPriorityQpnQue.size());
+        //     return;
+        // }
 
         if (highPriorityQpnQue.size() > 0)
         {
@@ -200,8 +201,8 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
 */
 void HanGuRnic::DescScheduler::wqePrefetch()
 {
-    // HANGU_PRINT(DescScheduler, "wqePrefetch in!\n");
-    if (wqeFetchInfoQue.size() < DESC_REQ_LIMIT)
+    HANGU_PRINT(DescScheduler, "wqePrefetch in! wqeFetchInfoQue size: %d\n", wqeFetchInfoQue.size());
+    if (wqeFetchInfoQue.size() < DESC_REQ_LIMIT || 1) // limit on-fly WQE request number
     {
         assert(wqePrefetchQpStatusRReqQue.size());
         uint32_t qpn = wqePrefetchQpStatusRReqQue.front();
@@ -272,7 +273,8 @@ void HanGuRnic::DescScheduler::wqePrefetch()
 */
 void HanGuRnic::DescScheduler::wqeProc()
 {
-    // HANGU_PRINT(DescScheduler, "wqeProc in!\n");
+    HANGU_PRINT(DescScheduler, "wqeProc in! wqeFetchInfoQue size: %d, wqeProcToLaunchWqeQueH size: %d, wqeProcToLaunchWqeQueL size: %d\n", 
+        wqeFetchInfoQue.size(), wqeProcToLaunchWqeQueH.size(), wqeProcToLaunchWqeQueL.size());
     assert(rNic->txdescRspFifo.size());
     uint32_t descNum = wqeFetchInfoQue.front().first;
     QPStatusPtr qpStatus = wqeFetchInfoQue.front().second;
@@ -421,9 +423,9 @@ void HanGuRnic::DescScheduler::wqeProc()
             qpStatus->in_que++;
             HANGU_PRINT(DescScheduler, "push back qpn into low qpn queue, qpn: 0x%x, in_que: %d\n", qpStatus->qpn, qpStatus->in_que);
             assert(qpStatus->in_que == 1);
-            if (!wqePrefetchEvent.scheduled())
+            if (!wqePrefetchScheduleEvent.scheduled())
             {
-                rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
+                rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
             }
         }
         else
@@ -456,12 +458,13 @@ void HanGuRnic::DescScheduler::wqeProc()
     if (qpStatus->type == LAT_QP)
     {
         wqeProcToLaunchWqeQueH.push(doorbell);
+        HANGU_PRINT(DescScheduler, "pseudo doorbell into Hqueue to launchWQE, QPN: 0x%x, num: %d\n", qpStatus->qpn, subDescNum);
     }
     else
     {
         wqeProcToLaunchWqeQueL.push(doorbell);
+        HANGU_PRINT(DescScheduler, "pseudo doorbell into Lqueue to launchWQE, QPN: 0x%x, num: %d\n", qpStatus->qpn, subDescNum);
     }
-    HANGU_PRINT(DescScheduler, "pseudo doorbell pushed into queue to launchWQE, QPN: 0x%x, num: %d\n", qpStatus->qpn, subDescNum);
     
     if (!launchWqeEvent.scheduled())
     {
@@ -478,16 +481,17 @@ void HanGuRnic::DescScheduler::wqeProc()
 */
 void HanGuRnic::DescScheduler::launchWQE()
 {
-    if (rNic->txDescLaunchQue.size() < DATA_REQ_LIMIT)
+    HANGU_PRINT(DescScheduler, "into launchWQE! txDescLaunchQue size: %d\n", rNic->txDescLaunchQue.size());
+    if (rNic->txDescLaunchQue.size() < DATA_REQ_LIMIT || 1)
     {
         DoorbellPtr doorbell;
         if (wqeProcToLaunchWqeQueH.size() > 0)
         {
             // get pseudo doorbell
             doorbell = wqeProcToLaunchWqeQueH.front();
+            wqeProcToLaunchWqeQueH.pop();
             HANGU_PRINT(DescScheduler, "high priority pseudo doorbell get by launchWQE, QPN: 0x%x, num: %d, type: %d, desc launch queue size: %d\n", 
                 doorbell->qpn, doorbell->num, doorbell->opcode, rNic->txDescLaunchQue.size());
-            wqeProcToLaunchWqeQueH.pop();
             assert(doorbell->num != 0);
             assert(highPriorityDescQue.size() >= doorbell->num);
             assert(doorbell->opcode == LAT_QP);
@@ -501,9 +505,9 @@ void HanGuRnic::DescScheduler::launchWQE()
         {
             // get pseudo doorbell
             doorbell = wqeProcToLaunchWqeQueL.front();
-            HANGU_PRINT(DescScheduler, "low priority pseudo doorbell get by launchWQE, QPN: 0x%x, num: %d, type: %d, desc launch queue size: %d\n", 
-                doorbell->qpn, doorbell->num, doorbell->opcode, rNic->txDescLaunchQue.size());
             wqeProcToLaunchWqeQueL.pop();
+            HANGU_PRINT(DescScheduler, "launchWQE gets low priority pseudo doorbell, QPN: 0x%x, num: %d, type: %d, wqeProcToLaunchWqeQueL size: %d, desc launch queue size: %d\n", 
+                doorbell->qpn, doorbell->num, doorbell->opcode, wqeProcToLaunchWqeQueL.size(), rNic->txDescLaunchQue.size());
             assert(doorbell->num != 0);
             assert(lowPriorityDescQue.size() >= doorbell->num);
             assert(doorbell->opcode == BW_QP || doorbell->opcode == UC_QP || doorbell->opcode == UD_QP);
@@ -523,6 +527,10 @@ void HanGuRnic::DescScheduler::launchWQE()
         {
             rNic->schedule(rNic->rdmaEngine.dduEvent, curTick() + rNic->clockPeriod());
         }
+    }
+    else
+    {
+        HANGU_PRINT(DescScheduler, "txDescLaunchQue is full: %d\n", rNic->txDescLaunchQue.size());
     }
 
     if (!launchWqeEvent.scheduled() && (wqeProcToLaunchWqeQueH.size() || wqeProcToLaunchWqeQueL.size()))

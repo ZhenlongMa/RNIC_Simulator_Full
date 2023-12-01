@@ -104,7 +104,7 @@ HanGuRnic::RdmaEngine::dduProcessing () {
     // HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing!\n");
 
     // make sure that on fly data request number does not exceed DATA_REQ_LIMIT
-    if (std::count(dd2dpVector.begin(), dd2dpVector.end(), nullptr) > dd2dpVector.size() - DATA_REQ_LIMIT)
+    if ((std::count(dd2dpVector.begin(), dd2dpVector.end(), nullptr) > dd2dpVector.size() - DATA_REQ_LIMIT) || 1)
     {
         /* If there's no valid idx, exit the schedule */
         if (dp2ddIdxFifo.size() == 0) {
@@ -120,6 +120,10 @@ HanGuRnic::RdmaEngine::dduProcessing () {
             df2ddFifo.pop();
             this->allowNewDb = false;
             HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: Get one Doorbell!\n");
+        }
+        else 
+        {
+            HANGU_PRINT(RdmaEngine, " Not allow new DB!\n");
         }
 
         /* Fetch one descriptor from tx descriptor fifo */
@@ -158,6 +162,11 @@ HanGuRnic::RdmaEngine::dduProcessing () {
             this->dduDbell = nullptr;
         }
     }
+    else
+    {
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: on fly data request number exceeds DATA_REQ_LIMIT: %d\n", 
+            std::count(dd2dpVector.begin(), dd2dpVector.end(), nullptr));
+    }
 
     /* Schedule myself again if there's new descriptor
      * or there remains descriptors to post */
@@ -169,7 +178,7 @@ HanGuRnic::RdmaEngine::dduProcessing () {
         }
     }
 
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: out!\n");
+    // HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: out!\n");
 }
 
 uint32_t
@@ -204,9 +213,9 @@ HanGuRnic::RdmaEngine::getRdmaHeadSize (uint8_t opcode, uint8_t qpType) {
 void
 HanGuRnic::RdmaEngine::dpuProcessing () {
 
-    // HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing!\n");
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing!\n");
 
-    if (dp2rgFifo.size() < DATA_REQ_LIMIT)
+    if (dp2rgFifo.size() < DATA_REQ_LIMIT || 1)
     {
         /* Get Context from Context Module */
         assert(rnic->qpcModule.txQpcRspFifo.size());
@@ -277,6 +286,10 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
             break;
         }
     }
+    else
+    {
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: dp2rgFifo size exceeds: %d\n", dp2rgFifo.size());
+    }
 
     /* Recall myself if there's new descriptor and QPC */
     if (rnic->qpcModule.txQpcRspFifo.size()) {
@@ -285,7 +298,7 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
         }
     }
     
-    // HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: out!\n");
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: out!\n");
 }
 
 /**
@@ -502,10 +515,10 @@ HanGuRnic::RdmaEngine::rguProcessing () {
 
     HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.%s!\n", __func__);
 
-    if (txsauFifo.size() > RGU_SAU_LIM)
-    {
-        return;
-    }
+    // if (txsauFifo.size() > RGU_SAU_LIM)
+    // {
+    //     return;
+    // }
 
     /* Get Descriptor & QPC & packet pointer 
      * from RdmaEngine.dpuProcessing */

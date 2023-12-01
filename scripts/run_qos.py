@@ -4,8 +4,8 @@ import sys
 
 SERVER_LID  = 10
 
-NUM_CPUS  = 9
-CPU_CLK   = "4GHz"
+NUM_CPUS  = 1
+CPU_CLK   = "20GHz"
 EN_SPEED  = "100Gbps"
 PCI_SPEED = "128Gbps"
 
@@ -102,4 +102,8 @@ def main():
     return execute_program(debug=debug, test_prog=test_prog, option=opt, params=params)
 
 if __name__ == "__main__":
+    start = time.localtime()
     main()
+    end = time.localtime()
+    print("Start time: ", time.strftime("%Y-%m-%d/%H:%H:%S", start))
+    print("End time: ", time.strftime("%Y-%m-%d/%H:%H:%S", end))

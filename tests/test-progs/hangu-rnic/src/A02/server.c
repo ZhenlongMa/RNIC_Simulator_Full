@@ -19,22 +19,6 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->exp_psn = 0;
         qp->dsubnet.dlid = (i % resc->num_rem) + resc->ctx->lid + 1;
         qp->group_id = resc->qos_group[0]->id;
-        // if (judge_latency(cpu_id) == LAT_QP)
-        // {
-        //     qp->indicator = LAT_QP;
-        // }
-        // else
-        // {
-        //     qp->indicator = BW_QP;
-        // }
-        // if (cpu_id == 0)
-        // {
-        //     qp->weight = 8;
-        // }
-        // else
-        // {
-        //     qp->weight = 2;
-        // }
         qp->indicator = BW_QP;
         qp->weight = 2;
         RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d, group id: %d\n", 
@@ -113,50 +97,6 @@ int svr_fill_mr (struct ibv_mr *mr, uint32_t offset) {
     return 0;
 }
 
-int svr_post_send (struct rdma_resc *resc, struct ibv_qp *qp, int wr_num, uint32_t offset, uint8_t op_mode, uint32_t msg_size) {
-
-    // RDMA_PRINT(Server, "enter svr_post_send %d\n", wr_num);
-    struct ibv_wqe wqe[THPT_WR_NUM];
-    struct ibv_mr *local_mr = (resc->mr)[0];
-    
-    if (op_mode == OPMODE_RDMA_WRITE) {
-
-        for (int i = 0; i < wr_num; ++i) {
-            // wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
-            wqe[i].length = msg_size;
-            wqe[i].mr = local_mr;
-            wqe[i].offset = offset;
-
-            /* Add RDMA Write element */
-            wqe[i].trans_type = IBV_TYPE_RDMA_WRITE;
-            wqe[i].flag       = (i == wr_num - 1) ? WR_FLAG_SIGNALED : 0;
-            wqe[i].rdma.raddr = resc->rinfo->raddr + (sizeof(TRANS_WRDMA_DATA) - 1) * i + offset;
-            wqe[i].rdma.rkey  = resc->rinfo->rkey;
-        }
-        
-    } else if (op_mode == OPMODE_RDMA_READ) {
-        
-        for (int i = 0; i < wr_num; ++i) {
-            wqe[i].length = sizeof(TRANS_RRDMA_DATA);
-            wqe[i].mr = local_mr;
-            wqe[i].offset = (sizeof(TRANS_RRDMA_DATA) - 1) * i + offset;
-
-            /* Add RDMA Read element */
-            wqe[i].trans_type = IBV_TYPE_RDMA_READ;
-            wqe[i].flag       = (i == wr_num - 1) ? WR_FLAG_SIGNALED : 0;
-            wqe[i].rdma.raddr = resc->rinfo->raddr + offset;
-            wqe[i].rdma.rkey  = resc->rinfo->rkey;
-        }
-        
-    }
-    
-    // RDMA_PRINT(Server, "ready to ibv_post_send! qpn: %d\n", qp->qp_num);
-    ibv_post_send(resc->ctx, wqe, qp, wr_num);
-    // RDMA_PRINT(Server, "finish ibv_post_send! qpn: %d\n", qp->qp_num);
-
-    return 0;
-}
-
 static void usage(const char *argv0) {
     printf("Usage:\n");
     printf("  %s            start a client and build connection\n", argv0);
@@ -167,52 +107,6 @@ static void usage(const char *argv0) {
     printf("  -t, --num-client=<num_client>     number of clients (default 1)\n");
     printf("  -c, --cpu-id=<cpu_id>             id of the cpu (default 0)\n");
     printf("  -m, --op-mode=<op_mode>           opcode mode (default 0, which is RDMA Write)\n");
-}
-
-double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode, uint32_t iter_count) 
-{
-    uint64_t iter_start_time, iter_end_time, con_time = 0;
-    struct cpl_desc **desc = resc->desc;
-    uint8_t polling;
-    uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
-    uint64_t test_start_time;
-    uint64_t test_end_time;
-
-    struct ibv_qp *qp = resc->qp[0]; // only use one QP
-    generate_wqe(resc, op_mode, sizeof(TRANS_WRDMA_DATA), 0, 1);
-    test_start_time = get_time(resc->ctx);
-    test_end_time = test_start_time;
-    RDMA_PRINT(Server, "latency_test start time: %ld\n", test_start_time);
-
-    int k = 0;
-    while(test_end_time - test_start_time < TEST_TIME * MS)
-    {
-        k++;
-        RDMA_PRINT(Server, "latency_test iteration %d\n", k);
-        for (int i = 0; i < num_client; ++i) 
-        {
-            iter_start_time = get_time(resc->ctx);
-            ibv_post_send(resc->ctx, resc->wqe, qp, LATENCY_WR_NUM);
-            polling = 1;
-            while (polling) 
-            {
-                int res = ibv_poll_cpl(qp->cq, desc, MAX_CPL_NUM);
-                for (int j = 0; j < res; ++j) 
-                {
-                    if (desc[j]->trans_type == ibv_type[op_mode]) 
-                    {
-                        polling = 0;
-                        iter_end_time = get_time(resc->ctx);
-                        test_end_time = iter_end_time;
-                        break;
-                    }
-                }
-            }
-            con_time += (iter_end_time - iter_start_time);
-            RDMA_PRINT(Server, "latency_test consume_time %.2lf ns\n", (iter_end_time - iter_start_time) / 1000.0);
-        }
-    }
-    return ((con_time * 1.0) / (num_qp * num_client * 1000.0));
 }
 
 void generate_wqe(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, uint32_t offset, int wr_num)
@@ -254,16 +148,52 @@ void generate_wqe(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, ui
     }
 }
 
+struct ibv_wqe *generate_wqe_new(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, uint32_t offset, int wr_num)
+{
+    struct ibv_wqe *wqe_list = (struct ibv_wqe *)malloc(sizeof(struct ibv_wqe) * THPT_WR_NUM);
+    struct ibv_mr *local_mr = (resc->mr)[0];
+
+    if (op_mode == OPMODE_RDMA_WRITE) 
+    {
+        for (int i = 0; i < wr_num; ++i) 
+        {
+            // wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
+            wqe_list[i].length = msg_size;
+            wqe_list[i].mr = local_mr;
+            wqe_list[i].offset = offset;
+
+            /* Add RDMA Write element */
+            wqe_list[i].trans_type = IBV_TYPE_RDMA_WRITE;
+            wqe_list[i].flag       = (i == wr_num - 1) ? WR_FLAG_SIGNALED : 0;
+            wqe_list[i].rdma.raddr = resc->rinfo->raddr + (sizeof(TRANS_WRDMA_DATA) - 1) * i + offset;
+            wqe_list[i].rdma.rkey  = resc->rinfo->rkey;
+        }
+    } 
+    else if (op_mode == OPMODE_RDMA_READ) 
+    {
+        for (int i = 0; i < wr_num; ++i) 
+        {
+            wqe_list[i].length = sizeof(TRANS_RRDMA_DATA);
+            wqe_list[i].mr = local_mr;
+            wqe_list[i].offset = (sizeof(TRANS_RRDMA_DATA) - 1) * i + offset;
+
+            /* Add RDMA Read element */
+            wqe_list[i].trans_type = IBV_TYPE_RDMA_READ;
+            wqe_list[i].flag       = (i == wr_num - 1) ? WR_FLAG_SIGNALED : 0;
+            wqe_list[i].rdma.raddr = resc->rinfo->raddr + offset;
+            wqe_list[i].rdma.rkey  = resc->rinfo->rkey;
+        }
+        
+    }
+    return wqe_list;
+}
+
 double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uint8_t op_mode, uint32_t offset, uint64_t *start_time, uint64_t *end_time, uint64_t *con_time, uint64_t *snd_cnt) {
     uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
-    // int num_qp = resc->num_qp;
-    // int num_cq = resc->num_cq;
     int num_qp = 0;
     int qos_group_num = ctx->group_num - 1;
-    // num_qp++;
     for (int i = 0; i < qos_group_num; i++)
     {
-        // num_qp += ctx->qos_group->qp_num;
         num_qp += grp_resc[i]->num_qp;
     }
     RDMA_PRINT(Server, "into throughput test, num_qp: %d, num_client: %d, qos_group_num: %d\n", num_qp, num_client, qos_group_num);
@@ -273,25 +203,26 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     record.cqe_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client));
     memset(record.qp_data_count, 0, sizeof(uint64_t) * (num_qp * num_client));
     memset(record.cqe_count, 0, sizeof(uint64_t) * (num_qp * num_client));
-    int wr_num;
-    uint32_t msg_size;
-
-    if (cpu_id == 0)
-    {
-        wr_num = BW_WR_NUM;
-        msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
-        RDMA_PRINT(Server, "large message! CPU: %d, write num: %d, message size: %d\n", cpu_id, wr_num, msg_size);
-    }
-    else 
-    {
-        wr_num = THPT_WR_NUM;
-        msg_size = sizeof(TRANS_WRDMA_DATA);
-        RDMA_PRINT(Server, "small message! CPU: %d, write num: %d, message size: %d\n", cpu_id, wr_num, msg_size);
-    }
+    int elephant_wr_num;
+    int mice_wr_num;
+    uint32_t elephant_msg_size;
+    uint32_t mice_msg_size;
+    struct ibv_wqe *mice_wqe_list;
+    struct ibv_wqe *elephant_wqe_list;
     
     // generate WQE
     for (int i = 0; i < qos_group_num; i++)
     {
+        if (cpu_id == 0)
+        {
+            wr_num = BW_WR_NUM;
+            msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
+        }
+        else 
+        {
+            wr_num = THPT_WR_NUM;
+            msg_size = sizeof(TRANS_WRDMA_DATA);
+        }
         generate_wqe(grp_resc[i], op_mode, msg_size, offset, wr_num);
     }
 
@@ -305,6 +236,14 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
         struct rdma_resc *resc = grp_resc[k];
         for (int i = 0; i < num_client; ++i) {
             for (int j = 0; j < resc->num_qp; ++j) {
+                if (j == 0)
+                {
+                    
+                }
+                else
+                {
+
+                }
                 ibv_post_send(resc->ctx, resc->wqe, resc->qp[i * resc->num_qp + j], wr_num);
                 ibv_post_send(resc->ctx, resc->wqe, resc->qp[i * resc->num_qp + j], wr_num);
             }
@@ -338,8 +277,6 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                                     qp = resc->qp[m];
                                 }
                             }
-                            // uint32_t qp_ptr = (desc[j]->qp_num & RESC_LIM_MASK) - 1; /* the mapping relation between qpn and qp array */
-                            // svr_post_send(resc, qp, wr_num, offset, op_mode, msg_size);
                             ibv_post_send(resc->ctx, resc->wqe, qp, wr_num);
                         }
                         else
@@ -469,24 +406,10 @@ int main (int argc, char **argv) {
     int grp1_weight;
     int grp2_weight;
 
-    // if (judge_latency(cpu_id) == LAT_QP)
-    // {
-    //     grp1_num_qp = 1;
-    //     grp2_num_qp = 1;
-    //     grp1_weight = 15;
-    //     grp2_weight = 15;
-    // }
-    // else
-    // {
-    //     grp1_num_qp = 1;
-    //     grp2_num_qp = 1;
-    //     grp1_weight = 15;
-    //     grp2_weight = 15;
-    // }
     if (cpu_id == 0)
     {
         grp1_num_qp = 1;
-        grp2_num_qp = 4;
+        grp2_num_qp = 16;
     }
     else 
     {
