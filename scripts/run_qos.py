@@ -24,7 +24,7 @@ def cmd_run_sim(debug, test_prog, option, params):
     '''
     Generate simulation running command
     '''
-
+    testcase = sys.argv[1]
     cmd = "cd ../ && build/X86/gem5.opt"
 
     # Add debug options
@@ -44,7 +44,7 @@ def cmd_run_sim(debug, test_prog, option, params):
     cmd += " --qpc-cache-cap "  + str(params.qpc_cache_cap)
     cmd += " --reorder-cap "    + str(params.reorder_cap)
     cmd += " --mem-size 2048MB"
-    cmd += " > scripts/qos_test.txt"
+    cmd += " > scripts/" + testcase + "_output"
 
     return cmd
 

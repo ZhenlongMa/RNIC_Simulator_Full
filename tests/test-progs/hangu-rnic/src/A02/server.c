@@ -203,27 +203,31 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     record.cqe_count = (uint64_t *)malloc(sizeof(uint64_t) * (num_qp * num_client));
     memset(record.qp_data_count, 0, sizeof(uint64_t) * (num_qp * num_client));
     memset(record.cqe_count, 0, sizeof(uint64_t) * (num_qp * num_client));
-    int elephant_wr_num;
-    int mice_wr_num;
+    uint8_t elephant_wr_num;
+    uint8_t mice_wr_num;
     uint32_t elephant_msg_size;
     uint32_t mice_msg_size;
+    #ifdef TEST_THPT_PEAK
+        elephant_wr_num = THPT_WR_NUM;
+        elephant_msg_size = sizeof(TRANS_WRDMA_DATA);
+    #else
+        elephant_wr_num = BW_WR_NUM;
+        elephant_msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
+    #endif
+    mice_wr_num = THPT_WR_NUM;
+    mice_msg_size = sizeof(TRANS_WRDMA_DATA) * 2;
     struct ibv_wqe *mice_wqe_list;
     struct ibv_wqe *elephant_wqe_list;
+    struct ibv_qp *elephant_qp;
     
     // generate WQE
     for (int i = 0; i < qos_group_num; i++)
     {
-        if (cpu_id == 0)
+        if (i != 0)
         {
-            wr_num = BW_WR_NUM;
-            msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
+            mice_wqe_list = generate_wqe_new(grp_resc[i], op_mode, sizeof(TRANS_WRDMA_DATA), offset, mice_wr_num);
+            elephant_wqe_list = generate_wqe_new(grp_resc[i], op_mode, sizeof(TRANS_WRDMA_DATA) * 16 * 512, offset, elephant_wr_num);
         }
-        else 
-        {
-            wr_num = THPT_WR_NUM;
-            msg_size = sizeof(TRANS_WRDMA_DATA);
-        }
-        generate_wqe(grp_resc[i], op_mode, msg_size, offset, wr_num);
     }
 
     /* Start to post all the QPs at beginning */
@@ -236,16 +240,17 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
         struct rdma_resc *resc = grp_resc[k];
         for (int i = 0; i < num_client; ++i) {
             for (int j = 0; j < resc->num_qp; ++j) {
-                if (j == 0)
+                if (j == 0) // elephant flow
                 {
-                    
+                    elephant_qp = resc->qp[i * resc->num_qp + j];
+                    ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
+                    ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
                 }
-                else
+                else // mice flows
                 {
-
+                    ibv_post_send(resc->ctx, mice_wqe_list, resc->qp[i * resc->num_qp + j], mice_wr_num);
+                    ibv_post_send(resc->ctx, mice_wqe_list, resc->qp[i * resc->num_qp + j], mice_wr_num);
                 }
-                ibv_post_send(resc->ctx, resc->wqe, resc->qp[i * resc->num_qp + j], wr_num);
-                ibv_post_send(resc->ctx, resc->wqe, resc->qp[i * resc->num_qp + j], wr_num);
             }
         }
     }
@@ -277,7 +282,16 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                                     qp = resc->qp[m];
                                 }
                             }
-                            ibv_post_send(resc->ctx, resc->wqe, qp, wr_num);
+
+                            if (qp->qp_num == elephant_qp->qp_num)
+                            {
+                                // WARNING: ONLY ONE ELEPHANT QP!
+                                ibv_post_send(resc->ctx, elephant_wqe_list, qp, elephant_wr_num);
+                            }
+                            else
+                            {
+                                ibv_post_send(resc->ctx, mice_wqe_list, qp, mice_wr_num);
+                            }
                         }
                         else
                         {
@@ -409,7 +423,7 @@ int main (int argc, char **argv) {
     if (cpu_id == 0)
     {
         grp1_num_qp = 1;
-        grp2_num_qp = 16;
+        grp2_num_qp = 17;
     }
     else 
     {
@@ -445,7 +459,7 @@ int main (int argc, char **argv) {
     if (judge_latency(cpu_id) == LAT_QP)
     {
         /* Start Latency test */
-        latency = latency_test(grp1_resc, 1, op_mode, 1000);
+        // latency = latency_test(grp1_resc, 1, op_mode, 1000);
         RDMA_PRINT(Server, "latency test end!\n");
     }
     else
