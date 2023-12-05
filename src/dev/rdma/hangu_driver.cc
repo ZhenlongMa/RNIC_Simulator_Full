@@ -483,8 +483,8 @@ void HanGuDriver::setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_gr
 {
     HanGuRnicDef::GroupInfo group[MAX_GROUP_NUM];
 
-    uint16_t bigN;
-    portProxy.readBlob(qosShareParamAddr + NOffset, &bigN, sizeof(uint16_t));
+    uint32_t bigN;
+    portProxy.readBlob(qosShareParamAddr + NOffset, &bigN, sizeof(uint32_t));
 
     uint8_t groupNum;
     portProxy.readBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint8_t));
@@ -520,8 +520,8 @@ void HanGuDriver::setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_gr
         portProxy.writeBlob(qosShareParamAddr + groupGranularityOffset + i * 4, &granularity, sizeof(uint32_t));
         group[i].groupID = i;
         group[i].granularity = granularity;
-        HANGU_PRINT(HanGuDriver, "set group granularity! group id: %d, group weight: %d, QP weight sum: %d, granularity: %d\n", 
-            i, groupWeight, qpWeightSum, granularity);
+        HANGU_PRINT(HanGuDriver, "set group granularity! N: %d, group id: %d, group weight: %d, QP weight sum: %d, granularity: %d\n", 
+            bigN, i, groupWeight, qpWeightSum, granularity);
     }
     // print all QoS weights and granularities
     printQoS(portProxy);
@@ -577,8 +577,8 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
     std::unordered_map<uint8_t, uint8_t> setGroup;
     uint32_t groupWeightSum;
     portProxy.readBlob(qosShareParamAddr + groupWeightSumOffset, &groupWeightSum, sizeof(uint32_t));
-    uint16_t bigN;
-    portProxy.readBlob(qosShareParamAddr + NOffset, &bigN, sizeof(uint16_t));
+    uint32_t bigN;
+    portProxy.readBlob(qosShareParamAddr + NOffset, &bigN, sizeof(uint32_t));
     // modify QP weight in group table and record the groups to be updated
     for (uint32_t i = 0; i < args->batch_size; ++i)
     {

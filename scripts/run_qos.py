@@ -105,5 +105,5 @@ if __name__ == "__main__":
     start = time.localtime()
     main()
     end = time.localtime()
-    print("Start time: ", time.strftime("%Y-%m-%d/%H:%H:%S", start))
-    print("End time: ", time.strftime("%Y-%m-%d/%H:%H:%S", end))
+    print("Start time: " + time.strftime("%Y-%m-%d/%H:%H:%S", start))
+    print("End time: " + time.strftime("%Y-%m-%d/%H:%H:%S", end))
