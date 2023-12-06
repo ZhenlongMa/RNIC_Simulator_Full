@@ -207,15 +207,15 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     uint8_t mice_wr_num;
     uint32_t elephant_msg_size;
     uint32_t mice_msg_size;
+    mice_wr_num = THPT_WR_NUM;
+    mice_msg_size = sizeof(TRANS_WRDMA_DATA) * 32;
     #ifdef TEST_THPT_PEAK
-        elephant_wr_num = THPT_WR_NUM;
-        elephant_msg_size = sizeof(TRANS_WRDMA_DATA);
+        elephant_wr_num = mice_wr_num;
+        elephant_msg_size = mice_msg_size;
     #else
         elephant_wr_num = BW_WR_NUM;
         elephant_msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
     #endif
-    mice_wr_num = THPT_WR_NUM;
-    mice_msg_size = sizeof(TRANS_WRDMA_DATA);
     struct ibv_wqe *mice_wqe_list;
     struct ibv_wqe *elephant_wqe_list;
     struct ibv_qp *elephant_qp;
