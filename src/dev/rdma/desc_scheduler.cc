@@ -514,6 +514,8 @@ void HanGuRnic::DescScheduler::launchWQE()
             for (int i = 0; i < doorbell->num; i++)
             {
                 rNic->txDescLaunchQue.push(lowPriorityDescQue.front());
+                HANGU_PRINT(DescScheduler, "Launch WQE!, QPN: 0x%x, desc num: %d, i: %d, sub-msg size: %d\n", 
+                    doorbell->qpn, doorbell->num, i, lowPriorityDescQue.front()->len);
                 lowPriorityDescQue.pop();
             }
         }
