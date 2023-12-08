@@ -520,7 +520,7 @@ int ibv_post_send(struct ibv_context *context, struct ibv_wqe *wqe, struct ibv_q
         
         /* Add Base unit */
         // tx_desc->opcode = (i == num - 1) ? IBV_TYPE_NULL : wqe[i+1].trans_type;
-        tx_desc->flags  = 0;
+        // tx_desc->flags  = 0;
         tx_desc->flags  = wqe[i].flag;
         tx_desc->opcode = wqe[i].trans_type;
 
@@ -571,6 +571,7 @@ int ibv_post_send(struct ibv_context *context, struct ibv_wqe *wqe, struct ibv_q
         //     HGRNIC_PRINT(" data[%d] 0x%x\n", i, u8_tmp[i]);
         // }
         // HGRNIC_PRINT("WQE opcode: %d\n", tx_desc->opcode);
+        assert(tx_desc->opcode != 0);
     }
 
     if (snd_cnt) {
