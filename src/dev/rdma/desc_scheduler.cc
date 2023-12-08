@@ -135,64 +135,57 @@ void HanGuRnic::DescScheduler::qpStatusProc()
 void HanGuRnic::DescScheduler::wqePrefetchSchedule()
 {
     HANGU_PRINT(DescScheduler, "into wqePrefetchSchedule! wqePrefetchQpStatusRReqQue size: %d\n", wqePrefetchQpStatusRReqQue.size());
-    assert(highPriorityQpnQue.size() || lowPriorityQpnQue.size());
-    if (wqePrefetchQpStatusRReqQue.size() < DESC_REQ_LIMIT || 1)
+    uint32_t batchSize;
+    Tick bwDelay;
+    uint32_t qpn;
+    // if (wqePrefetchQpStatusRReqQue.size() < DESC_REQ_LIMIT || 1)
+    // {
+    if (highPriorityQpnQue.size() > 0)
     {
-        // bool allowNewWQE;
-        // bool allowNewHWQE;
-        // bool allowNewLWQE;
-        // allowNewHWQE = highPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
-        // allowNewLWQE = lowPriorityDescQue.size() < WQE_BUFFER_CAPACITY;
-        // allowNewWQE = (allowNewHWQE && highPriorityQpnQue.size()) || (allowNewLWQE && (lowPriorityQpnQue.size()));
-
-        // if (!allowNewWQE)
-        // {
-        //     HANGU_PRINT(DescScheduler, "New WQE not allowed! lowPriorityDescQue size: %d, lowPriorityQpnQue size: %d\n", 
-        //         lowPriorityDescQue.size(), lowPriorityQpnQue.size());
-        //     return;
-        // }
-
-        if (highPriorityQpnQue.size() > 0)
-        {
-            uint32_t qpn = highPriorityQpnQue.front();
-            highPriorityQpnQue.pop();
-            wqePrefetchQpStatusRReqQue.push(qpn);
-            qpStatusTable[qpn]->in_que--;
-            qpStatusTable[qpn]->fetch_count++;
-            HANGU_PRINT(DescScheduler, "High priority QPN fetched! qpn: 0x%x, fetch count: %d, curtick: %ld\n", 
-                qpn, qpStatusTable[qpn]->fetch_count++, curTick());
-        }
-        else if (lowPriorityQpnQue.size() > 0)
-        {
-            if (lowPriorityQpnQue.size() < WQE_PREFETCH_THRESHOLD)
-            {
-                // HANGU_PRINT(DescScheduler, "Low priority QPN queue size: %d!\n", lowPriorityQpnQue.size());
-                uint32_t qpn = lowPriorityQpnQue.front();
-                lowPriorityQpnQue.pop();
-                wqePrefetchQpStatusRReqQue.push(qpn);
-                qpStatusTable[qpn]->in_que--;
-                qpStatusTable[qpn]->fetch_count++;
-                HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: 0x%x, in que: %d, fetch count: %ld\n", 
-                    qpn, qpStatusTable[qpn]->in_que, qpStatusTable[qpn]->fetch_count);
-            }
-        }
-
-        if (lowPriorityQpnQue.size() == 0 && highPriorityQpnQue.size() == 0)
-        {
-            HANGU_PRINT(DescScheduler, "Empty QPN queue!\n");
-        }
-
-        if (!wqePrefetchEvent.scheduled())
-        {
-            rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
-        }
+        qpn = highPriorityQpnQue.front();
+        highPriorityQpnQue.pop();
+        wqePrefetchQpStatusRReqQue.push(qpn);
+        qpStatusTable[qpn]->in_que--;
+        qpStatusTable[qpn]->fetch_count++;
+        HANGU_PRINT(DescScheduler, "High priority QPN fetched! qpn: 0x%x, fetch count: %d, curtick: %ld\n", 
+            qpn, qpStatusTable[qpn]->fetch_count++, curTick());
+    }
+    else if (lowPriorityQpnQue.size() > 0)
+    {
+        // HANGU_PRINT(DescScheduler, "Low priority QPN queue size: %d!\n", lowPriorityQpnQue.size());
+        qpn = lowPriorityQpnQue.front();
+        lowPriorityQpnQue.pop();
+        wqePrefetchQpStatusRReqQue.push(qpn);
+        qpStatusTable[qpn]->in_que--;
+        qpStatusTable[qpn]->fetch_count++;
+        HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: 0x%x, in que: %d, fetch count: %ld\n", 
+            qpn, qpStatusTable[qpn]->in_que, qpStatusTable[qpn]->fetch_count);
+    }
+    else
+    {
+        HANGU_PRINT(DescScheduler, "Empty QPN queue!\n");
+        return;
     }
 
-    if ((highPriorityQpnQue.size() || lowPriorityQpnQue.size() || leastPriorityQpnQue.size()) 
-        && !wqePrefetchScheduleEvent.scheduled())
+    batchSize = qpStatusTable[qpn]->weight * groupTable[qpStatusTable[qpn]->group_id];
+    bwDelay = batchSize * rNic->etherBandwidth;
+    HANGU_PRINT(DescScheduler, "Schedule wqePrefetchScheduleEvent! QPN: 0x%x, batchSize: %d, bwDelay: %d\n", 
+        qpn, batchSize, bwDelay);
+
+    if (wqePrefetchScheduleEvent.scheduled())
     {
-        rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
+        rNic->reschedule(wqePrefetchScheduleEvent, curTick() + bwDelay);
     }
+    else
+    {
+        rNic->schedule(wqePrefetchScheduleEvent, curTick() + bwDelay);
+    }
+
+    if (!wqePrefetchEvent.scheduled())
+    {
+        rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
+    }
+    // }
 }
 
 /**
@@ -411,7 +404,7 @@ void HanGuRnic::DescScheduler::wqeProc()
                 procSize += subDesc->len;
                 HANGU_PRINT(DescScheduler, "finish WQE split: type: %d, sub WQE length: %d, qpn: 0x%x, descNum: %d, sub WQE flag: 0x%x\n", 
                     qpStatus->type, subDesc->len, qpStatus->qpn, descNum, subDesc->flags);
-
+                assert(subDesc->opcode != 0);
                 lowPriorityDescQue.push(subDesc);
                 subDescNum++;
             }
