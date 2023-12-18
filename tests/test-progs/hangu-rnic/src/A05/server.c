@@ -20,18 +20,7 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->dsubnet.dlid = (i % resc->num_rem) + resc->ctx->lid + 1;
         qp->group_id = resc->qos_group[0]->id;
         qp->indicator = BW_QP;
-        if (qp->group_id % 2 == 0)
-        {
-            qp->weight = i + 1;
-            if (qp->weight == 1)
-            {
-                qp->weight = 6;
-            }
-        }
-        else
-        {
-            qp->weight = 2;
-        }
+        qp->weight = 2;
         RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d, group id: %d\n", 
                 qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num, i, qp->group_id);
         RDMA_PRINT(Server, "svr_update_qps: qp weight setting: i: %d, src_qp 0x%x, weight: %d, group id: %d\n", 
@@ -376,8 +365,8 @@ int main (int argc, char **argv) {
     
     if (cpu_id == 0 || 1)
     {
-        grp1_num_qp = 3;
-        grp2_num_qp = 3;
+        grp1_num_qp = 2;
+        grp2_num_qp = 2;
     }
     else 
     {

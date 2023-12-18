@@ -208,7 +208,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     uint32_t elephant_msg_size;
     uint32_t mice_msg_size;
     mice_wr_num = THPT_WR_NUM;
-    mice_msg_size = sizeof(TRANS_WRDMA_DATA) * 32;
+    mice_msg_size = sizeof(TRANS_WRDMA_DATA) * 64;
     #ifdef TEST_THPT_PEAK
         elephant_wr_num = mice_wr_num;
         elephant_msg_size = mice_msg_size;
@@ -243,13 +243,17 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                 if (j == 0) // elephant flow
                 {
                     elephant_qp = resc->qp[i * resc->num_qp + j];
-                    ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
-                    ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
+                    for (int k = 0; k < 10; k++)
+                    {
+                        ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
+                    }
                 }
                 else // mice flows
                 {
-                    ibv_post_send(resc->ctx, mice_wqe_list, resc->qp[i * resc->num_qp + j], mice_wr_num);
-                    ibv_post_send(resc->ctx, mice_wqe_list, resc->qp[i * resc->num_qp + j], mice_wr_num);
+                    for (int k = 0; k < 10; k++)
+                    {
+                        ibv_post_send(resc->ctx, mice_wqe_list, resc->qp[i * resc->num_qp + j], mice_wr_num);
+                    }
                 }
             }
         }
