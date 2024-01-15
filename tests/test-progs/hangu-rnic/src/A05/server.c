@@ -365,8 +365,8 @@ int main (int argc, char **argv) {
     
     if (cpu_id == 0 || 1)
     {
-        grp1_num_qp = 2;
-        grp2_num_qp = 2;
+        grp1_num_qp = 1;
+        grp2_num_qp = 3;
     }
     else 
     {

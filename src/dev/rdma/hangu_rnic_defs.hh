@@ -67,7 +67,7 @@
 #define DESC_REQ_LIMIT 5
 #define DATA_REQ_LIMIT 6
 // #define RGU_SAU_LIM 1
-#define BIGN 204800
+#define BIGN 20480
 #define WINDOW_CAP 20
 // #define MAX_SUBWQE_SIZE 1024
 
