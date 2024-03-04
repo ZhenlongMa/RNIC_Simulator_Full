@@ -136,8 +136,8 @@ HanGuRnic::RdmaEngine::dduProcessing () {
         rnic->txDescLaunchQue.pop();
 
         /* Put one descriptor to waiting Memory */
-        HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: desc->len 0x%x, desc->lkey 0x%x, desc->lvaddr 0x%x, desc->opcode 0x%x, desc->flags 0x%x, dduDbell->qpn 0x%x\n", 
-                txDesc->len, txDesc->lkey, txDesc->lVaddr, txDesc->opcode, txDesc->flags, dduDbell->qpn);
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: desc->len 0x%x, desc->lkey 0x%x, desc->lvaddr 0x%x, desc->opcode 0x%x, desc->flags 0x%x, dduDbell->qpn 0x%x, dduDbell->num: %d\n", 
+                txDesc->len, txDesc->lkey, txDesc->lVaddr, txDesc->opcode, txDesc->flags, dduDbell->qpn, dduDbell->num);
         HANGU_PRINT(RdmaEngine, "WQE left in queue: %d\n", rnic->txDescLaunchQue.size());
         uint8_t idx = dp2ddIdxFifo.front();
         dp2ddIdxFifo.pop();
@@ -176,6 +176,10 @@ HanGuRnic::RdmaEngine::dduProcessing () {
         if (!dduEvent.scheduled()) { /* Schedule myself */
             rnic->schedule(dduEvent, curTick() + rnic->clockPeriod());
         }
+    }
+    else {
+        HANGU_PRINT(RdmaEngine, "dp2ddIdxFifo.size: %d, rnic->txDescLaunchQue.size: %d, allowNewDb: %B, df2ddFifo.size: %d\n", 
+            dp2ddIdxFifo.size(), rnic->txDescLaunchQue.size(), allowNewDb, df2ddFifo.size());
     }
 
     // HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: out!\n");
@@ -235,10 +239,12 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
                     " Get descriptor entry from RdmaEngine.dduProcessing, len: %d, lkey: %d, opcode: %d, rkey: %d\n", 
                     desc->len, desc->lkey, desc->opcode, desc->rdmaType.rkey);
 
-        /* schedule ddu if dp2ddIdxFifo is empty */
+        /* schedule ddu if dp2ddIdxFifo is capable */
         dp2ddIdxFifo.push(idx);
-        if ((dp2ddIdxFifo.size() == 1) && rnic->txdescRspFifo.size() && 
-                ((allowNewDb && df2ddFifo.size()) || (!allowNewDb))) {
+        // bug fix: 20240301
+        if ((dp2ddIdxFifo.size() == 1) && 
+            //  rnic->txdescRspFifo.size() && 
+             ((allowNewDb && df2ddFifo.size()) || (!allowNewDb))) {
             if (!dduEvent.scheduled()) {
                 rnic->schedule(dduEvent, curTick() + rnic->clockPeriod());
             }
