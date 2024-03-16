@@ -80,8 +80,8 @@ class HanGuRnic(RdmaNic):
     InterruptPin = 0x01
     BAR0Size = '1kB'
     
-    dma_read_delay = Param.Latency('500ns', "delay after desc fetch occurs")
-    dma_write_delay = Param.Latency('250ns', "delay after desc wb occurs")
+    dma_read_delay = Param.Latency('1000ns', "delay after desc fetch occurs")
+    dma_write_delay = Param.Latency('500ns', "delay after desc wb occurs")
 
     pci_speed = Param.NetworkBandwidth('1Gbps', "pci speed in bits per second")
     ether_speed = Param.NetworkBandwidth('1Gbps', "NIC speed in bits per second")
