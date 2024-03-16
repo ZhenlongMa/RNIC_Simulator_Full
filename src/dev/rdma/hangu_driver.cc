@@ -87,8 +87,6 @@ HanGuDriver::mmap(ThreadContext *tc, Addr start, uint64_t length, int prot,
     return start + 24;
 }
 
-
-
 int
 HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
     auto &virt_proxy = tc->getVirtProxy();
@@ -220,13 +218,13 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
 
             allocQpc(args);
 
+            updateN(args);
+
             // allocate space for QP context
             if (!isIcmMapped(qpcMeta, args->qp_num + args->batch_size - 1)) {
                 Addr icmVPage = allocIcm (process, qpcMeta, args->qp_num);
                 writeIcm(virt_proxy, HanGuRnicDef::ICMTYPE_QPC, qpcMeta, icmVPage);
             }
-
-            // TODO: allocate space for TQ
 
             HANGU_PRINT(HanGuDriver, " ioctl : HGKFD_IOC_ALLOC_QP, qp_num: 0x%x(%d), batch_size %d\n", args->qp_num, RESC_LIM_MASK&args->qp_num, args->batch_size);
 
@@ -563,6 +561,14 @@ void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_allo
     groupNum += args->group_num;
     portProxy.writeBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint8_t));
     HANGU_PRINT(HanGuDriver, "group allocated! group ID: %d, groupNum: %d\n", args->group_id[0], groupNum);
+}
+
+void updateN(TypeBufferArg<kfd_ioctl_alloc_qp_args> &args)
+{
+    qpAmount += args->batch_size;
+    uint32_t bigN = qpAmount * chunkSizePerQP;
+    portProxy.writeBlob(qosShareParamAddr + NOffset, &bigN, sizeof(uint32_t));
+    HANGU_PRINT(HanGuDriver, "N updated! qp amount: %d, N: %d\n", qpAmount, bigN);
 }
 
 /**
