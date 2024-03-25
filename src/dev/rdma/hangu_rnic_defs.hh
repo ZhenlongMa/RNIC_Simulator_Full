@@ -66,13 +66,16 @@
 #define LEAST_QPN_QUE_CAP 64
 #define DESC_REQ_LIMIT 5
 #define DATA_REQ_LIMIT 6
-// #define RGU_SAU_LIM 1
-#define BIGN 20480
+#define RGU_SAU_LIM 1
+#define BIGN 819200
 #define WINDOW_CAP 20
-// #define MAX_SUBWQE_SIZE 1024
+#define MAX_SUBWQE_SIZE 1024
 
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
+
+// qpc prefecth related parameters
+#define GAP_REQ_NUM 0
 
 namespace HanGuRnicDef {
 
@@ -442,6 +445,7 @@ const uint8_t CXT_RREQ_CQ = 0x04;
 const uint8_t CXT_RRSP_CQ = 0x05;
 const uint8_t CXT_RREQ_SQ = 0x06; /* read sq addr */
 const uint8_t CXT_CREQ_QP = 0x07; /* create request */
+const uint8_t CXT_PREF_QP = 0x08; /* prefetch qpc */
 const uint8_t CXT_CHNL_TX = 0x01;
 const uint8_t CXT_CHNL_RX = 0x02;
 
@@ -651,6 +655,7 @@ struct Regs : public Serializable {
     };
     DOORBELL db;
 
+    uint32_t prefetchNum;
     uint64_t qosShareAddr = 0;
 
 
@@ -767,7 +772,19 @@ struct GroupInfo
 {
     uint8_t groupID;
     uint16_t granularity;
+    // GroupInfo(uint8_t groupID, uint16_t granularity)
+    // {
+    //     this->groupID = groupID;
+    //     this->granularity = granularity;
+    // }
+    // GroupInfo()
+    // {}
 };
+
+// struct AllGroupInfo
+// {
+//     uint16_t granularity[MAX_GROUP_NUM];
+// };
 
 
 } // namespace HanGuRnicDef

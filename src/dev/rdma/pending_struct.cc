@@ -39,7 +39,7 @@ HanGuRnic::PendingStruct::pushElemProc() {
     CxtReqRspPtr qpcReq = pElem->reqPkt;
     pushFifo.pop();
 
-    HANGU_PRINT(CxtResc, " PendingStruct.pushElemProc: qpn %d idx %d chnl %d\n", pElem->qpn, pElem->idx, pElem->chnl);
+    //HANGU_PRINT(CxtResc, " PendingStruct.pushElemProc: qpn %d idx %d chnl %d\n", pElem->qpn, pElem->idx, pElem->chnl);
     assert((pElem->qpn & QPN_MASK) <= QPN_NUM);
     assert((pElem->reqPkt->num & QPN_MASK) <= QPN_NUM);
     assert(qpcReq != nullptr);
@@ -53,7 +53,7 @@ HanGuRnic::PendingStruct::pushElemProc() {
     }
 
     /* schedule loadMem to post qpcReq dma pkt to dma engine */
-    HANGU_PRINT(CxtResc, " PendingStruct.pushElemProc: has_dma %d\n", pElem->has_dma);
+    //HANGU_PRINT(CxtResc, " PendingStruct.pushElemProc: has_dma %d\n", pElem->has_dma);
     if (pElem->has_dma) {
         rnic->qpcModule.loadMem(qpcReq);
     }
@@ -64,7 +64,7 @@ HanGuRnic::PendingStruct::pushElemProc() {
             rnic->schedule(pushElemProcEvent, curTick() + rnic->clockPeriod());
         }
     }
-    HANGU_PRINT(CxtResc, " PendingStruct.pushElemProc: out!\n");
+    //HANGU_PRINT(CxtResc, " PendingStruct.pushElemProc: out!\n");
 }
 
 bool 
@@ -101,7 +101,7 @@ HanGuRnic::PendingStruct::pop_elem() {
         swapIdx();
     }
 
-    HANGU_PRINT(CxtResc, " PendingStruct.pop_elem: exit, get_size() %d elemNum %d\n", get_size(), elemNum);
+    //HANGU_PRINT(CxtResc, " PendingStruct.pop_elem: exit, get_size() %d elemNum %d\n", get_size(), elemNum);
     
     return pElem;
 }
@@ -120,7 +120,7 @@ HanGuRnic::PendingStruct::get_elem_check() {
     pendingFifo[offlineIdx].pop();
     --elemNum;
 
-    HANGU_PRINT(CxtResc, " QpcModule.PendingStruct.get_elem_check: exit\n");
+    //HANGU_PRINT(CxtResc, " QpcModule.PendingStruct.get_elem_check: exit\n");
     return pElem;
 }
 
@@ -130,7 +130,7 @@ HanGuRnic::PendingStruct::ignore_elem_check(PendingElemPtr pElem) {
     pendingFifo[onlineIdx].push(pElem);
     ++elemNum;
 
-    HANGU_PRINT(CxtResc, " QpcModule.PendingStruct.ignore_elem_check: exit\n");
+    //HANGU_PRINT(CxtResc, " QpcModule.PendingStruct.ignore_elem_check: exit\n");
 }
 
 /* if it is the first, swap online and offline pendingFifo */
@@ -140,8 +140,7 @@ HanGuRnic::PendingStruct::succ_elem_check() {
         /* swap onlineIdx and offlineIdx */
         swapIdx();
     }
-    HANGU_PRINT(CxtResc, " QpcModule.PendingStruct.succ_elem_check: get_size %d, elemNum %d\n", 
-            get_size(), elemNum);
+    //HANGU_PRINT(CxtResc, " QpcModule.PendingStruct.succ_elem_check: get_size %d, elemNum %d\n", get_size(), elemNum);
 }
 
 /* call push_elem */
@@ -152,6 +151,6 @@ HanGuRnic::PendingStruct::push_elem_check(PendingElemPtr pElem) {
         swapIdx();
     }
     push_elem(pElem);
-    HANGU_PRINT(CxtResc, " QpcModule.PendingStruct.push_elem_check: exit\n");
+    //HANGU_PRINT(CxtResc, " QpcModule.PendingStruct.push_elem_check: exit\n");
 }
 ///////////////////////////// HanGuRnic::PendingStruct {end}//////////////////////////////

@@ -321,16 +321,24 @@ class HanGuRnic : public RdmaNic {
             private:
                 HanGuRnic *rNic;
                 std::string _name;
+                uint32_t totalWeight;
                 void qpcRspProc();
                 void qpStatusProc();
+                // void qpStatusReqProc();
                 void wqePrefetchSchedule();
                 void wqePrefetch();
                 void wqeProc();
                 void rxUpdate();
+                // void commitWQE(uint32_t descNum, std::queue<TxDescPtr> & descQue);
                 void launchWQE();
                 void createQpStatus();
+                // qpc prefecth process function
+                void qpcPrefetchProc();
+
                 uint16_t sqSize;
                 uint16_t rqSize;
+
+                // uint8_t onFlyDescReqNum;
                 std::queue<uint32_t> highPriorityQpnQue;
                 std::queue<uint32_t> lowPriorityQpnQue;
                 std::queue<uint32_t> leastPriorityQpnQue;
@@ -342,10 +350,18 @@ class HanGuRnic : public RdmaNic {
                 std::queue<std::pair<uint32_t, QPStatusPtr>> wqeFetchInfoQue;
                 std::queue<DoorbellPtr> wqeProcToLaunchWqeQueH;
                 std::queue<DoorbellPtr> wqeProcToLaunchWqeQueL;
+                // qpc prefecth fifo
+                std::queue<uint32_t> highQpcPrefetchFifo;
+                std::queue<uint32_t> lowQpcPrefetchFifo;
+
                 EventFunctionWrapper qpStatusRspEvent;
+                // EventFunctionWrapper rxUpdateEvent;
+                // EventFunctionWrapper qpStatusReqEvent;
                 EventFunctionWrapper wqePrefetchEvent;
-                EventFunctionWrapper wqePrefetchScheduleEvent;
+                EventFunctionWrapper getPrefetchQpnEvent;
                 EventFunctionWrapper launchWqeEvent;
+                // qpc prefetch event
+                EventFunctionWrapper qpcPrefetchEvent;
             public:
                 DescScheduler(HanGuRnic *rNic, std::string name);
                 EventFunctionWrapper updateEvent;
@@ -914,6 +930,8 @@ class HanGuRnic : public RdmaNic {
                 std::queue<CxtReqRspPtr>  txQpAddrRreqFifo; // [0]
                 std::queue<CxtReqRspPtr>  txQpcRreqFifo;    // [1]
                 std::queue<CxtReqRspPtr>  rxQpcRreqFifo;    // [2]
+                //prefetch channel
+                std::queue<CxtReqRspPtr>  prefQpcFifo;      //channel_num = 3
                 /* --------RDMA Engine or CCU -(req)-> QpcModule {end}-------- */
 
                 /* --------Req Proc related {begin}-------- */

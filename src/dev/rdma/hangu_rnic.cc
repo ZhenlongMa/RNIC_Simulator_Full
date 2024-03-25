@@ -208,8 +208,14 @@ HanGuRnic::write(PacketPtr pkt) {
         this->tick = curTick();
 
         /* Schedule doorbellProc */
-        if (!doorbellProcEvent.scheduled()) { 
-            schedule(doorbellProcEvent, curTick() + clockPeriod());
+        // if (!doorbellProcEvent.scheduled()) { 
+        //     schedule(doorbellProcEvent, curTick() + clockPeriod());
+        // }
+
+        /* Schedule desc_scheduler.qpcRspProc */
+        /* We bypass the doorbellProc, request qpAddr after prefetching. PrefetchProc will be scheduled when PriorityQpnQue is long enough. */
+        if (!descScheduler.qpcRspEvent.scheduled()) {
+            schedule(descScheduler.qpcRspEvent, curTick() + clockPeriod());
         }
 
         HANGU_PRINT(HanGuRnic, " PioEngine.write: qpn %d, opcode %x, num %d\n", 
