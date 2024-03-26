@@ -218,7 +218,7 @@ HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
 
             allocQpc(args);
 
-            updateN(args);
+            updateN(virt_proxy, args);
 
             // allocate space for QP context
             if (!isIcmMapped(qpcMeta, args->qp_num + args->batch_size - 1)) {
@@ -563,7 +563,7 @@ void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_allo
     HANGU_PRINT(HanGuDriver, "group allocated! group ID: %d, groupNum: %d\n", args->group_id[0], groupNum);
 }
 
-void updateN(TypeBufferArg<kfd_ioctl_alloc_qp_args> &args)
+void updateN(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_qp_args> &args)
 {
     qpAmount += args->batch_size;
     uint32_t bigN = qpAmount * chunkSizePerQP;
