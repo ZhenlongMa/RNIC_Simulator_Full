@@ -5,7 +5,7 @@ import sys
 SERVER_LID  = 10
 
 NUM_CPUS  = 1
-CPU_CLK   = "20GHz"
+CPU_CLK   = "4GHz"
 EN_SPEED  = "100Gbps"
 PCI_SPEED = "128Gbps"
 
@@ -24,7 +24,7 @@ def cmd_run_sim(debug, test_prog, option, params):
     '''
     Generate simulation running command
     '''
-    testcase = sys.argv[1]
+
     cmd = "cd ../ && build/X86/gem5.opt"
 
     # Add debug options
@@ -44,7 +44,7 @@ def cmd_run_sim(debug, test_prog, option, params):
     cmd += " --qpc-cache-cap "  + str(params.qpc_cache_cap)
     cmd += " --reorder-cap "    + str(params.reorder_cap)
     cmd += " --mem-size 2048MB"
-    cmd += " > scripts/" + testcase + "_output"
+    cmd += " > scripts/qos_test.txt"
 
     return cmd
 
@@ -78,15 +78,17 @@ def main():
     else:
         testcase = sys.argv[1]
 
-    params = Param(2, 300, 64, WRITE)
+    params = Param(2, 100, 64, WRITE)
 
     num_nodes = params.num_nodes
     svr_lid = SERVER_LID
 
     debug = ""
-    debug = "PioEngine,CcuEngine,MrResc,HanGuDriver,RescCache,Ethernet,RdmaEngine,"
-    debug +="HanGuRnic,CxtResc,DmaEngine,"
-    debug +="DescScheduler"
+    debug = "HanGuDriver"
+    debug += ",CxtResc"
+    # debug = "PioEngine,CcuEngine,MrResc,HanGuDriver,RescCache,Ethernet,RdmaEngine,"
+    # debug +="HanGuRnic,CxtResc,DmaEngine,"
+    # debug +="DescScheduler"
 
     # add server program
     test_prog = "'tests/test-progs/hangu-rnic/src/" + testcase + "/server"
@@ -102,8 +104,4 @@ def main():
     return execute_program(debug=debug, test_prog=test_prog, option=opt, params=params)
 
 if __name__ == "__main__":
-    start = time.localtime()
     main()
-    end = time.localtime()
-    print("Start time: " + time.strftime("%Y-%m-%d/%H:%H:%S", start))
-    print("End time: " + time.strftime("%Y-%m-%d/%H:%H:%S", end))
