@@ -25,13 +25,12 @@ int cm_post_recv(struct ibv_context *ctx, int wr_num) {
         if (ctx->cm_rcv_posted_off + sizeof(struct rdma_cr) > RCV_WR_MAX * sizeof(struct rdma_cr)) {
             ctx->cm_rcv_posted_off = 0;
         }
-        RDMA_PRINT(librdma, "cm_post_recv : %d, flag 0x%x base addr 0x%lx, off 0x%lx\n", 
-            i, ((struct rdma_cr *)(recv_wqe[i].mr->addr + recv_wqe[i].offset))->flag, (uint64_t)recv_wqe[i].mr->addr, (uint64_t)recv_wqe[i].offset);
+        //RDMA_PRINT(librdma, "cm_post_recv : %d, flag 0x%x base addr 0x%lx, off 0x%lx\n", i, ((struct rdma_cr *)(recv_wqe[i].mr->addr + recv_wqe[i].offset))->flag, (uint64_t)recv_wqe[i].mr->addr, (uint64_t)recv_wqe[i].offset);
     }
     
     ibv_post_recv(ctx, recv_wqe, ctx->cm_qp, i);
     free(recv_wqe);
-    RDMA_PRINT(librdma, "cm_post_recv : exit\n");
+    //RDMA_PRINT(librdma, "cm_post_recv : exit\n");
     return i;
 }
 
@@ -46,7 +45,7 @@ int cm_post_send(struct ibv_context *ctx, struct rdma_cr *cr_info, int wr_num, u
 
     if (wr_num > SND_WR_MAX) {
         wr_num = SND_WR_MAX;
-        RDMA_PRINT(librdma, "cm_post_send: There's not enough room for CM to post send!\n");
+        //RDMA_PRINT(librdma, "cm_post_send: There's not enough room for CM to post send!\n");
         assert(wr_num < SND_WR_MAX);
     }
     
@@ -65,8 +64,7 @@ int cm_post_send(struct ibv_context *ctx, struct rdma_cr *cr_info, int wr_num, u
         send_wqe[i].send.dqpn = ctx->cm_qp->qp_num;
         send_wqe[i].send.qkey = QKEY_CM;
 
-        RDMA_PRINT(librdma, "cm_post_send[%d]: flag 0x%x base addr 0x%lx, off 0x%lx\n", 
-            i, cr_info[i].flag, (uint64_t)send_wqe[i].mr->addr, (uint64_t)send_wqe[i].offset);
+        //RDMA_PRINT(librdma, "cm_post_send[%d]: flag 0x%x base addr 0x%lx, off 0x%lx\n",  i, cr_info[i].flag, (uint64_t)send_wqe[i].mr->addr, (uint64_t)send_wqe[i].offset);
 
         ctx->cm_snd_off += sizeof(struct rdma_cr);
         if (ctx->cm_snd_off + sizeof(struct rdma_cr) > SND_WR_BASE + SND_WR_MAX * sizeof(struct rdma_cr)) {
@@ -75,7 +73,7 @@ int cm_post_send(struct ibv_context *ctx, struct rdma_cr *cr_info, int wr_num, u
     }
     ibv_post_send(ctx, send_wqe, ctx->cm_qp, wr_num);
     free(send_wqe);
-    RDMA_PRINT(librdma, "cm_post_send: after free\n");
+    //RDMA_PRINT(librdma, "cm_post_send: after free\n");
 
     return wr_num;
 }
@@ -105,7 +103,7 @@ struct rdma_resc *rdma_resc_init(struct ibv_context *ctx,int num_mr, int num_cq,
     // struct ibv_context *ctx = (struct ibv_context *)malloc(sizeof(struct ibv_context));
     // ibv_open_device(ctx, llid);
     // resc->ctx = ctx;
-    // RDMA_PRINT(librdma, "ibv_open_device : doorbell address 0x%lx\n", (long int)ctx->dvr);
+    // //RDMA_PRINT(librdma, "ibv_open_device : doorbell address 0x%lx\n", (long int)ctx->dvr);
 
     /* Post receive to CM */
     cm_post_recv(ctx, RCV_WR_MAX);
@@ -117,18 +115,18 @@ struct rdma_resc *rdma_resc_init(struct ibv_context *ctx,int num_mr, int num_cq,
     mr_attr.flag = MR_FLAG_RD | MR_FLAG_WR | MR_FLAG_LOCAL | MR_FLAG_REMOTE;
     for (i = 0; i < num_mr; ++i) {
         resc->mr[i] = ibv_reg_mr(ctx, &mr_attr);
-        RDMA_PRINT(librdma, "ibv_reg_mr: lkey 0x%x(%d)\n", resc->mr[i]->lkey, resc->mr[i]->lkey&RESC_LIM_MASK);
+        //RDMA_PRINT(librdma, "ibv_reg_mr: lkey 0x%x(%d)\n", resc->mr[i]->lkey, resc->mr[i]->lkey&RESC_LIM_MASK);
     }
-    RDMA_PRINT(librdma, "Init MR finish!\n");
+    //RDMA_PRINT(librdma, "Init MR finish!\n");
 
     /* Create CQ */
     struct ibv_cq_init_attr cq_attr;
     cq_attr.size_log = 12;
     for (i = 0; i < num_cq; ++i) {
         resc->cq[i] = ibv_create_cq(ctx, &cq_attr);
-        RDMA_PRINT(librdma, "ibv_create_cq: cqn 0x%x(%d)\n", resc->cq[i]->cq_num, resc->cq[i]->cq_num&RESC_LIM_MASK);
+        //RDMA_PRINT(librdma, "ibv_create_cq: cqn 0x%x(%d)\n", resc->cq[i]->cq_num, resc->cq[i]->cq_num&RESC_LIM_MASK);
     }
-    RDMA_PRINT(librdma, "Init CQ finish!\n");
+    //RDMA_PRINT(librdma, "Init CQ finish!\n");
 
     /* Create QP */
     struct ibv_qp_create_attr qp_attr;
@@ -136,14 +134,14 @@ struct rdma_resc *rdma_resc_init(struct ibv_context *ctx,int num_mr, int num_cq,
     qp_attr.rq_size_log = 12;
     // for (i = 0; i < num_qp * num_rem; ++i) {
     //     resc->qp[i] = ibv_create_qp(ctx, &qp_attr);
-    //     RDMA_PRINT(librdma, "ibv_create_qp: qpn %d\n", resc->qp[i]->qp_num);
+    //     //RDMA_PRINT(librdma, "ibv_create_qp: qpn %d\n", resc->qp[i]->qp_num);
     // }
     struct ibv_qp *qp_tmp = ibv_create_batch_qp(ctx, &qp_attr, num_qp * num_rem);
     for (i = 0; i < num_qp * num_rem; ++i) {
         resc->qp[i] = &(qp_tmp[i]);
-        // RDMA_PRINT(librdma, "ibv_create_qp: qpn 0x%x(%d)\n", resc->qp[i]->qp_num, resc->qp[i]->qp_num&RESC_LIM_MASK);
+        // //RDMA_PRINT(librdma, "ibv_create_qp: qpn 0x%x(%d)\n", resc->qp[i]->qp_num, resc->qp[i]->qp_num&RESC_LIM_MASK);
     }
-    RDMA_PRINT(librdma, "Init QP finish\n");
+    //RDMA_PRINT(librdma, "Init QP finish\n");
 
     for (i = 0; i < resc->num_rem; ++i) {
         /* Initialize remote info */
@@ -188,12 +186,12 @@ struct rdma_cr *rdma_listen(struct rdma_resc *resc, int *cm_cpl_num) {
         int res = ibv_poll_cpl(ctx->cm_cq, desc, MAX_CPL_NUM);
         if (res) {
             
-            RDMA_PRINT(librdma, "rdma_listen: ibv_poll_cpl finish ! return is %d, cpl_cnt %d\n", res, ctx->cm_cq->cpl_cnt);
+            //RDMA_PRINT(librdma, "rdma_listen: ibv_poll_cpl finish ! return is %d, cpl_cnt %d\n", res, ctx->cm_cq->cpl_cnt);
 
             for (int j  = 0; j < res; ++j) {
                 if (desc[j]->trans_type == IBV_TYPE_RECV) {
                     ++cnt;
-                    RDMA_PRINT(librdma, "rdma_listen: ibv_poll_cpl recv %d bytes CR.\n", desc[j]->byte_cnt);
+                    //RDMA_PRINT(librdma, "rdma_listen: ibv_poll_cpl recv %d bytes CR.\n", desc[j]->byte_cnt);
                 }
             }
             break;
@@ -217,18 +215,18 @@ struct rdma_cr *rdma_listen(struct rdma_resc *resc, int *cm_cpl_num) {
                     break;
                 }
             }
-            RDMA_PRINT(librdma, "rdma_listen: CR_TYPE_SYNC\n");
+            //RDMA_PRINT(librdma, "rdma_listen: CR_TYPE_SYNC\n");
         } else {
             memcpy(&(cr_info[req_cnt]), cr_tmp, sizeof(struct rdma_cr));
             ++req_cnt;
         }
 
         // u8_tmp = (uint8_t *)&(cr_info[i]);
-        // RDMA_PRINT(librdma, "rdma_listen: flag: 0x%x, base_addr 0x%lx, acked_off 0x%lx, src_qpn 0x%x, dst_qpn 0x%x\n", 
+        // //RDMA_PRINT(librdma, "rdma_listen: flag: 0x%x, base_addr 0x%lx, acked_off 0x%lx, src_qpn 0x%x, dst_qpn 0x%x\n", 
         //         cr_info[i].flag, (uint64_t)ctx->cm_mr->addr, (uint64_t)ctx->cm_rcv_acked_off,  
         //         cr_info[i].src_qpn, cr_info[i].dst_qpn);
         // for (int j = 0; j < sizeof(struct rdma_cr); ++j) {
-        //     RDMA_PRINT(librdma, "rdma_listen: data[%d] 0x%x\n", j, u8_tmp[j]);
+        //     //RDMA_PRINT(librdma, "rdma_listen: data[%d] 0x%x\n", j, u8_tmp[j]);
         // }
 
         /* Clear cpl data */
@@ -244,7 +242,7 @@ struct rdma_cr *rdma_listen(struct rdma_resc *resc, int *cm_cpl_num) {
     /* Post CM recv to RQ */
     if (ctx->cm_rcv_num < RCV_WR_MAX) {
         int rcv_wqe_num = cm_post_recv(ctx, RCV_WR_MAX);
-        RDMA_PRINT(librdma, "rdma_listen: Replenish %d Recv WQEs\n", rcv_wqe_num);
+        //RDMA_PRINT(librdma, "rdma_listen: Replenish %d Recv WQEs\n", rcv_wqe_num);
     }
 
     *cm_cpl_num = req_cnt;
@@ -277,7 +275,7 @@ int rdma_connect(struct rdma_resc *resc, struct rdma_cr *cr_info, uint16_t *dest
         }
 
         /* Post Same destination in one doorbell */
-        RDMA_PRINT(librdma, "rdma_connect: cm_post_send dest_info 0x%x cnt %d\n", dest_info[i], cnt);
+        //RDMA_PRINT(librdma, "rdma_connect: cm_post_send dest_info 0x%x cnt %d\n", dest_info[i], cnt);
 
         cm_post_send(ctx, &(cr_info[i]), cnt, dest_info[i]);
         i += cnt;
@@ -303,10 +301,10 @@ struct cpl_desc **rdma_poll_cm_rcv_cpl(struct rdma_resc *resc, int *cnt) {
         
         if (res) {
             
-            RDMA_PRINT(librdma, "rdma_poll_cm_rcv_cpl: ibv_poll_cpl finish ! return is %d, cpl cnt %d\n", res, ctx->cm_cq->cpl_cnt);
+            //RDMA_PRINT(librdma, "rdma_poll_cm_rcv_cpl: ibv_poll_cpl finish ! return is %d, cpl cnt %d\n", res, ctx->cm_cq->cpl_cnt);
 
             for (int j  = 0; j < res; ++j) {
-                RDMA_PRINT(librdma, "rdma_poll_cm_rcv_cpl: ibv_poll_cpl recv %d bytes CR Data.\n", desc[j]->byte_cnt);
+                //RDMA_PRINT(librdma, "rdma_poll_cm_rcv_cpl: ibv_poll_cpl recv %d bytes CR Data.\n", desc[j]->byte_cnt);
                 if (desc[j]->trans_type == IBV_TYPE_RECV) {
                     memcpy(desc[*cnt], desc[j], sizeof(struct cpl_desc));
                     ++(*cnt);
@@ -320,7 +318,7 @@ struct cpl_desc **rdma_poll_cm_rcv_cpl(struct rdma_resc *resc, int *cnt) {
 
 
 int post_sync(struct rdma_resc *resc) {
-    RDMA_PRINT(librdma, "into post_sync function!\n");
+    //RDMA_PRINT(librdma, "into post_sync function!\n");
     struct rdma_cr *cr_info = (struct rdma_cr *)malloc(sizeof(struct rdma_cr));
     
     memset(cr_info, 0, sizeof(struct rdma_cr));
@@ -328,7 +326,7 @@ int post_sync(struct rdma_resc *resc) {
     cr_info->src_lid = resc->ctx->lid;
     
     for (int i = 0; i < resc->num_rem; ++i) {
-        RDMA_PRINT(librdma, "post sync: %d\n", i);
+        //RDMA_PRINT(librdma, "post sync: %d\n", i);
         cm_post_send(resc->ctx, cr_info, 1, resc->rinfo[i].dlid);
     }
     free(cr_info);
@@ -338,7 +336,7 @@ int post_sync(struct rdma_resc *resc) {
 
 
 int poll_sync(struct rdma_resc *resc) {
-    RDMA_PRINT(librdma, "into poll_sync function1!\n");
+    //RDMA_PRINT(librdma, "into poll_sync function1!\n");
     /* Recv Sync CR Data */
     struct ibv_context *ctx = resc->ctx;
     struct rdma_cr *cr_info;
@@ -347,7 +345,7 @@ int poll_sync(struct rdma_resc *resc) {
     int cnt;
     int polled_sync_num = 0;
 
-    RDMA_PRINT(librdma, "into poll_sync function2!\n");
+    //RDMA_PRINT(librdma, "into poll_sync function2!\n");
 
     /* count already synced */
     for (int i = 0; i < resc->num_rem; ++i) {
@@ -360,25 +358,25 @@ int poll_sync(struct rdma_resc *resc) {
         return 0;
     }
 
-    RDMA_PRINT(librdma, "poll_sync: waiting!\n");
+    //RDMA_PRINT(librdma, "poll_sync: waiting!\n");
 
     while (1) {
 
         /* replenish cm recv wqe */
         if (ctx->cm_rcv_num < (RCV_WR_MAX / 2)) {
             int rcv_wqe_num = cm_post_recv(ctx, RCV_WR_MAX);
-            RDMA_PRINT(librdma, "poll_sync: Replenish %d Recv WQEs\n", rcv_wqe_num);
+            //RDMA_PRINT(librdma, "poll_sync: Replenish %d Recv WQEs\n", rcv_wqe_num);
         }
         
         /* Fetch Recv cpl in CQ */
         cnt = 0;
         while (1) {
             int res = ibv_poll_cpl(ctx->cm_cq, desc, MAX_CPL_NUM);
-            RDMA_PRINT(librdma, "poll_sync: (ibv_poll_cpl) finish ! return is %d, cpl cnt %d\n", res, ctx->cm_cq->cpl_cnt);
+            //RDMA_PRINT(librdma, "poll_sync: (ibv_poll_cpl) finish ! return is %d, cpl cnt %d\n", res, ctx->cm_cq->cpl_cnt);
             
             if (res) {
                 for (int j  = 0; j < res; ++j) {
-                    // RDMA_PRINT(librdma, "poll_sync: (ibv_poll_cpl) finish! recv %d bytes, trans type is %d.\n", desc[j]->byte_cnt, desc[j]->trans_type);
+                    // //RDMA_PRINT(librdma, "poll_sync: (ibv_poll_cpl) finish! recv %d bytes, trans type is %d.\n", desc[j]->byte_cnt, desc[j]->trans_type);
                     /* count number of recv completion */
                     if (desc[j]->trans_type == IBV_TYPE_RECV) {
                         ++cnt;
@@ -388,22 +386,19 @@ int poll_sync(struct rdma_resc *resc) {
             }
         }
 
-        RDMA_PRINT(librdma, "poll_sync: we got %d RECV CPL, cpl cnt %d, polled num %d\n", 
-                cnt, ctx->cm_cq->cpl_cnt, polled_sync_num);
+        //RDMA_PRINT(librdma, "poll_sync: we got %d RECV CPL, cpl cnt %d, polled num %d\n", cnt, ctx->cm_cq->cpl_cnt, polled_sync_num);
         
         for (int i = 0; i < cnt; ++i) {
             cr_info = (struct rdma_cr *)(ctx->cm_mr->addr + ctx->cm_rcv_acked_off + i * sizeof(struct rdma_cr));
 
-            RDMA_PRINT(librdma, "poll_sync: show : cr_info flag 0x%x, cr_info->src_lid %d\n", 
-                    cr_info->flag, cr_info->src_lid);
+            //RDMA_PRINT(librdma, "poll_sync: show : cr_info flag 0x%x, cr_info->src_lid %d\n", cr_info->flag, cr_info->src_lid);
         }
         
         /* Read every Connection Request (CR) data in cm_mr */
         for (int i = 0; i < cnt; ++i) {
             cr_info = (struct rdma_cr *)(ctx->cm_mr->addr + ctx->cm_rcv_acked_off);
 
-            RDMA_PRINT(librdma, "poll_sync: cr_info flag 0x%x, cr_info->src_lid %d\n", 
-                    cr_info->flag, cr_info->src_lid);
+            //RDMA_PRINT(librdma, "poll_sync: cr_info flag 0x%x, cr_info->src_lid %d\n",  cr_info->flag, cr_info->src_lid);
 
             /* Update CM CPL pointer */
             --ctx->cm_rcv_num;
@@ -445,15 +440,15 @@ int poll_sync(struct rdma_resc *resc) {
 // 
 int rdma_recv_sync(struct rdma_resc *resc) {
 
-    RDMA_PRINT(librdma, "rdma_recv_sync!\n");
+    //RDMA_PRINT(librdma, "rdma_recv_sync!\n");
 
     /* Recv Sync CR Data */
     poll_sync(resc);
-    RDMA_PRINT(librdma, "rdma_recv_sync: Recv Sync CR Data\n");
+    //RDMA_PRINT(librdma, "rdma_recv_sync: Recv Sync CR Data\n");
 
     /* Find Sync Data, Send CR Sync Data back and Exit */
     post_sync(resc);
-    RDMA_PRINT(librdma, "rdma_recv_sync: out\n");
+    //RDMA_PRINT(librdma, "rdma_recv_sync: out\n");
 
     return 0;
 
@@ -461,15 +456,15 @@ int rdma_recv_sync(struct rdma_resc *resc) {
 
 int rdma_send_sync(struct rdma_resc *resc) {
 
-    RDMA_PRINT(librdma, "rdma_send_sync!\n");
+    //RDMA_PRINT(librdma, "rdma_send_sync!\n");
 
     /* Send Sync CR data */
     post_sync(resc);
-    RDMA_PRINT(librdma, "rdma_send_sync: Send Sync CR data %d\n", resc->num_rem);
+    //RDMA_PRINT(librdma, "rdma_send_sync: Send Sync CR data %d\n", resc->num_rem);
 
     /* Recv Sync CR Data */
     poll_sync(resc);
-    RDMA_PRINT(librdma, "rdma_send_sync: Recv Sync CR Data %d\n", resc->num_rem);
+    //RDMA_PRINT(librdma, "rdma_send_sync: Recv Sync CR Data %d\n", resc->num_rem);
 
     return 0;
 }
@@ -484,10 +479,10 @@ int rdma_send_sync(struct rdma_resc *resc) {
 //     uint8_t total_group_weight = grp_resc->ctx->total_group_weight;
 //     uint8_t group_total_qp_weight = grp_resc->qos_group[0]->total_qp_weight;
 //     grp_resc->qos_group[0]->granularity = (double)group_weight / total_group_weight * N /group_total_qp_weight;
-//     RDMA_PRINT(librdma, "setting group granularity! group id: %d, group num: %d, group weight: %d, total group weight: %d, N: %d, group total qp weight: %d\n", 
+//     //RDMA_PRINT(librdma, "setting group granularity! group id: %d, group num: %d, group weight: %d, total group weight: %d, N: %d, group total qp weight: %d\n", 
 //         grp_resc->qos_group[0]->id, grp_resc->ctx->group_num, group_weight, total_group_weight, N, group_total_qp_weight);
 //     set_qos_group(grp_resc->ctx, grp_resc->qos_group[0], 1, &grp_resc->qos_group[0]->granularity);
-//     RDMA_PRINT(librdma, "group granularity set! group: %d, granularity: %d\n", grp_resc->qos_group[0]->id, grp_resc->qos_group[0]->granularity);
+//     //RDMA_PRINT(librdma, "group granularity set! group: %d, granularity: %d\n", grp_resc->qos_group[0]->id, grp_resc->qos_group[0]->granularity);
 // }
 
 // void set_all_granularity(struct ibv_context *ctx)
@@ -500,7 +495,7 @@ int rdma_send_sync(struct rdma_resc *resc) {
 //         group = ctx->qos_group + i;
 //         group->granularity = (double)group->weight / ctx->total_group_weight * ctx->N / group->total_qp_weight;
 //         granularity[i] = group->granularity;
-//         RDMA_PRINT(librdma, "set all granularity! group id: %d, group weight: %d, total group weight: %ld, group total qp weight: %ld, granularity: %d, group num: %d\n",
+//         //RDMA_PRINT(librdma, "set all granularity! group id: %d, group weight: %d, total group weight: %ld, group total qp weight: %ld, granularity: %d, group num: %d\n",
 //             group->id, group->weight, ctx->total_group_weight, group->total_qp_weight, group->granularity, group_num);
 //     }
 //     set_qos_group(ctx, ctx->qos_group, group_num, granularity);

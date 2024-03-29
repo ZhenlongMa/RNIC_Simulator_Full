@@ -37,6 +37,8 @@ uint8_t  cpu_id;
 uint32_t num_client;
 uint16_t qp_num;
 
+extern uint8_t post_send_num;
+
 #define HGRNIC_PRINT(x, ...) do {                       \
     printf("%s-%d [libhgrnic] " x, id_name, cpu_id, ##__VA_ARGS__);\
 } while (0)
