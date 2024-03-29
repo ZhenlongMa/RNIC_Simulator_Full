@@ -461,10 +461,12 @@ void HanGuDriver::initQoS(PortProxy& portProxy, Process* process)
         qosShareParamAddr = mem_state->getMmapEnd() - (qosSharePageNum << 12);
         mem_state->setMmapEnd(qosShareParamAddr);
         process->pTable->map(qosShareParamAddr, sharePhysAddr, (qosSharePageNum << 12), false);
-        uint32_t N = BIGN;
-        portProxy.writeBlob(qosShareParamAddr + NOffset, &N, sizeof(uint32_t));
+        // uint32_t N = BIGN;
+        // portProxy.writeBlob(qosShareParamAddr + NOffset, &N, sizeof(uint32_t));
         uint16_t groupNum = 0;
         portProxy.writeBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint16_t));
+        uint64_t qpNum = 0;
+        portProxy.writeBlob(qosShareParamAddr + qpAmountOffset, &qpNum, sizeof(uint64_t));
     }
     else
     {
@@ -563,12 +565,19 @@ void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_allo
     HANGU_PRINT(HanGuDriver, "group allocated! group ID: %d, groupNum: %d\n", args->group_id[0], groupNum);
 }
 
-void updateN(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_qp_args> &args)
+void HanGuDriver::updateN(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_qp_args> &args)
 {
+    // qpAmount += args->batch_size;
+    // update QP amount
+    uint64_t qpAmount;
+    portProxy.readBlob(qosShareParamAddr + qpAmountOffset, &qpAmount, sizeof(uint64_t));
+    HANGU_PRINT(HanGuDriver, "QP amount get! qp amount: %d\n", qpAmount);
     qpAmount += args->batch_size;
+    portProxy.writeBlob(qosShareParamAddr + qpAmountOffset, &qpAmount, sizeof(uint64_t));
+    HANGU_PRINT(HanGuDriver, "QP amount set! qp amount: %d\n", qpAmount);
     uint32_t bigN = qpAmount * chunkSizePerQP;
     portProxy.writeBlob(qosShareParamAddr + NOffset, &bigN, sizeof(uint32_t));
-    HANGU_PRINT(HanGuDriver, "N updated! qp amount: %d, N: %d\n", qpAmount, bigN);
+    HANGU_PRINT(HanGuDriver, "N updated! N: %d\n", bigN);
 }
 
 /**

@@ -187,8 +187,9 @@ class HanGuDriver final : public EmulatedDriver {
     const int groupGranularityOffset    = 1536;
     const int barShareAddrOffset        = 0x30;
     const int barShareAddrFlagOffset    = 0x40;
+    const int qpAmountOffset            = 0x50;
     const int qosSharePageNum           = 1;
-    int qpAmount = 0;
+    // int qpAmount = 0;
     const int chunkSizePerQP = 1024;
     /* -------QoS Group resources {end}------- */
 

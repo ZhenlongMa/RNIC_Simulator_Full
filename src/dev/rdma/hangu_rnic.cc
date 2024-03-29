@@ -155,6 +155,10 @@ HanGuRnic::read(PacketPtr pkt) {
     {
         pkt->setLE<uint64_t>(regs.qosShareAddr);
     }
+    else if (daddr == 0x40)
+    {
+        // reserved for QP amount
+    }
     else {
         pkt->setLE<uint32_t>(0);
     }

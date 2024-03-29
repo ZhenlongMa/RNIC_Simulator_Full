@@ -1,0 +1,45 @@
+Date : 2024-03-26 23:00:25
+Directory : d:\Projects\RNIC-Scheduler\src\dev\rdma
+Total : 19 files,  5441 codes, 1618 comments, 1395 blanks, all 8454 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| C++      |         16 |      5,227 |      1,504 |      1,306 |      8,037 |
+| CUDA C++ |          1 |        134 |         62 |         64 |        260 |
+| Python   |          2 |         80 |         52 |         25 |        157 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++-------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                        | files      | code       | comment    | blank      | total      |
++-------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                           |         19 |      5,441 |      1,618 |      1,395 |      8,454 |
++-------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                    | language | code       | comment    | blank      | total      |
++-------------------------------------------------------------+----------+------------+------------+------------+------------+
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\Rnic.py             | Python   |         54 |         24 |         14 |         92 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\SConscript          | Python   |         26 |         28 |         11 |         65 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\cqc_module.cc       | C++      |        110 |         11 |         35 |        156 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\desc_scheduler.cc   | C++      |        502 |         67 |         37 |        606 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\hangu_cache.cc      | C++      |         60 |         30 |         17 |        107 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\hangu_dma_engine.cc | C++      |        214 |         34 |         54 |        302 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\hangu_driver.cc     | C++      |        600 |        115 |        131 |        846 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\hangu_driver.hh     | C++      |         97 |         68 |         50 |        215 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\hangu_rnic.cc       | C++      |        442 |         87 |        106 |        635 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\hangu_rnic.hh       | C++      |        528 |        367 |        282 |      1,177 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\hangu_rnic_defs.hh  | C++      |        586 |         91 |         98 |        775 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\kfd_ioctl.h         | CUDA C++ |        134 |         62 |         64 |        260 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\mr_module.cc        | C++      |        371 |         66 |         81 |        518 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\pending_struct.cc   | C++      |        111 |         19 |         28 |        158 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\qpc_module.cc       | C++      |        341 |         38 |         36 |        415 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\rdma_engine.cc      | C++      |        883 |        359 |        237 |      1,479 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\rdma_nic.cc         | C++      |        102 |         24 |         23 |        149 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\rdma_nic.hh         | C++      |         38 |         24 |         11 |         73 |
+| d:\Projects\RNIC-Scheduler\src\dev\rdma\resc_cache.cc       | C++      |        242 |        104 |         80 |        426 |
+| Total                                                       |          |      5,441 |      1,618 |      1,395 |      8,454 |
++-------------------------------------------------------------+----------+------------+------------+------------+------------+
