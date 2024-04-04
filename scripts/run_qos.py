@@ -4,8 +4,8 @@ import sys
 
 SERVER_LID  = 10
 
-NUM_CPUS  = 1
-CPU_CLK   = "20GHz"
+NUM_CPUS  = 2
+CPU_CLK   = "4GHz"
 EN_SPEED  = "100Gbps"
 PCI_SPEED = "128Gbps"
 
@@ -13,11 +13,12 @@ WRITE = 0
 READ = 1
 
 class Param():
-    def __init__(self, num_nodes, qpc_cache_cap, reorder_cap, op_mode):
+    def __init__(self, num_nodes, qpc_cache_cap, reorder_cap, op_mode, test_case):
         self.num_nodes     = num_nodes
         self.qpc_cache_cap = qpc_cache_cap
         self.reorder_cap   = reorder_cap
         self.op_mode       = op_mode
+        self.test_case     = test_case
 
 
 def cmd_run_sim(debug, test_prog, option, params):
@@ -44,7 +45,7 @@ def cmd_run_sim(debug, test_prog, option, params):
     cmd += " --qpc-cache-cap "  + str(params.qpc_cache_cap)
     cmd += " --reorder-cap "    + str(params.reorder_cap)
     cmd += " --mem-size 2048MB"
-    cmd += " > scripts/" + testcase + "_output"
+    cmd += " > scripts/" + params.test_case + ".txt"
 
     return cmd
 
@@ -78,7 +79,7 @@ def main():
     else:
         testcase = sys.argv[1]
 
-    params = Param(2, 300, 64, WRITE)
+    params = Param(2, 100, 64, WRITE, testcase)
 
     num_nodes = params.num_nodes
     svr_lid = SERVER_LID
