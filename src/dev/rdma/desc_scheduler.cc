@@ -157,17 +157,14 @@ void HanGuRnic::DescScheduler::qpcPrefetchProc(){
     if(highQpcPrefetchFifo.size()){
         qpn = highQpcPrefetchFifo.front();
         highQpcPrefetchFifo.pop();
-        CxtReqRspPtr qpcRdReq = make_shared<CxtReqRsp>(CXT_PREF_QP, CXT_CHNL_TX, qpn, 1, 0); 
-        qpcRdReq->txQpcRsp = new QpcResc;
-        rNic->qpcModule.postQpcReq(qpcRdReq);
     }else if(lowQpcPrefetchFifo.size()){
         qpn = lowQpcPrefetchFifo.front();
         lowQpcPrefetchFifo.pop();
-        CxtReqRspPtr qpcRdReq = make_shared<CxtReqRsp>(CXT_PREF_QP, CXT_CHNL_TX, qpn, 1, 0); 
-        qpcRdReq->txQpcRsp = new QpcResc;
-        rNic->qpcModule.postQpcReq(qpcRdReq);
     }
-
+    CxtReqRspPtr qpcRdReq = make_shared<CxtReqRsp>(CXT_PREF_QP, CXT_CHNL_TX, qpn, 1, 0); 
+    qpcRdReq->txQpcRsp = new QpcResc;
+    rNic->qpcModule.postQpcReq(qpcRdReq);
+    HANGU_PRINT(DescScheduler, "QPC Prefetch! QPN: 0x%x, idx: %d\n", qpn, qpcRdReq->idx);
     if(highQpcPrefetchFifo.size() + lowQpcPrefetchFifo.size()){
         if(!qpcPrefetchEvent.scheduled()){
             rNic->schedule(qpcPrefetchEvent, curTick() + rNic->clockPeriod());
