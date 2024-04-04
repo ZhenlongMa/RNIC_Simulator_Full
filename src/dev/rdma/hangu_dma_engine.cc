@@ -146,13 +146,8 @@ HanGuRnic::DmaEngine::dmaReadCplProcessing() {
     dmaReq->rdVld = 1;
     Event *e = &rnic->qpcModule.qpcRspProcEvent;
     if (dmaReq->event == e) { /* qpc dma read cpl pkt */
-        HANGU_PRINT(DmaEngine, " DMAEngine.dmaReadCplProcessing: push to rnic->qpcModule.qpcRspProcEvent!\n");
+        assert(dmaReq->size == 256);
         rnic->qpcDmaRdCplFifo.push(dmaReq);
-
-        if (dmaReq->size == 256) {
-            HANGU_PRINT(DmaEngine, " DMAEngine.dmaReadCplProcessing: 0x%lx!\n", uintptr_t(dmaReq->data));
-            HANGU_PRINT(DmaEngine, " DMAEngine.dmaReadCplProcessing: qpn %d dqpn %d!\n", ((QpcResc *)dmaReq->data)->srcQpn, ((QpcResc *)dmaReq->data)->destQpn);
-        }
     }
 
     /* Schedule related completion event */
