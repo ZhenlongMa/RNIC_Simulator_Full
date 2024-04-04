@@ -185,6 +185,7 @@ const uint8_t MPT_FLAG_LOCAL  = (1 << 2);
 const uint8_t MPT_FLAG_REMOTE = (1 << 3);
 
 // WRITE_QP
+// WARNING: The size of QPC must be 256B!
 struct QpcResc {
     uint8_t flag; // QP state, not useed now
     uint8_t qpType;
@@ -203,11 +204,12 @@ struct QpcResc {
     uint32_t sndWqeBaseLkey; // send wqe base lkey
     uint32_t rcvWqeBaseLkey; // receive wqe base lkey
     uint32_t qkey;
-    uint32_t reserved[52];
+    uint32_t reserved[51];
 
     uint8_t  indicator; // 1: latency-sensitive; 2: bandwidth-sensitive; 3: message rate sensitive
     uint8_t  perfWeight;
     uint8_t  groupID;
+    uint8_t  qosReserve;
 };
 
 const uint8_t QP_TYPE_RC = 0x00;
