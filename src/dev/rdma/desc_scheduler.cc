@@ -334,6 +334,8 @@ void HanGuRnic::DescScheduler::wqeProc()
         assert(descNum >= 1);
         uint32_t procSize = 0; // data size been processed in this schedule period
         uint32_t batchSize; // the size of data that should be transmitted in this schedule period
+        assert(qpStatus->weight > 0);
+        assert(groupTable[qpStatus->group_id] > 0);
         batchSize = qpStatus->weight * groupTable[qpStatus->group_id];
         assert(batchSize > 0);
         for (int i = 0; i < descNum; i++)
