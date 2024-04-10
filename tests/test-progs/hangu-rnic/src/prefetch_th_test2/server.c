@@ -23,10 +23,8 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->weight = 2;
         RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d, group id: %d\n", 
                 qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num, i, qp->group_id);
-        // ibv_modify_qp(resc->ctx, qp);
     }
     ibv_modify_batch_qp(resc->ctx, resc->qp[0], resc->num_qp * resc->num_rem);
-
     return 0;
 }
 
@@ -49,28 +47,23 @@ int svr_update_info(struct rdma_resc *resc) {
     int sum = 0, num;
     struct rdma_cr *cr_info;
     uint16_t *dest_info = (uint16_t *)malloc(sizeof(uint16_t) * resc->num_rem);
-
     while (sum < resc->num_rem) {
         cr_info = rdma_listen(resc, &num); /* listen connection request from client (QP0) */
         if (num == 0) { /* no cr_info is acquired */
             continue;
         }
         RDMA_PRINT(Server, "svr_update_info: rdma_listen end, Polled %d CR data\n", num);
-        
         for (int i = 0; i < num; ++i) {
-
             /* get remote addr information */
             resc->rinfo[sum].dlid  = cr_info[i].src_lid;
             resc->rinfo[sum].raddr = cr_info[i].raddr;
             resc->rinfo[sum].rkey  = cr_info[i].rkey;
             ++sum;
-
             /* Generate Connect Request to respond client */
             cr_info[i].flag = CR_TYPE_ACK;
             cr_info[i].raddr = (uintptr_t)resc->mr[0]->addr;
             cr_info[i].rkey  = resc->mr[0]->lkey;
             dest_info[i] = cr_info[i].src_lid;
-
             RDMA_PRINT(Server, "svr_update_info: sum %d resc_num_rem %d, cr_info[i].raddr %ld cr_info[i].rkey %d dest_info[i] %d\n", 
                     sum, resc->num_rem, cr_info[i].raddr, cr_info[i].rkey, dest_info[i]);
         }
@@ -79,10 +72,8 @@ int svr_update_info(struct rdma_resc *resc) {
         free(cr_info);
     }
     free(dest_info);
-
     /* modify qp in server side */
     svr_update_qps(resc);
-
     return 0;
 }
 

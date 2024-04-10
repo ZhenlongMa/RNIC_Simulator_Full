@@ -166,59 +166,6 @@ static void usage(const char *argv0) {
     printf("  -m, --op-mode=<op_mode>           opcode mode (default 0, which is RDMA Write)\n");
 }
 
-double latency_test(struct rdma_resc *resc, int num_qp, uint8_t op_mode, uint32_t iter_count) 
-{
-    uint64_t iter_start_time, iter_end_time, con_time = 0;
-    struct cpl_desc **desc = resc->desc;
-    uint8_t polling;
-    uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
-    uint64_t* latency_vec;
-    uint64_t test_start_time;
-    uint64_t test_end_time;
-    latency_vec = (uint64_t*)malloc(sizeof(uint64_t) * iter_count);
-
-    // struct ibv_qp *qp = resc->qp[0]; // only use one QP
-    struct ibv_qp *qp = resc->qp[0];
-    generate_wqe(resc, op_mode, sizeof(TRANS_WRDMA_DATA), 0, LATENCY_WR_NUM);
-    test_start_time = get_time(resc->ctx);
-    test_end_time = test_start_time;
-    //RDMA_PRINT(Server, "latency_test start time: %ld\n", test_start_time);
-
-    int k = 0;
-    while(test_end_time - test_start_time < TEST_TIME * 200UL * US)
-    {
-        k++;
-        //RDMA_PRINT(Server, "latency_test iteration %d, qp_num: %d\n", k, qp->qp_num);
-        for (int i = 0; i < num_client; ++i) 
-        {
-            for(int jj = 0; jj < num_qp; jj++){
-                qp = resc->qp[jj];
-
-                iter_start_time = get_time(resc->ctx);
-                ibv_post_send(resc->ctx, resc->wqe, qp, LATENCY_WR_NUM);
-                polling = 1;
-                while (polling) 
-                {
-                    int res = ibv_poll_cpl(qp->cq, desc, MAX_CPL_NUM);
-                    for (int j = 0; j < res; ++j) 
-                    {
-                        if (desc[j]->trans_type == ibv_type[op_mode]) 
-                        {
-                            polling = 0;
-                            iter_end_time = get_time(resc->ctx);
-                            test_end_time = iter_end_time;
-                            break;
-                        }
-                    }
-                }
-                con_time += (iter_end_time - iter_start_time);
-                RDMA_PRINT(Server, "qpn_num: %d, latency_test consume_time %.2lf ns\n", qp->qp_num, (iter_end_time - iter_start_time) / 1000.0);
-            }
-        }
-    }
-    return ((con_time * 1.0) / (k * num_qp * num_client * 1000.0));
-}
-
 void generate_wqe(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, uint32_t offset, int wr_num)
 {
     resc->wqe = (struct ibv_wqe *)malloc(sizeof(struct ibv_wqe) * THPT_WR_NUM);
@@ -258,6 +205,46 @@ void generate_wqe(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, ui
     }
 }
 
+struct ibv_wqe *generate_wqe_new(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, uint32_t offset, int wr_num)
+{
+    struct ibv_wqe *wqe_list = (struct ibv_wqe *)malloc(sizeof(struct ibv_wqe) * THPT_WR_NUM);
+    struct ibv_mr *local_mr = (resc->mr)[0];
+
+    if (op_mode == OPMODE_RDMA_WRITE) 
+    {
+        for (int i = 0; i < wr_num; ++i) 
+        {
+            // wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
+            wqe_list[i].length = msg_size;
+            wqe_list[i].mr = local_mr;
+            wqe_list[i].offset = offset;
+
+            /* Add RDMA Write element */
+            wqe_list[i].trans_type = IBV_TYPE_RDMA_WRITE;
+            wqe_list[i].flag       = (i == wr_num - 1) ? WR_FLAG_SIGNALED : 0;
+            wqe_list[i].rdma.raddr = resc->rinfo->raddr + (sizeof(TRANS_WRDMA_DATA) - 1) * i + offset;
+            wqe_list[i].rdma.rkey  = resc->rinfo->rkey;
+        }
+    } 
+    else if (op_mode == OPMODE_RDMA_READ) 
+    {
+        for (int i = 0; i < wr_num; ++i) 
+        {
+            wqe_list[i].length = sizeof(TRANS_RRDMA_DATA);
+            wqe_list[i].mr = local_mr;
+            wqe_list[i].offset = (sizeof(TRANS_RRDMA_DATA) - 1) * i + offset;
+
+            /* Add RDMA Read element */
+            wqe_list[i].trans_type = IBV_TYPE_RDMA_READ;
+            wqe_list[i].flag       = (i == wr_num - 1) ? WR_FLAG_SIGNALED : 0;
+            wqe_list[i].rdma.raddr = resc->rinfo->raddr + offset;
+            wqe_list[i].rdma.rkey  = resc->rinfo->rkey;
+        }
+        
+    }
+    return wqe_list;
+}
+
 double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uint8_t op_mode, uint32_t offset, uint64_t *start_time, uint64_t *end_time, uint64_t *con_time, uint64_t *snd_cnt) {
     uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
     // int num_qp = resc->num_qp;
@@ -279,6 +266,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     memset(record.cqe_count, 0, sizeof(uint64_t) * (num_qp * num_client));
     int wr_num;
     uint32_t msg_size;
+    struct ibv_wqe* wqe_list;
 
     // if (cpu_id == 0)
     // {
@@ -300,7 +288,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     // generate WQE
     for (int i = 0; i < qos_group_num; i++)
     {
-        generate_wqe(grp_resc[i], op_mode, msg_size, offset, wr_num);
+        wqe_list = generate_wqe_new(grp_resc[i], op_mode, msg_size, offset, wr_num);
     }
 
     /* Start to post all the QPs at beginning */
@@ -356,17 +344,17 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
         }
         *end_time = get_time(ctx);
         *con_time = *end_time - *start_time;
-    } while ((*con_time < TEST_TIME * 20UL * US) || (*start_time == 0));
+    } while ((*con_time < TEST_TIME * MS) || (*start_time == 0));
 
     int cqe_sum = 0;
     for (int i = 0; i < num_client * num_qp; i++)
     {
         // note that this is not indexed by QPN!
-        //RDMA_PRINT(Server, "QP[%d] cqe count: %ld\n", i + 1, record.cqe_count[i]);
+        RDMA_PRINT(Server, "QP[%d] cqe count: %ld\n", i + 1, record.cqe_count[i]);
         cqe_sum += record.cqe_count[i];
     }
-    //RDMA_PRINT(Server, "CPU[%d] cqe sum: %d\n", cpu_id, cqe_sum);
-    //RDMA_PRINT(Server, "time: %ld\n", *con_time);
+    RDMA_PRINT(Server, "CPU[%d] cqe sum: %d\n", cpu_id, cqe_sum);
+    RDMA_PRINT(Server, "time: %ld\n", *con_time);
     return (*snd_cnt * 1000000.0) / *con_time; /* message rate */
 }
 
