@@ -292,7 +292,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     //     msg_size = sizeof(TRANS_WRDMA_DATA);
     //     //RDMA_PRINT(Server, "small message! CPU: %d, write num: %d, message size: %d\n", cpu_id, wr_num, msg_size);
     // }
-    wr_num = BW_WR_NUM;
+    wr_num = THPT_WR_NUM;
     // msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
     msg_size = sizeof(TRANS_WRDMA_DATA);
     //RDMA_PRINT(Server, "set wr num and msg size! cpu id: %d, wr num: %d, msg size: %d\n", cpu_id, wr_num, msg_size);
@@ -484,8 +484,8 @@ int main (int argc, char **argv) {
     }
     else
     {
-        grp1_num_qp = 260;
-        grp2_num_qp = 10;
+        grp1_num_qp = 2;
+        grp2_num_qp = 2;
         grp1_weight = 15;
         grp2_weight = 15;
     }
@@ -515,26 +515,26 @@ int main (int argc, char **argv) {
     grp_resc[0] = grp1_resc;
     grp_resc[1] = grp2_resc;
 
-    latency = latency_test(grp1_resc, 256, op_mode, 1000);
-    RDMA_PRINT(Server, "latency test end!,latency = %.2lf ns\n", latency);
+    // latency = latency_test(grp1_resc, 256, op_mode, 1000);
+    // RDMA_PRINT(Server, "latency test end!,latency = %.2lf ns\n", latency);
     
-    // if (judge_latency(cpu_id) == LAT_QP)
-    // {
-    //     // Start Latency test 
-    //     latency = latency_test(grp1_resc, 1, op_mode, 1000);
-    //     RDMA_PRINT(Server, "latency test end!,latency = %.2lf ns\n", latency);
-    // }
-    // else
-    // {
-    //     msg_rate = throughput_test(ib_context, grp_resc, op_mode, offset, &start_time, &end_time, &con_time, &snd_cnt);
-    //     if (op_mode == OPMODE_RDMA_WRITE) {
-    //         bandwidth = msg_rate * sizeof(TRANS_WRDMA_DATA);
-    //     } else if (op_mode == OPMODE_RDMA_READ) {
-    //         bandwidth = msg_rate * sizeof(TRANS_RRDMA_DATA);
-    //     }
-    //     RDMA_PRINT(Server, "start time %lu end time %lu consumed time is %lu, send cnt: %lu, bandwidth %.2lf MB/s, msg_rate %.2lf Mops/s, latency %.2lf ns\n", 
-    //             start_time, end_time, con_time, snd_cnt, bandwidth, msg_rate, latency);
-    // }
+    if (judge_latency(cpu_id) == LAT_QP)
+    {
+        // Start Latency test 
+        latency = latency_test(grp1_resc, 1, op_mode, 1000);
+        RDMA_PRINT(Server, "latency test end!,latency = %.2lf ns\n", latency);
+    }
+    else
+    {
+        msg_rate = throughput_test(ib_context, grp_resc, op_mode, offset, &start_time, &end_time, &con_time, &snd_cnt);
+        if (op_mode == OPMODE_RDMA_WRITE) {
+            bandwidth = msg_rate * sizeof(TRANS_WRDMA_DATA);
+        } else if (op_mode == OPMODE_RDMA_READ) {
+            bandwidth = msg_rate * sizeof(TRANS_RRDMA_DATA);
+        }
+        RDMA_PRINT(Server, "start time %lu end time %lu consumed time is %lu, send cnt: %lu, bandwidth %.2lf MB/s, msg_rate %.2lf Mops/s, latency %.2lf ns\n", 
+                start_time, end_time, con_time, snd_cnt, bandwidth, msg_rate, latency);
+    }
 
     
     /* Inform Client that Transmission has completed */
