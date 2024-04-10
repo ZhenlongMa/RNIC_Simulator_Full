@@ -88,8 +88,6 @@ void HanGuRnic::DescScheduler::qpStatusProc()
 
         if(highPriorityQpnQue.size() + lowPriorityQpnQue.size() > GAP_REQ_NUM){
             highQpcPrefetchFifo.push(db->qpn);
-           
-            // printf("highQpcPrefetchFifo push qpn: %d, highPriorityQpnQue size: %d, lowPriorityQpnQue size: %d\n", db->qpn, highPriorityQpnQue.size(), lowPriorityQpnQue.size());
         }
 
         schedule = true;
@@ -106,8 +104,6 @@ void HanGuRnic::DescScheduler::qpStatusProc()
 
             if(highPriorityQpnQue.size() + lowPriorityQpnQue.size() > GAP_REQ_NUM){
                 lowQpcPrefetchFifo.push(db->qpn);
-
-                // printf("highQpcPrefetchFifo push qpn: %d, highPriorityQpnQue size: %d, lowPriorityQpnQue size: %d\n", db->qpn, highPriorityQpnQue.size(), lowPriorityQpnQue.size());
             }
 
             schedule = true;
