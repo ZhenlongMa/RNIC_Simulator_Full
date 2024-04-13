@@ -101,7 +101,7 @@ HanGuRnic::RdmaEngine::dfuProcessing () {
 void
 HanGuRnic::RdmaEngine::dduProcessing () {
     
-    // HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing!\n");
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing!\n");
 
     // make sure that on fly data request number does not exceed DATA_REQ_LIMIT
     if (std::count(dd2dpVector.begin(), dd2dpVector.end(), nullptr) > dd2dpVector.size() - DATA_REQ_LIMIT)
@@ -158,6 +158,10 @@ HanGuRnic::RdmaEngine::dduProcessing () {
             this->dduDbell = nullptr;
         }
     }
+    else {
+        HANGU_PRINT(HanGuRnic, "RdmaEngine.dduProcessing: dd2dpVector overfull! vector nullptr number: %d, vector size: %d, Wait a second......\n",
+            std::count(dd2dpVector.begin(), dd2dpVector.end(), nullptr), dd2dpVector.size());
+    }
 
     /* Schedule myself again if there's new descriptor
      * or there remains descriptors to post */
@@ -204,7 +208,7 @@ HanGuRnic::RdmaEngine::getRdmaHeadSize (uint8_t opcode, uint8_t qpType) {
 void
 HanGuRnic::RdmaEngine::dpuProcessing () {
 
-    // HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing!\n");
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing!\n");
 
     if (dp2rgFifo.size() < DATA_REQ_LIMIT)
     {
@@ -277,6 +281,10 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
             break;
         }
     }
+    else
+    {
+        HANGU_PRINT(RdmaEngine, "RdmaEngine.dpuProcessing: dp2rgFifo overfull! FIFO size: %d, Wait for a second......\n", dp2rgFifo.size());
+    }
 
     /* Recall myself if there's new descriptor and QPC */
     if (rnic->qpcModule.txQpcRspFifo.size()) {
@@ -327,16 +335,16 @@ void
 HanGuRnic::RdmaEngine::postTxCpl(uint8_t qpType, uint32_t qpn, 
         uint32_t cqn, TxDescPtr desc) {
     
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.postTxCpl! qpn %d, cqn %d \n", qpn, cqn);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.postTxCpl! qpn 0x%x, cqn %d \n", qpn, cqn);
 
     /* signaled to CQ based on the info from wqe */
     if (!desc->isSignaled()) {
-        HANGU_PRINT(RdmaEngine, "Do not post completion! QPN: %d, desc flag: 0x%lx\n", qpn, desc->flags);
+        HANGU_PRINT(RdmaEngine, "Do not post completion! QPN: 0x%x, desc flag: 0x%lx\n", qpn, desc->flags);
         return;
     }
     else
     {
-        HANGU_PRINT(RdmaEngine, "Post completioin! QPN: %d, desc flag: 0x%lx\n", qpn, desc->flags);
+        HANGU_PRINT(RdmaEngine, "Post completion! QPN: 0x%x, desc flag: 0x%lx\n", qpn, desc->flags);
     }
     
     /* Post related info into scu Fifo */
@@ -857,7 +865,7 @@ HanGuRnic::RdmaEngine::scuProcessing () {
 
     assert(rnic->txCqcRspFifo.size());
     
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.scuProcessing: cq offset: %d, cq lkey %d, qpn %d, cqn %d, transtype: %d\n", 
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.scuProcessing: cq offset: %d, cq lkey %d, qpn 0x%x, cqn %d, transtype: %d\n", 
             rnic->txCqcRspFifo.front()->txCqcRsp->offset, 
             rnic->txCqcRspFifo.front()->txCqcRsp->lkey, 
             rg2scFifo.front()->qpn, rg2scFifo.front()->cqn, rg2scFifo.front()->transType);
