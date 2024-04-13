@@ -224,24 +224,24 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     /* Start to post all the QPs at beginning */
     for (int k = 0; k < qos_group_num; k++) // exclude CM group
     {
-        if (cpu_id == 0 && k == 0)
-        {
-            continue;
-        }
+        // if (cpu_id == 0 && k == 0)
+        // {
+        //     continue;
+        // }
         struct rdma_resc *resc = grp_resc[k];
         for (int i = 0; i < num_client; ++i) {
             for (int j = 0; j < resc->num_qp; ++j) {
                 if (j == 0) // elephant flow
                 {
                     elephant_qp = resc->qp[i * resc->num_qp + j];
-                    for (int k = 0; k < 2; k++)
+                    for (int k = 0; k < 1; k++)
                     {
                         ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
                     }
                 }
                 else // mice flows
                 {
-                    for (int k = 0; k < 2; k++)
+                    for (int k = 0; k < 1; k++)
                     {
                         ibv_post_send(resc->ctx, mice_wqe_list, resc->qp[i * resc->num_qp + j], mice_wr_num);
                     }
@@ -260,8 +260,8 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
             int num_cq = resc->num_cq;
             for (int i = 0; i < num_cq; ++i) {
                 int res = ibv_poll_cpl(resc->cq[i], desc, MAX_CPL_NUM);
-                // RDMA_PRINT(Server, "cpu[%d] get cqe num: %d\n", cpu_id, res);
                 if (res) {
+                    RDMA_PRINT(Server, "cpu[%d] get cqe num: %d\n", cpu_id, res);
                     if (*start_time == 0) {
                         *start_time = get_time(resc->ctx);
                     }
