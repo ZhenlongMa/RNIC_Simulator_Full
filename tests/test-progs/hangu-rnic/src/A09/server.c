@@ -2,7 +2,7 @@
 #include "server.h"
 
 int svr_update_qps(struct rdma_resc *resc) {
-    int weight = 2;
+    static int weight = 2;
     for (int i = 0; i < resc->num_qp * resc->num_rem; ++i) {
         /* Modify Local QP */
         struct ibv_qp *qp = resc->qp[i];
@@ -22,8 +22,8 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->group_id = resc->qos_group[0]->id;
         qp->indicator = BW_QP;
         qp->weight = weight;
-        RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d, weight: %d, group id: %d, group weight: %d\n", 
-                qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num, i, qp->weight, qp->group_id, resc->qos_group[0]->weight);
+        RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d, weight: %d, group id: %d\n", 
+                qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num, i, qp->weight, qp->group_id);
         // ibv_modify_qp(resc->ctx, qp);
         weight++;
     }
@@ -171,7 +171,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
         elephant_msg_size = mice_msg_size;
     #else
         elephant_wr_num = BW_WR_NUM;
-        elephant_msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
+        elephant_msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
     #endif
     struct ibv_wqe *mice_wqe_list;
     struct ibv_wqe *elephant_wqe_list;
@@ -192,7 +192,9 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
             }
         }
     }
-    
+
+not finished!
+
     /* polling for completion */
     do { // snd_cnt < (num_qp * TEST_WR_NUM * num_client)
         for (int grp_id = 0; grp_id < qos_group_num; grp_id++) {
@@ -339,19 +341,14 @@ int main (int argc, char **argv) {
 
     int num_mr = 1;
     int num_cq = TEST_CQ_NUM;
-    int group_num = 4;
+    int group_num = 2;
     int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
     int *group_weight = (int *)malloc(sizeof(int) * group_num);
     group_qp_num[0] = 2;
     group_qp_num[1] = 2;
-    group_qp_num[2] = 2;
-    group_qp_num[3] = 2;
-    group_weight[0] = 10 + cpu_id * 4;
-    group_weight[1] = 11 + cpu_id * 4;
-    group_weight[2] = 12 + cpu_id * 4;
-    group_weight[3] = 13 + cpu_id * 4;
-    RDMA_PRINT(Server, "cpu id: %d, group 0 weight: %d, group 1 weight: %d, group 2 weight: %d, group 3 weight: %d\n", 
-        cpu_id, group_weight[0], group_weight[1], group_weight[2], group_weight[3]);
+    group_weight[0] = 10 + cpu_id * 5;
+    group_weight[1] = 15 + cpu_id * 5;
+    RDMA_PRINT(Server, "cpu id: %d, group 0 weight: %d, group 1 weight: %d\n", cpu_id, group_weight[0], group_weight[1]);
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
 
     /* device initialization */
@@ -361,10 +358,6 @@ int main (int argc, char **argv) {
     RDMA_PRINT(Server, "group1 resource created!\n");
     struct rdma_resc *grp2_resc = set_group_resource(ib_context, num_mr, num_cq, group_qp_num[1], svr_lid, num_client, group_weight[1]);
     RDMA_PRINT(Server, "group2 resource created!\n");
-    struct rdma_resc *grp3_resc = set_group_resource(ib_context, num_mr, num_cq, group_qp_num[2], svr_lid, num_client, group_weight[2]);
-    RDMA_PRINT(Server, "group3 resource created!\n");
-    struct rdma_resc *grp4_resc = set_group_resource(ib_context, num_mr, num_cq, group_qp_num[3], svr_lid, num_client, group_weight[3]);
-    RDMA_PRINT(Server, "group4 resource created!\n");
 
     /* sync to make sure that we could get start */
     rdma_recv_sync(grp1_resc);
@@ -379,8 +372,6 @@ int main (int argc, char **argv) {
     struct rdma_resc **grp_resc = (struct rdma_resc**)malloc(sizeof(struct rdma_resc *) * (ib_context->group_num - 1));
     grp_resc[0] = grp1_resc;
     grp_resc[1] = grp2_resc;
-    grp_resc[2] = grp3_resc;
-    grp_resc[3] = grp4_resc;
 
     msg_rate = throughput_test(ib_context, grp_resc, op_mode, offset, &start_time, &end_time, &con_time, &snd_cnt);
     if (op_mode == OPMODE_RDMA_WRITE) {

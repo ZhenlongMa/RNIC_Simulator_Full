@@ -171,12 +171,8 @@ int main (int argc, char **argv) {
     // int num_cq = TEST_CQ_NUM;
     int grp1_num_qp = 10;
     int grp2_num_qp = 20;
-    int grp3_num_qp = 10;
-    int grp4_num_qp = 20;
     int grp1_weight = 3;
     int grp2_weight = 2;
-    int grp3_weight = 3;
-    int grp4_weight = 2;
 
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
 
@@ -187,8 +183,6 @@ int main (int argc, char **argv) {
 
     struct rdma_resc *resc1 = rdma_resc_init(ib_context, num_mr, num_cq, grp1_num_qp, llid, 1);
     struct rdma_resc *resc2 = rdma_resc_init(ib_context, num_mr, num_cq, grp2_num_qp, llid, 1);
-    struct rdma_resc *resc3 = rdma_resc_init(ib_context, num_mr, num_cq, grp3_num_qp, llid, 1);
-    struct rdma_resc *resc4 = rdma_resc_init(ib_context, num_mr, num_cq, grp4_num_qp, llid, 1);
 
     /* Connect QPs to server's QP */
     // clt_connect_qps(resc, svr_lid);
@@ -196,10 +190,6 @@ int main (int argc, char **argv) {
     RDMA_PRINT(Client, "clt_connect_qps 1 end\n");
     clt_update_info(resc2, svr_lid);
     RDMA_PRINT(Client, "clt_connect_qps 2 end\n");
-    clt_update_info(resc3, svr_lid);
-    RDMA_PRINT(Client, "clt_connect_qps 3 end\n");
-    clt_update_info(resc4, svr_lid);
-    RDMA_PRINT(Client, "clt_connect_qps 4 end\n");
 
     /* sync to make sure that we could get start */
     rdma_send_sync(resc1);
