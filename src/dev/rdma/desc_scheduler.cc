@@ -168,7 +168,7 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
     }
 
     batchSize = qpStatusTable[qpn]->weight * groupTable[qpStatusTable[qpn]->group_id];
-    bwDelay = batchSize * rNic->etherBandwidth;
+    bwDelay = (batchSize + 44) * rNic->etherBandwidth;
     HANGU_PRINT(DescScheduler, "Schedule wqePrefetchScheduleEvent! QPN: 0x%x, batchSize: %d, bwDelay: %d\n", 
         qpn, batchSize, bwDelay);
 
@@ -237,7 +237,7 @@ void HanGuRnic::DescScheduler::wqePrefetch()
                 rNic->descReqFifo.push(descReq);
                 std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
                 wqeFetchInfoQue.push(wqeFetchInfoPair);
-                HANGU_PRINT(DescScheduler, "WQE req sent! QPN: %d, WQE num: %d, req size: %d, tail ptr: %d, WQE fetch info queue size: %d\n", 
+                HANGU_PRINT(DescScheduler, "WQE req sent! QPN: 0x%x, WQE num: %d, req size: %d, tail ptr: %d, WQE fetch info queue size: %d\n", 
                     qpStatus->qpn, descNum, descNum * sizeof(TxDesc), qpStatus->tail_ptr, wqeFetchInfoQue.size());
                 if (!rNic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
                     rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
