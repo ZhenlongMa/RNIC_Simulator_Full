@@ -620,8 +620,7 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
     HANGU_PRINT(HanGuDriver, "into update QP weight! setGroupNum: %d\n", setGroupNum);
     // update group granularity
     int i = 0;
-    for (std::unordered_map<uint8_t, uint8_t>::iterator iter = setGroup.begin(); iter != setGroup.end(); iter++)
-    {
+    for (std::unordered_map<uint8_t, uint8_t>::iterator iter = setGroup.begin(); iter != setGroup.end(); iter++) {
         assert(iter->second == 1);
         uint8_t groupID = iter->first;
         // recalculate group granularity
@@ -632,7 +631,7 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
         }
         uint8_t groupWeight;
         uint32_t granularity;
-        portProxy.readBlob(qosShareParamAddr + groupWeightOffset * 1, &groupWeight, sizeof(uint8_t));
+        portProxy.readBlob(qosShareParamAddr + groupWeightOffset +  groupID * 1, &groupWeight, sizeof(uint8_t));
         granularity = (double)groupWeight / groupWeightSum * bigN / qpWeightSum;
         group[i].groupID = groupID;
         group[i].granularity = granularity;

@@ -190,7 +190,7 @@ class HanGuDriver final : public EmulatedDriver {
     const int qpAmountOffset            = 0x50;
     const int qosSharePageNum           = 1;
     // int qpAmount = 0;
-    const int chunkSizePerQP = 1024;
+    const int chunkSizePerQP = 4096;
     /* -------QoS Group resources {end}------- */
 
     /* ------------TQ resources {begin}---------- */
