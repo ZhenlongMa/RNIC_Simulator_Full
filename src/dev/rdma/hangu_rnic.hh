@@ -358,7 +358,7 @@ class HanGuRnic : public RdmaNic {
                 // EventFunctionWrapper rxUpdateEvent;
                 // EventFunctionWrapper qpStatusReqEvent;
                 EventFunctionWrapper wqePrefetchEvent;
-                EventFunctionWrapper getPrefetchQpnEvent;
+                EventFunctionWrapper wqePrefetchScheduleEvent;
                 EventFunctionWrapper launchWqeEvent;
                 // qpc prefetch event
                 EventFunctionWrapper qpcPrefetchEvent;
