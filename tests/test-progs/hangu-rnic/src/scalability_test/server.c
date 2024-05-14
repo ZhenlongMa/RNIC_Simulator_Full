@@ -131,7 +131,7 @@ struct ibv_wqe *generate_wqe_new(struct rdma_resc *resc, uint8_t op_mode, uint32
     } 
     else if (op_mode == OPMODE_RDMA_READ) {
         for (int i = 0; i < wr_num; ++i) {
-            wqe_list[i].length = sizeof(TRANS_RRDMA_DATA);
+            wqe_list[i].length = msg_size;
             wqe_list[i].mr = local_mr;
             wqe_list[i].offset = (sizeof(TRANS_RRDMA_DATA) - 1) * i + offset;
 
@@ -165,7 +165,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     uint32_t elephant_msg_size;
     uint32_t mice_msg_size;
     mice_wr_num = THPT_WR_NUM;
-    mice_msg_size = sizeof(TRANS_WRDMA_DATA) * 64;
+    mice_msg_size = sizeof(TRANS_WRDMA_DATA);
     #ifdef TEST_THPT_PEAK
         elephant_wr_num = mice_wr_num;
         elephant_msg_size = mice_msg_size;
@@ -346,10 +346,10 @@ int main (int argc, char **argv) {
     group_qp_num[1] = 2;
     group_qp_num[2] = 2;
     group_qp_num[3] = 2;
-    group_weight[0] = 10 + cpu_id * 4;
-    group_weight[1] = 11 + cpu_id * 4;
-    group_weight[2] = 12 + cpu_id * 4;
-    group_weight[3] = 13 + cpu_id * 4;
+    group_weight[0] = 10;
+    group_weight[1] = 10;
+    group_weight[2] = 10;
+    group_weight[3] = 10;
     RDMA_PRINT(Server, "cpu id: %d, group 0 weight: %d, group 1 weight: %d, group 2 weight: %d, group 3 weight: %d\n", 
         cpu_id, group_weight[0], group_weight[1], group_weight[2], group_weight[3]);
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
