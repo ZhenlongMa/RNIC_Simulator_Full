@@ -36,6 +36,7 @@ HanGuRnic::RdmaEngine::txDescLenSel (uint8_t num) {
  */
 void
 HanGuRnic::RdmaEngine::dfuProcessing () {
+    assert(0);
 
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dfuProcessing!\n");
 

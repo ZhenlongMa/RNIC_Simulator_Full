@@ -448,6 +448,7 @@ HanGuRnic::ceuProc () {
  */
 void
 HanGuRnic::doorbellProc () {
+    assert(0);
 
     HANGU_PRINT(HanGuRnic, " CCU.doorbellProc! db_size %d\n", pio2ccuDbFifo.size());
 
