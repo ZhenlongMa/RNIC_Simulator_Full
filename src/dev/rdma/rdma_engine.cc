@@ -105,7 +105,7 @@ HanGuRnic::RdmaEngine::dduProcessing () {
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing!\n");
 
     // make sure that on fly data request number does not exceed DATA_REQ_LIMIT
-    if (std::count(dd2dpVector.begin(), dd2dpVector.end(), nullptr) > dd2dpVector.size() - DATA_REQ_LIMIT)
+    if ((std::count(dd2dpVector.begin(), dd2dpVector.end(), nullptr) > dd2dpVector.size() - DATA_REQ_LIMIT) || 1)
     {
         /* If there's no valid idx, exit the schedule */
         if (dp2ddIdxFifo.size() == 0) {
@@ -208,10 +208,8 @@ HanGuRnic::RdmaEngine::getRdmaHeadSize (uint8_t opcode, uint8_t qpType) {
  */
 void
 HanGuRnic::RdmaEngine::dpuProcessing () {
-
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing!\n");
-
-    if (dp2rgFifo.size() < DATA_REQ_LIMIT)
+    if (dp2rgFifo.size() < DATA_REQ_LIMIT || 1)
     {
         /* Get Context from Context Module */
         assert(rnic->qpcModule.txQpcRspFifo.size());
