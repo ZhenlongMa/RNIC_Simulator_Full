@@ -7,7 +7,7 @@
 #define BW_WR_NUM 5
 // #define LATENCY_WR_NUM 1
 #define TEST_TIME 10UL // milisecond
-// #define TEST_THPT_PEAK
+#define TEST_THPT_PEAK
 
 struct perf_record
 {

@@ -134,7 +134,7 @@ void HanGuRnic::DescScheduler::qpStatusProc()
 */
 void HanGuRnic::DescScheduler::wqePrefetchSchedule()
 {
-    HANGU_PRINT(DescScheduler, "into wqePrefetchSchedule! wqePrefetchQpStatusRReqQue size: %d\n", wqePrefetchQpStatusRReqQue.size());
+    // HANGU_PRINT(DescScheduler, "into wqePrefetchSchedule! wqePrefetchQpStatusRReqQue size: %d\n", wqePrefetchQpStatusRReqQue.size());
     uint32_t batchSize;
     Tick bwDelay;
     uint32_t qpn;
@@ -147,8 +147,8 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
         wqePrefetchQpStatusRReqQue.push(qpn);
         qpStatusTable[qpn]->in_que--;
         qpStatusTable[qpn]->fetch_count++;
-        HANGU_PRINT(DescScheduler, "High priority QPN fetched! qpn: 0x%x, fetch count: %d, curtick: %ld\n", 
-            qpn, qpStatusTable[qpn]->fetch_count++, curTick());
+        // HANGU_PRINT(DescScheduler, "High priority QPN fetched! qpn: 0x%x, fetch count: %d, curtick: %ld\n", 
+            // qpn, qpStatusTable[qpn]->fetch_count++, curTick());
     }
     else if (lowPriorityQpnQue.size() > 0)
     {
@@ -158,8 +158,8 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
         wqePrefetchQpStatusRReqQue.push(qpn);
         qpStatusTable[qpn]->in_que--;
         qpStatusTable[qpn]->fetch_count++;
-        HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: 0x%x, in que: %d, fetch count: %ld\n", 
-            qpn, qpStatusTable[qpn]->in_que, qpStatusTable[qpn]->fetch_count);
+        // HANGU_PRINT(DescScheduler, "Low priority QPN fetched! qpn: 0x%x, in que: %d, fetch count: %ld\n", 
+            // qpn, qpStatusTable[qpn]->in_que, qpStatusTable[qpn]->fetch_count);
     }
     else
     {
@@ -168,7 +168,8 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule()
     }
 
     batchSize = qpStatusTable[qpn]->weight * groupTable[qpStatusTable[qpn]->group_id];
-    bwDelay = (batchSize + 44) * rNic->etherBandwidth;
+    // bwDelay = (batchSize + 44) * rNic->etherBandwidth;
+    bwDelay = rNic->clockPeriod();
     HANGU_PRINT(DescScheduler, "Schedule wqePrefetchScheduleEvent! QPN: 0x%x, batchSize: %d, bwDelay: %d\n", 
         qpn, batchSize, bwDelay);
 

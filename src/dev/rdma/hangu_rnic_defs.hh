@@ -54,7 +54,7 @@
 #define MAX_MSG_RATE 60
 #define MAX_BW 100
 #define WQE_BUFFER_CAPACITY 120
-#define WQE_PREFETCH_THRESHOLD 100
+// #define WQE_PREFETCH_THRESHOLD 100
 #define LAT_QP 1
 #define BW_QP 2
 #define RATE_QP 3
