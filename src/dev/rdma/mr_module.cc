@@ -177,8 +177,7 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
                 tptRsp->lkey, tptRsp->length, tptRsp->offset);
 
     // update DMA on fly request count
-    switch (tptRsp->chnl)
-    {
+    switch (tptRsp->chnl) {
         case MR_RCHNL_TX_DESC:
         case MR_RCHNL_RX_DESC:
             onFlyDescDmaRdReqNum--;
@@ -191,8 +190,7 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
             break;
     }
 
-    if (tptRsp->dmaRspNum == tptRsp->mttNum)
-    {
+    if (tptRsp->dmaRspNum == tptRsp->mttNum) {
         Event *event;
         RxDescPtr rxDesc;
         TxDescPtr txDesc;
@@ -253,8 +251,7 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
         }
         HANGU_PRINT(MrResc, "The last DMA response!\n");
     }
-    else
-    {
+    else {
         HANGU_PRINT(MrResc, "Not the last DMA response!\n");
     }
 
@@ -306,12 +303,10 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     uint64_t mttIdx = mptResc->mttSeg + ((reqPkt->offset + (mptResc->startVAddr & 0xFFF)) >> PAGE_SIZE_LOG);
 
     // Calculate mttNum
-    if ((reqPkt->length + (reqPkt->offset % PAGE_SIZE)) % PAGE_SIZE == 0)
-    {
+    if ((reqPkt->length + (reqPkt->offset % PAGE_SIZE)) % PAGE_SIZE == 0) {
         reqPkt->mttNum = (reqPkt->length + (reqPkt->offset % PAGE_SIZE)) / PAGE_SIZE;
     }
-    else
-    {
+    else {
         reqPkt->mttNum = (reqPkt->length + (reqPkt->offset % PAGE_SIZE)) / PAGE_SIZE + 1;
     }
     reqPkt->mttRspNum   = 0;
@@ -320,8 +315,7 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: reqPkt->offset 0x%x, mptResc->startVAddr 0x%x, mptResc->mttSeg 0x%x, mttIdx 0x%x, mttNum: %d\n", 
         reqPkt->offset, mptResc->startVAddr, mptResc->mttSeg, mttIdx, reqPkt->mttNum);
 
-    if (reqPkt->chnl == MR_RCHNL_TX_DESC)
-    {
+    if (reqPkt->chnl == MR_RCHNL_TX_DESC) {
         HANGU_PRINT(MrResc, "tx desc MR request! mttNum: %d\n", reqPkt->mttNum);
         // The size of the Work Queue is up to one page.
         assert(reqPkt->mttNum == 1);
@@ -332,8 +326,7 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
 
     /* Post mtt req */
     // modified by mazhenlong
-    for (int i = 0; i < reqPkt->mttNum; i++)
-    {
+    for (int i = 0; i < reqPkt->mttNum; i++) {
         mttReqProcess(mttIdx + i, reqPkt);
     }
 
@@ -368,54 +361,42 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
     uint64_t dmaAddr;
 
     // set DMA address
-    if (reqPkt->mttRspNum == 0)
-    {
+    if (reqPkt->mttRspNum == 0) {
         dmaAddr = mttResc->pAddr + reqPkt->offset % PAGE_SIZE; // WARNING: suppose MR is page-aligned
     }
-    else
-    {
+    else {
         dmaAddr = mttResc->pAddr;
     }
 
     // set offset
-    if (reqPkt->mttRspNum == 0)
-    {
+    if (reqPkt->mttRspNum == 0) {
         offset = 0;
     }
-    else
-    {
+    else {
         offset = (reqPkt->mttRspNum - 1) * PAGE_SIZE + (PAGE_SIZE - (reqPkt->offset % PAGE_SIZE));
     }
 
     // set length
-    if (reqPkt->mttRspNum == 0) // if this is the first MTT response
-    {
-        if (reqPkt->mttRspNum + 1 == reqPkt->mttNum)
-        {
+    if (reqPkt->mttRspNum == 0) { // if this is the first MTT response
+        if (reqPkt->mttRspNum + 1 == reqPkt->mttNum) {
             length = reqPkt->length;
         }
-        else
-        {
+        else {
             length = PAGE_SIZE - reqPkt->offset;
         }
     }
-    else if (reqPkt->mttRspNum + 1 == reqPkt->mttNum)
-    {
-        if ((reqPkt->length + reqPkt->offset) % PAGE_SIZE == 0)
-        {
+    else if (reqPkt->mttRspNum + 1 == reqPkt->mttNum) {
+        if ((reqPkt->length + reqPkt->offset) % PAGE_SIZE == 0) {
             length = PAGE_SIZE;
         }
-        else
-        {
+        else {
             length = (reqPkt->length + reqPkt->offset) % PAGE_SIZE; 
         }
     }
-    else if (reqPkt->mttRspNum + 1 < reqPkt->mttNum)
-    {
+    else if (reqPkt->mttRspNum + 1 < reqPkt->mttNum) {
         length = PAGE_SIZE;
     }
-    else
-    {
+    else {
         panic("Wrong mtt rsp num and mtt num! mtt rsp num: %d, mtt num: %d", reqPkt->mttRspNum, reqPkt->mttNum);
     }
     assert(length != 0);
@@ -426,7 +407,6 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
 
     /* Schedule myself */
     if (mttCache.rrspFifo.size()) {
-        
         if (!mttRspEvent.scheduled()) {
             rnic->schedule(mttRspEvent, curTick() + rnic->clockPeriod());
         }
