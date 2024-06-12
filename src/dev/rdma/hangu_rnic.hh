@@ -263,8 +263,7 @@ class HanGuRnic : public RdmaNic {
                     rpuEvent ([this]{ rpuProcessing(); }, n),
                     rcvRpuEvent  ([this]{rcvRpuProcessing();  }, n),
                     rdCplRpuEvent([this]{rdCplRpuProcessing();}, n),
-                    rcuEvent([this]{ rcuProcessing();}, n)
-                    { 
+                    rcuEvent([this]{ rcuProcessing();}, n) {
                         for (uint32_t x = 0; x < elemCap; ++x) {
                             dp2ddIdxFifo.push(x);
                             rp2raIdxFifo.push(x);
@@ -317,7 +316,7 @@ class HanGuRnic : public RdmaNic {
         /* -----------------------RDMA Engine Relevant{end}----------------------- */
 
         /* -------------------WQE Scheduler Relevant{begin}---------------------- */
-        class DescScheduler{
+        class DescScheduler {
             private:
                 HanGuRnic *rNic;
                 std::string _name;
@@ -354,8 +353,7 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper wqeRspEvent;
                 std::unordered_map<uint8_t, uint16_t> groupTable;
                 std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
-                std::string name()
-                {
+                std::string name() {
                     return _name;
                 }
         };

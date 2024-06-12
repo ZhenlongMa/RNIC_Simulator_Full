@@ -297,14 +297,6 @@ void HanGuRnic::DescScheduler::wqeProc() {
                     qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr, qpStatus->fetch_offset);
                 assert(qpStatus->tail_ptr < qpStatus->head_ptr);
                 assert(qpStatus->fetch_offset < desc->len);
-                // if (batchSize - procSize < MAX_SUBWQE_SIZE)
-                // {
-
-                // }
-                // else
-                // {
-
-                // }
                 TxDescPtr subDesc = make_shared<TxDesc>(desc);
                 subDesc->opcode = desc->opcode;
                 subDesc->lVaddr = desc->lVaddr + qpStatus->fetch_offset;

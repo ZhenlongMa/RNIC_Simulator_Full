@@ -219,8 +219,7 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
 
     HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing!\n");
 
-    if (dp2rgFifo.size() < DATA_REQ_LIMIT || 1)
-    {
+    if (dp2rgFifo.size() < DATA_REQ_LIMIT || 1) {
         /* Get Context from Context Module */
         assert(rnic->qpcModule.txQpcRspFifo.size());
         CxtReqRspPtr dpuQpc = rnic->qpcModule.txQpcRspFifo.front();
@@ -649,8 +648,7 @@ HanGuRnic::RdmaEngine::rguProcessing () {
     messageEnd = true; /* Just ignore it now. */
 
     // update on fly packet number, ONLY FOR RC CONNECTIONS
-    if (needAck)
-    {
+    if (needAck) {
         onFlyPacketNum++;
     }
 
@@ -713,8 +711,7 @@ HanGuRnic::RdmaEngine::isWindowBlocked() {
 void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* pktPtr, uint8_t &needAck)
 {
     uint32_t bthOp;
-    if (desc->opcode == OPCODE_SEND && qpc->qpType == QP_TYPE_RC) 
-    { /* RC Send */
+    if (desc->opcode == OPCODE_SEND && qpc->qpType == QP_TYPE_RC)  { /* RC Send */
         
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: RC send!\n");
 
@@ -729,8 +726,7 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
                 ((BTH *) pktPtr)->op_destQpn, ((BTH *) pktPtr)->needAck_psn);
         
     } 
-    else if (desc->opcode == OPCODE_SEND && qpc->qpType == QP_TYPE_UD) 
-    { /* UD Send */
+    else if (desc->opcode == OPCODE_SEND && qpc->qpType == QP_TYPE_UD) { /* UD Send */
         
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: UD send!\n");
         
@@ -752,8 +748,7 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
                 "DETH head: 0x%x 0x%x\n", 
                 ((DETH *) pktPtr)->srcQpn, ((DETH *) pktPtr)->qKey);
     } 
-    else if (qpc->qpType == QP_TYPE_RC && desc->opcode == OPCODE_RDMA_WRITE) 
-    { /* RC RDMA Write */
+    else if (qpc->qpType == QP_TYPE_RC && desc->opcode == OPCODE_RDMA_WRITE)  { /* RC RDMA Write */
 
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: RC RDMA Write!\n");
         
@@ -777,8 +772,7 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
                 ((RETH *) pktPtr)->rVaddr_l, ((RETH *) pktPtr)->rVaddr_h, 
                 ((RETH *) pktPtr)->rKey, ((RETH *) pktPtr)->len);
     } 
-    else if (qpc->qpType == QP_TYPE_RC && desc->opcode == OPCODE_RDMA_READ) 
-    { /* RC RDMA Read */
+    else if (qpc->qpType == QP_TYPE_RC && desc->opcode == OPCODE_RDMA_READ)  { /* RC RDMA Read */
         
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: RC RDMA Write!\n");
         
@@ -803,8 +797,7 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
                 ((RETH *) pktPtr)->rVaddr_l, ((RETH *) pktPtr)->rVaddr_h, 
                 ((RETH *) pktPtr)->rKey, ((RETH *) pktPtr)->len);
     } 
-    else 
-    {
+    else  {
         panic("Unsupported opcode and QP type combination, "
                 "opcode: %d, type: %d\n", desc->opcode, qpc->qpType);
     }
@@ -962,14 +955,11 @@ HanGuRnic::RdmaEngine::sauProcessing () {
     //         rnic->schedule(sauEvent, curTick() + rnic->clockPeriod());
     //     }
     // }
-    if (txsauFifo.size())
-    {
-        if (sauEvent.scheduled())
-        {
+    if (txsauFifo.size()) {
+        if (sauEvent.scheduled()) {
             rnic->reschedule(sauEvent, curTick() + bwDelay);
         }
-        else
-        {
+        else {
             rnic->schedule(sauEvent, curTick() + bwDelay);
         }
     }
