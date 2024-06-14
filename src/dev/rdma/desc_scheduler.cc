@@ -20,7 +20,6 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name)
     createQpStatusEvent([this]{createQpStatus();}, name),
     qpcRspEvent([this]{qpcRspProc();}, name),
     wqeRspEvent([this]{wqeProc();}, name) {
-    // HANGU_PRINT(DescScheduler, "init\n");
 }
 
 /**
@@ -145,8 +144,8 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule() {
         return;
     }
     batchSize = qpStatusTable[qpn]->weight * groupTable[qpStatusTable[qpn]->group_id];
-    // bwDelay = (batchSize + 44) * rNic->etherBandwidth;
-    bwDelay = rNic->clockPeriod();
+    bwDelay = (batchSize + 44) * rNic->etherBandwidth;
+    // bwDelay = rNic->clockPeriod();
     HANGU_PRINT(DescScheduler, "Schedule wqePrefetchScheduleEvent! QPN: 0x%x, batchSize: %d, bwDelay: %d\n", 
         qpn, batchSize, bwDelay);
     if (wqePrefetchScheduleEvent.scheduled()) {
