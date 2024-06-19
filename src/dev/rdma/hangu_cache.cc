@@ -29,6 +29,7 @@ uint32_t HanGuRnic::Cache<T>::replaceEntry() {
     for (auto iter = cache.begin(); iter != cache.end(); ++iter) { // std::unordered_map<uint32_t, std::pair<T*, uint64_t>>::iterator
         if (min >= iter->second.second) {
             rescNum = iter->first;
+            min = iter->second.second;
         }
     }
     HANGU_PRINT(CxtResc, " HanGuRnic.Cache.replaceEntry: out! %d\n", rescNum);

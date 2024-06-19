@@ -35,6 +35,9 @@ HanGuRnic::QpcModule::postQpcReq(CxtReqRspPtr qpcReq) {
         txQpcRreqFifo.push(qpcReq);
     } else if (qpcReq->chnl == CXT_CHNL_RX && qpcReq->type == CXT_RREQ_QP) {
         rxQpcRreqFifo.push(qpcReq);
+    } else if (qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_PFCH_QP) {
+        txQpcPfetchFifo.push(qpcReq);
+    }
     } else {
         panic("[QpcModule.postQpcReq] invalid chnl %d or type %d", qpcReq->chnl, qpcReq->type);
     }
@@ -98,7 +101,10 @@ HanGuRnic::QpcModule::hitProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
 
         rxQpcRspFifo.push(qpcReq);
         e = &rnic->rdmaEngine.rpuEvent;
-    } else {
+    } else if (chnlNum == 3) {
+        e = &rnic->rescPrefetch.qpcRspProcEvent;
+    }
+    else {
         panic("[QpcModule.readProc.hitProc] Unrecognized chnl %d or type %d", qpcReq->chnl, qpcReq->type);
     }
 
@@ -110,6 +116,11 @@ HanGuRnic::QpcModule::hitProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
 bool 
 HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
     HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc!\n");
+    if (qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_PFCH_QP) {
+        if (qpcCache.lookupHit(qpcReq->num)) {
+            return true;
+        }
+    }
     /* Lookup qpnHashMap to learn that if there's 
      * pending elem for this qpn in this channel. */
     if (qpnHashMap.find(qpcReq->num) != qpnHashMap.end()) { /* related qpn is found in qpnHashMap, check if pending */
@@ -164,34 +175,40 @@ HanGuRnic::QpcModule::qpcCreate() {
 
 void 
 HanGuRnic::QpcModule::qpcAccess() {
-    uint8_t CHNL_NUM = 3;
+    uint8_t CHNL_NUM = 4;
     bool isEmpty[CHNL_NUM];
     isEmpty[0] = txQpAddrRreqFifo.empty();
     isEmpty[1] = txQpcRreqFifo.empty();
     isEmpty[2] = rxQpcRreqFifo.empty();
+    isEmpty[3] = txQpcPfetchFifo.empty();
     HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.qpcAccess: empty[0] %d empty[1] %d empty[2] %d\n", isEmpty[0], isEmpty[1], isEmpty[2]);
     CxtReqRspPtr qpcReq;
     for (uint8_t cnt = 0; cnt < CHNL_NUM; ++cnt) {
         if (isEmpty[this->chnlIdx] == false) {
             switch (this->chnlIdx) {
-              case 0:
-                qpcReq = txQpAddrRreqFifo.front();
-                txQpAddrRreqFifo.pop();
-                assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_SQ);
-                break;
-              case 1:
-                qpcReq = txQpcRreqFifo.front();
-                txQpcRreqFifo.pop();
-                assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_QP);
-                break;
-              case 2:
-                qpcReq = rxQpcRreqFifo.front();
-                rxQpcRreqFifo.pop();
-                assert(qpcReq->chnl == CXT_CHNL_RX && qpcReq->type == CXT_RREQ_QP);
-                break;
-              default:
-                panic("[QpcModule.qpcReqProc.qpcAccess] chnlIdx error! %d", this->chnlIdx);
-                break;
+                case 0:
+                    qpcReq = txQpAddrRreqFifo.front();
+                    txQpAddrRreqFifo.pop();
+                    assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_SQ);
+                    break;
+                case 1:
+                    qpcReq = txQpcRreqFifo.front();
+                    txQpcRreqFifo.pop();
+                    assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_RREQ_QP);
+                    break;
+                case 2:
+                    qpcReq = rxQpcRreqFifo.front();
+                    rxQpcRreqFifo.pop();
+                    assert(qpcReq->chnl == CXT_CHNL_RX && qpcReq->type == CXT_RREQ_QP);
+                    break;
+                case 3:
+                    qpcReq = txQpcPrefetchFifo.front();
+                    txQpcPrefetchFifo.pop();
+                    assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_PFCH_QP);
+                    break;
+                default:
+                    panic("[QpcModule.qpcReqProc.qpcAccess] chnlIdx error! %d", this->chnlIdx);
+                    break;
             }
             HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.qpcAccess: qpn: %d, chnlIdx %d, idx %d rtnCnt %d\n", 
                     qpcReq->num, this->chnlIdx, qpcReq->idx, rtnCnt);
@@ -392,7 +409,8 @@ HanGuRnic::QpcModule::isReqValidRun() {
     return (ccuQpcWreqFifo.size()   || 
             txQpAddrRreqFifo.size() || 
             txQpcRreqFifo.size()    || 
-            rxQpcRreqFifo.size()      );
+            rxQpcRreqFifo.size()    ||
+            txQpcPfetchFifo.size()  );
 }
 
 void

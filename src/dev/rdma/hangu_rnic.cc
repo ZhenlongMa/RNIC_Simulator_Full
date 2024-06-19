@@ -322,6 +322,7 @@ HanGuRnic::mboxFetchCpl () {
             HANGU_PRINT(CcuEngine, " CcuEngine.CEU.mboxFetchCpl: WRITE_QPC command! i %d qpn 0x%x(%d), addr 0x%lx\n", 
                     i, qpcReq->txQpcReq->srcQpn, qpcReq->txQpcReq->srcQpn&QPN_MASK, (uintptr_t)qpcReq->txQpcReq);
             qpcReq->num = qpcReq->txQpcReq->srcQpn;
+            assert(qpcreq->txQpcReq->sqSizeLog == PAGE_SIZE_LOG);
             qpcModule.postQpcReq(qpcReq); /* post create request to qpcModule */
             
             // write QP status
@@ -338,8 +339,7 @@ HanGuRnic::mboxFetchCpl () {
             // assert(qpcReq->txQpcReq->indicator == BW_QP);
             // descScheduler.qpStatusTable.emplace(qpStatus->qpn, qpStatus);
             createQue.push(qpStatus);
-            if (!descScheduler.createQpStatusEvent.scheduled())
-            {
+            if (!descScheduler.createQpStatusEvent.scheduled()) {
                 schedule(descScheduler.createQpStatusEvent, curTick() + clockPeriod());
             }
         }
@@ -446,46 +446,27 @@ HanGuRnic::ceuProc () {
  */
 void
 HanGuRnic::doorbellProc () {
-
     HANGU_PRINT(HanGuRnic, " CCU.doorbellProc! db_size %d\n", pio2ccuDbFifo.size());
-
     /* If there's no valid idx, exit the schedule */
     if (df2ccuIdxFifo.size() == 0) {
         HANGU_PRINT(CcuEngine, " CCU.doorbellProc, If there's no valid idx, exit the schedule\n");
         return;
     }
-
     /* read doorbell info */
     assert(pio2ccuDbFifo.size());
     DoorbellPtr dbell = pio2ccuDbFifo.front();
     pio2ccuDbFifo.pop();
-
-    /* Push doorbell to doorbell fifo */
-    uint8_t idx = df2ccuIdxFifo.front();
-    df2ccuIdxFifo.pop();
-    doorbellVector[idx] = dbell;
-    /* We don't schedule it here, cause it should be 
-     * scheduled by Context Module. */
-    // if (!rdmaEngine.dfuEvent.scheduled()) { /* Schedule RdmaEngine.dfuProcessing */
-    //     schedule(rdmaEngine.dfuEvent, curTick() + clockPeriod());
-    // }
-
-    /* Post QP addr request to QpcModule */
-    CxtReqRspPtr qpAddrReq = make_shared<CxtReqRsp>(CXT_RREQ_SQ, 
-            CXT_CHNL_TX, dbell->qpn, 1, idx); // regs.db.qpn()
-    qpAddrReq->txQpcRsp = new QpcResc;
-    qpcModule.postQpcReq(qpAddrReq);
-
-    HANGU_PRINT(CcuEngine, " CCU.doorbellProc: db.qpn: 0x%x, df2ccuIdxFifo.size %d idx %d\n", 
-            dbell->qpn, df2ccuIdxFifo.size(), idx);
-
+    descScheduler.dbQue.push(dbell);
+    if (!descScheduler.qpcRspEvent.scheduled()) {
+        schedule(descScheduler.qpcRspEvent, curTick() + clockPeriod());
+    }
+    HANGU_PRINT(CcuEngine, " CCU.doorbellProc: db.qpn: 0x%x\n", dbell->qpn);
     /* If there still has elem in fifo, schedule myself again */
-    if (df2ccuIdxFifo.size() && pio2ccuDbFifo.size()) {
+    if (pio2ccuDbFifo.size()) {
         if (!doorbellProcEvent.scheduled()) {
             schedule(doorbellProcEvent, curTick() + clockPeriod());
         }
     }
-
     HANGU_PRINT(CcuEngine, " CCU.doorbellProc: out!\n");
 }
 ///////////////////////////// HanGuRnic::CCU relevant {end}//////////////////////////////

@@ -328,8 +328,9 @@ class HanGuRnic : public RdmaNic {
                 void rxUpdate();
                 void launchWQE();
                 void createQpStatus();
-                uint16_t sqSize;
+                uint16_t sqSize = PAGE_SIZE;
                 uint16_t rqSize;
+                std::queue<DoorbellPtr> dbQue;
                 std::queue<uint32_t> highPriorityQpnQue;
                 std::queue<uint32_t> lowPriorityQpnQue;
                 std::queue<uint32_t> leastPriorityQpnQue;
@@ -360,28 +361,38 @@ class HanGuRnic : public RdmaNic {
         DescScheduler descScheduler;
         /* -------------------WQE Scheduler Relevant{end}------------------------ */
 
-        /* -------------------WQE Buffer Relevant{begin}---------------------- */
-        // class DescBuffer{
-        //     private:
+        /* -------------------Prefetch Relevant{begin}------------------------ */
+        class RescPrefetcher {
+            private:
+                uint16_t prefetchNum;
+                hanGuRnic *rNic;
+                std::string _name;
+                void prefetchProc();
+            public:
+                RescPrefetcher(HanGuRnic *rNic, std::string name);
+                std::queue<uint32_t> prefetchQue;
+                EventFunctionWrapper prefetchProcEvent;
+                std::string name() {
+                    returen _name;
+                }
+        };
+        RescPrefetcher rescPrefetcher;
+        /* -------------------Prefetch Relevant{end}-------------------------- */
 
-        //     public:
-        //         DescBuffer();
-        //         uint64_t byteSize;
-        //         uint32_t totalWeight;
-        // };
-        // DescBuffer wqeBuffer;
-        // /* -------------------WQE Buffer Relevant{end}------------------------ */
-
-        // /* -------------------QP Status Relevant{begin}---------------------- */
-        // class QPStatus{
-        //     private:
-
-        //     public:
-        //         QPStatus();
-        // };
-        // QPStatus qpStatus;
-        /* -------------------QP Status Relevant{end}------------------------ */
-
+        /* -------------------WQE Buffer Manage {begin}-------------------------------- */
+        class WqeBufferManage
+        {
+            private:
+                HanGuRnic *rNic;
+            public:
+                std::string _name;
+                std::queue<uint16_t> vacantAddr;
+                std::unordered_map<uint32_t, WqeBufferUnitPtr> wqeBuffer;
+                std::unordered_map<uint32_t, WqeBufferMetadataPtr> wqeBufferMetadataTable;
+                int descBufferCap;
+        };
+        WqeBufferManage wqeBuffMng;
+        /* -------------------WQE Buffer Manage {end}---------------------------------- 
         
         /* -----------------------Cache {begin}------------------------ */
         template <class T, class S>
