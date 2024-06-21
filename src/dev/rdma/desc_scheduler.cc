@@ -212,16 +212,19 @@ void HanGuRnic::DescScheduler::wqePrefetch() {
                 assert(tailOffset + descNum <= sqSize / sizeof(TxDesc));
             }
             if (descNum != 0) {
-                MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-                    qpStatus->key, descNum * sizeof(TxDesc), qpStatus->tail_ptr * sizeof(TxDesc) % sqSize);
-                descReq->txDescRsp = new TxDesc[descNum];
-                rNic->descReqFifo.push(descReq);
+                // MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
+                    // qpStatus->key, descNum * sizeof(TxDesc), qpStatus->tail_ptr * sizeof(TxDesc) % sqSize);
+                // descReq->txDescRsp = new TxDesc[descNum];
+                // rNic->descReqFifo.push(descReq);
                 std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
                 wqeFetchInfoQue.push(wqeFetchInfoPair);
                 HANGU_PRINT(DescScheduler, "WQE req sent! QPN: 0x%x, WQE num: %d, req size: %d, tail ptr: %d, WQE fetch info queue size: %d\n", 
                     qpStatus->qpn, descNum, descNum * sizeof(TxDesc), qpStatus->tail_ptr, wqeFetchInfoQue.size());
-                if (!rNic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
-                    rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
+                // if (!rNic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
+                //     rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
+                // }
+                if (!rNic->wqeBuffManager.wqeReadReqProcessEvent.scheduled()) {
+                    rNic->schedule(wqeReadReqProcessEvent, curTick() + rNic->clockPeriod());
                 }
             }
             else {

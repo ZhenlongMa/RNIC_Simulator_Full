@@ -197,7 +197,8 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
         switch (tptRsp->chnl) {
             case MR_RCHNL_TX_DESC:
                 // event = &rnic->rdmaEngine.dduEvent;
-                event = &rnic->descScheduler.wqeRspEvent;
+                // event = &rnic->descScheduler.wqeRspEvent;
+                event = &rnic->wqeBuffManage.;
 
                 for (uint32_t i = 0; (i * sizeof(TxDesc)) < tptRsp->length; ++i) {
                     txDesc = make_shared<TxDesc>(tptRsp->txDescRsp + i);
@@ -433,31 +434,31 @@ HanGuRnic::MrRescModule::transReqProcessing() {
     for (uint8_t cnt = 0; cnt < CHNL_NUM; ++cnt) {
         if (isEmpty[chnlIdx] == false) {
             switch (chnlIdx) {
-              case 0:
-                mrReq = rnic->descReqFifo.front();
-                rnic->descReqFifo.pop();
-                onFlyDescMrRdReqNum++;
-                assert(onFlyDescMrRdReqNum > 0);
-                HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: Desc read request! on-fly request count: %d\n", 
-                    onFlyDescMrRdReqNum);
-                assert(mrReq->type == DMA_TYPE_RREQ);
-                break;
-              case 1:
-                mrReq = rnic->cqWreqFifo.front();
-                rnic->cqWreqFifo.pop();
-                HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: Completion Queue write request, offset %d\n", mrReq->offset);
-                break;
-              case 2:
-                mrReq = rnic->dataReqFifo.front();
-                rnic->dataReqFifo.pop();
-                if (mrReq->type == DMA_TYPE_RREQ)
-                {
-                    onFlyDataMrRdReqNum++;
-                    assert(onFlyDataMrRdReqNum > 0);
-                    HANGU_PRINT(MrResc, "MR module receive a data MR request! on-fly request count: %d\n", onFlyDataMrRdReqNum);
-                }
-                HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: Data read/Write request! data addr 0x%lx\n", (uintptr_t)(mrReq->data));
-                break;
+                case 0:
+                    mrReq = rnic->descReqFifo.front();
+                    rnic->descReqFifo.pop();
+                    onFlyDescMrRdReqNum++;
+                    assert(onFlyDescMrRdReqNum > 0);
+                    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: Desc read request! on-fly request count: %d\n", 
+                        onFlyDescMrRdReqNum);
+                    assert(mrReq->type == DMA_TYPE_RREQ);
+                    break;
+                case 1:
+                    mrReq = rnic->cqWreqFifo.front();
+                    rnic->cqWreqFifo.pop();
+                    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: Completion Queue write request, offset %d\n", mrReq->offset);
+                    break;
+                case 2:
+                    mrReq = rnic->dataReqFifo.front();
+                    rnic->dataReqFifo.pop();
+                    if (mrReq->type == DMA_TYPE_RREQ)
+                    {
+                        onFlyDataMrRdReqNum++;
+                        assert(onFlyDataMrRdReqNum > 0);
+                        HANGU_PRINT(MrResc, "MR module receive a data MR request! on-fly request count: %d\n", onFlyDataMrRdReqNum);
+                    }
+                    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: Data read/Write request! data addr 0x%lx\n", (uintptr_t)(mrReq->data));
+                    break;
             }
 
             // for (int i = 0; i < mrReq->length; ++i) {

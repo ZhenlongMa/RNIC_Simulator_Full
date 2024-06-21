@@ -384,14 +384,18 @@ class HanGuRnic : public RdmaNic {
         {
             private:
                 HanGuRnic *rNic;
+                std::queue<uint32_t> replaceQue;
+                uint64_t minReplaceParam;
+                uint64_t maxReplaceParam;
             public:
                 std::string _name;
                 std::queue<uint16_t> vacantAddr;
+                std::queue<uint32_t> prefetchQpnQue;
                 std::unordered_map<uint32_t, WqeBufferUnitPtr> wqeBuffer;
                 std::unordered_map<uint32_t, WqeBufferMetadataPtr> wqeBufferMetadataTable;
                 int descBufferCap;
         };
-        WqeBufferManage wqeBuffMng;
+        WqeBufferManage wqeBuffManage;
         /* -------------------WQE Buffer Manage {end}---------------------------------- 
         
         /* -----------------------Cache {begin}------------------------ */

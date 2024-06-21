@@ -373,6 +373,16 @@ struct MrReqRsp {
         
         this->wrDataReq = nullptr;
     }
+    MrReqRsp(uint8_t type, uint8_t chnl, uint32_t lkey, 
+            uint32_t len, uint32_t vaddr, uint32_t qpn) {
+        this->type = type;
+        this->chnl = chnl;
+        this->lkey = lkey;
+        this->length = len;
+        this->offset = vaddr;
+        this->wrDataReq = nullptr;
+        this->qpn = qpn;
+    }
 
     uint8_t  type  ; /* 1 - wreq; 2 - rreq, 3 - rrsp; */
     uint8_t  chnl  ; /* 1 - wreq TX cq; 2 - wreq RX cq; 3 - wreq TX data; 4 - wreq RX data;
@@ -388,6 +398,7 @@ struct MrReqRsp {
     uint32_t mttRspNum;     /* number of responded MTT items */ 
     uint32_t dmaRspNum;     /* number of responded DMA requests */ 
     uint32_t sentPktNum;    /* number of Ethernet packet that has finished */
+    uint32_t qpn;
     struct MptResc *mpt;
     union {
         TxDesc  *txDescRsp;
@@ -702,10 +713,8 @@ struct Regs : public Serializable {
 };
 
 // WQE Scheduler relevant
-struct QPStatusItem
-{
-    QPStatusItem(uint32_t key, uint8_t weight, uint8_t qos_type, uint32_t qpn, uint8_t group_id, uint8_t service_type)
-    {
+struct QPStatusItem {
+    QPStatusItem(uint32_t key, uint8_t weight, uint8_t qos_type, uint32_t qpn, uint8_t group_id, uint8_t service_type) {
         this->key                   = key;
         this->weight                = weight;
         this->qpn                   = qpn;
@@ -721,8 +730,7 @@ struct QPStatusItem
         this->fetch_lock            = 0;
         this->in_que                = 0;
         assert(service_type != QP_TYPE_RD);
-        switch (service_type)
-        {
+        switch (service_type) {
             case QP_TYPE_RC:
                 this->type = qos_type;
                 break;
@@ -749,6 +757,11 @@ struct QPStatusItem
     uint32_t wnd_end;
     // uint32_t wnd_fetch;
     // uint32_t current_msg_offset;
+    enum process_state {
+        PENDING,
+        WAITING_FETCH,
+        PROCESSING
+    } procState;
     uint32_t key;
     uint8_t weight;
     uint8_t type; // 1: latency, 2: bandwidth, 3: rate, 4: UC, 5: UD. In regard to librdma.h
@@ -763,12 +776,36 @@ struct QPStatusItem
 };
 typedef std::shared_ptr<QPStatusItem> QPStatusPtr;
 
-struct GroupInfo
-{
+struct GroupInfo {
     uint8_t groupID;
     uint16_t granularity;
 };
 
+struct WqeBufferUnit {
+    TxDesc desc;
+    uint16_t next;
+    uint16_t prev;
+    std::queue<TxDesc> descQue;
+}
+typedef std::shared_ptr<WqeBufferUnit> WqeBufferUnitPtr;
+
+struct WqeBufferMetadata {
+    uint16_t head;
+    uint16_t tail;
+    uint8_t valid;
+    uint16_t avaiNum; // WQE number available in the buffer
+    uint16_t reqNum; // WQE umber requested
+    uint16_t keepNum; // WQE number needed to keep in the buffer
+    uint16_t pendingReqNum; // panding WQE request number
+    uint64_t replaceParam;
+    bool replaceLock;
+    enum wqe_state {
+        IDLE,
+        WAITING_FETCH,
+        WAITING_PREFETCH,
+    } wqeState;
+}
+typedef std::shared_ptr<WqeBufferMetadata> WqeBufferMetadataPtr;
 
 } // namespace HanGuRnicDef
 

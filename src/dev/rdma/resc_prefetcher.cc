@@ -21,4 +21,13 @@ void HanGuRnic::RescPrefetcher::prefetchProc() {
     CxtReqRspPtr qpcRdReq = make_shared<CxtReqRsp>(CXT_PFCH_QP, CXT_CHNL_TX, qpn, 1, 0);
     rNic->qpcModule.postQpcReq(qpcRdReq);
     // prefetch WQE
+    rNic->wqeBuffManage.prefetchQpnQue.push(qpn);
+    if (!rNic->wqeBuffManage.prefetchProcEvent.scheduled())
+    {
+        rNic->schedule(rNic->wqeBuffManage.prefetchProcEvent, curTick() + rNic->clockPeriod());
+    }
+}
+
+void HanGuRnic::RescPrefetcher::prefetchMemProc() {
+    
 }

@@ -49,21 +49,22 @@ using namespace std;
 
 HanGuRnic::HanGuRnic(const Params *p)
   : RdmaNic(p), etherInt(NULL),
-    doorbellVector(p->reorder_cap),
-    ceuProcEvent      ([this]{ ceuProc();      }, name()),
-    doorbellProcEvent ([this]{ doorbellProc(); }, name()),
-    mboxEvent([this]{ mboxFetchCpl();    }, name()),
-    rdmaEngine  (this, name() + ".RdmaEngine", p->reorder_cap),
-    descScheduler(this, name() + ".DescScheduler"),
-    mrRescModule(this, name() + ".MrRescModule", p->mpt_cache_num, p->mtt_cache_num),
-    cqcModule   (this, name() + ".CqcModule", p->cqc_cache_num),
-    qpcModule   (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
-    dmaReadDelay(p->dma_read_delay), dmaWriteDelay(p->dma_write_delay),
-    pciBandwidth(p->pci_speed),
-    etherBandwidth(p->ether_speed),
-    dmaEngine   (this, name() + ".DmaEngine"),
-    LinkDelay     (p->link_delay),
-    ethRxPktProcEvent([this]{ ethRxPktProc(); }, name()) {
+    doorbellVector      (p->reorder_cap),
+    ceuProcEvent        ([this]{ ceuProc();      }, name()),
+    doorbellProcEvent   ([this]{ doorbellProc(); }, name()),
+    mboxEvent           ([this]{ mboxFetchCpl();    }, name()),
+    rdmaEngine          (this, name() + ".RdmaEngine", p->reorder_cap),
+    descScheduler       (this, name() + ".DescScheduler"),
+    wqeBuffManager      (this, name() + ".WqeBuffManager"),
+    mrRescModule        (this, name() + ".MrRescModule", p->mpt_cache_num, p->mtt_cache_num),
+    cqcModule           (this, name() + ".CqcModule", p->cqc_cache_num),
+    qpcModule           (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
+    dmaReadDelay        (p->dma_read_delay), dmaWriteDelay(p->dma_write_delay),
+    pciBandwidth        (p->pci_speed),
+    etherBandwidth      (p->ether_speed),
+    dmaEngine           (this, name() + ".DmaEngine"),
+    LinkDelay           (p->link_delay),
+    ethRxPktProcEvent   ([this]{ ethRxPktProc(); }, name()) {
 
     HANGU_PRINT(HanGuRnic, " qpc_cache_cap %d  reorder_cap %d cpuNum 0x%x\n", p->qpc_cache_cap, p->reorder_cap, p->cpu_num);
 
