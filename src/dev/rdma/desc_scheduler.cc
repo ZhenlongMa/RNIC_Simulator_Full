@@ -56,6 +56,7 @@ void HanGuRnic::DescScheduler::qpcRspProc() {
         if (qpStatus->head_ptr == qpStatus->tail_ptr) { // WARNING: consider corner case!
             lowPriorityQpnQue.push(db->qpn);
             rNic->rescPrefetch.prefetchQue.push(db->qpn);
+            rNic->rescPrefetcher.triggerPrefetch();
             schedule = true;
             qpStatus->in_que++;
             HANGU_PRINT(DescScheduler, "Inactive QP! low priority qpn: 0x%x, in que: %d\n", db->qpn, qpStatus->in_que);
@@ -156,6 +157,7 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule() {
         lowPriorityQpnQue.pop();
         wqePrefetchQpStatusRReqQue.push(qpn);
         qpStatusTable[qpn]->in_que--;
+        rNic->rescPrefetcher.triggerPrefetch();
     }
     else {
         HANGU_PRINT(DescScheduler, "Empty QPN queue!\n");
@@ -183,58 +185,56 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule() {
 */
 void HanGuRnic::DescScheduler::wqePrefetch() {
     HANGU_PRINT(DescScheduler, "wqePrefetch in! wqeFetchInfoQue size: %d\n", wqeFetchInfoQue.size());
-    if (wqeFetchInfoQue.size() < DESC_REQ_LIMIT || 1) { // limit on-fly WQE request number
-        assert(wqePrefetchQpStatusRReqQue.size());
-        uint32_t qpn = wqePrefetchQpStatusRReqQue.front();
-        wqePrefetchQpStatusRReqQue.pop();
-        QPStatusPtr qpStatus = qpStatusTable[qpn];
-        if (qpStatus->fetch_lock == 0) {
-            uint32_t descNum;
-            HANGU_PRINT(DescScheduler, "wqe prefetch! qpn: 0x%x, head_ptr: 0x%x, tail pointer: 0x%x, fetch offset: 0x%x\n", 
-                qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr, qpStatus->fetch_offset);
-            HANGU_PRINT(DescScheduler, "QP num: 0x%x, type: %d, group ID: %d, weight: %d, group granularity: %d\n", 
-                qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
-            if (qpStatus->type == LAT_QP) {
-                HANGU_PRINT(DescScheduler, "wqe prefetch! qpn: 0x%x, curtick: %ld\n", qpStatus->qpn, curTick());
-            }
-            if (qpStatus->head_ptr - qpStatus->tail_ptr > MAX_PREFETCH_NUM) {
-                descNum = MAX_PREFETCH_NUM;
-            }
-            else {
-                descNum = qpStatus->head_ptr - qpStatus->tail_ptr;
-            }
-            // In case of going back in circular queue
-            uint32_t tailOffset = qpStatus->tail_ptr % (sqSize / sizeof(TxDesc));
-            if (descNum + tailOffset > sqSize / sizeof(TxDesc)) {
-                HANGU_PRINT(DescScheduler, "Loopback Send Queue! descNum: %d, tail pointer: %d, tailOffset: %d, sqSize: %d, size of desc: %d\n", 
-                    descNum, qpStatus->tail_ptr, tailOffset, sqSize, sizeof(TxDesc));
-                descNum = sqSize / sizeof(TxDesc) - tailOffset;
-                assert(tailOffset + descNum <= sqSize / sizeof(TxDesc));
-            }
-            if (descNum != 0) {
-                // MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
-                    // qpStatus->key, descNum * sizeof(TxDesc), qpStatus->tail_ptr * sizeof(TxDesc) % sqSize);
-                // descReq->txDescRsp = new TxDesc[descNum];
-                // rNic->descReqFifo.push(descReq);
-                std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
-                wqeFetchInfoQue.push(wqeFetchInfoPair);
-                HANGU_PRINT(DescScheduler, "WQE req sent! QPN: 0x%x, WQE num: %d, req size: %d, tail ptr: %d, WQE fetch info queue size: %d\n", 
-                    qpStatus->qpn, descNum, descNum * sizeof(TxDesc), qpStatus->tail_ptr, wqeFetchInfoQue.size());
-                // if (!rNic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
-                //     rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
-                // }
-                if (!rNic->wqeBuffManager.wqeReadReqProcessEvent.scheduled()) {
-                    rNic->schedule(wqeReadReqProcessEvent, curTick() + rNic->clockPeriod());
-                }
-            }
-            else {
-                HANGU_PRINT(DescScheduler, "useless least-priority qpn! qpn: %d\n", qpStatus->qpn);
-            }
-            qpStatus->fetch_lock = 1;
+    assert(wqePrefetchQpStatusRReqQue.size());
+    uint32_t qpn = wqePrefetchQpStatusRReqQue.front();
+    wqePrefetchQpStatusRReqQue.pop();
+    QPStatusPtr qpStatus = qpStatusTable[qpn];
+    if (qpStatus->fetch_lock == 0) {
+        uint32_t descNum;
+        HANGU_PRINT(DescScheduler, "wqe prefetch! qpn: 0x%x, head_ptr: 0x%x, tail pointer: 0x%x, fetch offset: 0x%x\n", 
+            qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr, qpStatus->fetch_offset);
+        HANGU_PRINT(DescScheduler, "QP num: 0x%x, type: %d, group ID: %d, weight: %d, group granularity: %d\n", 
+            qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);
+        if (qpStatus->type == LAT_QP) {
+            HANGU_PRINT(DescScheduler, "wqe prefetch! qpn: 0x%x, curtick: %ld\n", qpStatus->qpn, curTick());
+        }
+        if (qpStatus->head_ptr - qpStatus->tail_ptr > MAX_PREFETCH_NUM) {
+            descNum = MAX_PREFETCH_NUM;
         }
         else {
-            HANGU_PRINT(DescScheduler, "Fetch locked! QPN: %d\n", qpStatus->qpn);
+            descNum = qpStatus->head_ptr - qpStatus->tail_ptr;
         }
+        // In case of going back in circular queue
+        uint32_t tailOffset = qpStatus->tail_ptr % (sqSize / sizeof(TxDesc));
+        if (descNum + tailOffset > sqSize / sizeof(TxDesc)) {
+            HANGU_PRINT(DescScheduler, "Loopback Send Queue! descNum: %d, tail pointer: %d, tailOffset: %d, sqSize: %d, size of desc: %d\n", 
+                descNum, qpStatus->tail_ptr, tailOffset, sqSize, sizeof(TxDesc));
+            descNum = sqSize / sizeof(TxDesc) - tailOffset;
+            assert(tailOffset + descNum <= sqSize / sizeof(TxDesc));
+        }
+        if (descNum != 0) {
+            // MrReqRspPtr descReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC,
+                // qpStatus->key, descNum * sizeof(TxDesc), qpStatus->tail_ptr * sizeof(TxDesc) % sqSize);
+            // descReq->txDescRsp = new TxDesc[descNum];
+            // rNic->descReqFifo.push(descReq);
+            std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
+            wqeFetchInfoQue.push(wqeFetchInfoPair);
+            HANGU_PRINT(DescScheduler, "WQE req sent! QPN: 0x%x, WQE num: %d, req size: %d, tail ptr: %d, WQE fetch info queue size: %d\n", 
+                qpStatus->qpn, descNum, descNum * sizeof(TxDesc), qpStatus->tail_ptr, wqeFetchInfoQue.size());
+            // if (!rNic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
+            //     rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
+            // }
+            if (!rNic->wqeBuffManager.wqeReadReqProcessEvent.scheduled()) {
+                rNic->schedule(wqeReadReqProcessEvent, curTick() + rNic->clockPeriod());
+            }
+        }
+        else {
+            HANGU_PRINT(DescScheduler, "useless least-priority qpn! qpn: %d\n", qpStatus->qpn);
+        }
+        qpStatus->fetch_lock = 1;
+    }
+    else {
+        HANGU_PRINT(DescScheduler, "Fetch locked! QPN: %d\n", qpStatus->qpn);
     }
     if (wqePrefetchQpStatusRReqQue.size() && !wqePrefetchEvent.scheduled()) {
         rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
@@ -249,9 +249,12 @@ void HanGuRnic::DescScheduler::wqeProc() {
     HANGU_PRINT(DescScheduler, "wqeProc in! wqeFetchInfoQue size: %d, wqeProcToLaunchWqeQueH size: %d, wqeProcToLaunchWqeQueL size: %d\n", 
         wqeFetchInfoQue.size(), wqeProcToLaunchWqeQueH.size(), wqeProcToLaunchWqeQueL.size());
     assert(rNic->txdescRspFifo.size());
-    uint32_t descNum = wqeFetchInfoQue.front().first;
-    QPStatusPtr qpStatus = wqeFetchInfoQue.front().second;
-    wqeFetchInfoQue.pop();
+    uint32_t descNum = rNic->wqeRspInfoQue.front().first;
+    uint32_t qpn = rNic->wqeRspInfoQue.front().second;
+    uint32_t updateNum = 0;
+    // QPStatusPtr qpStatus = wqeFetchInfoQue.front().second;
+    QPStatusPtr qpStatus = qpStatusTable[qpn];
+    rNic->wqeRspInfoQue.pop();
     TxDescPtr desc;
     uint8_t subDescNum = 0;
     HANGU_PRINT(DescScheduler, "WQE processing begin! QPN: 0x%x, type: %d, group: %d, QP weight: %d, group granularity: %d, WQE fetch info queue size: %d\n", 
@@ -279,23 +282,6 @@ void HanGuRnic::DescScheduler::wqeProc() {
         qpStatus->tail_ptr += descNum;
         subDescNum = descNum;
         HANGU_PRINT(DescScheduler, "received WQE response! qpn: 0x%x, curtick: %ld\n", qpStatus->qpn, curTick());
-    }
-    else if (qpStatus->type == RATE_QP) { // WARNING: modify here
-        assert(0);
-        // For message rate sensitive QP, commit up to 8 WQEs
-        int fetchNum;
-        if (descNum > MAX_PREFETCH_NUM) {
-            fetchNum = MAX_PREFETCH_NUM;
-        }
-        else {
-            fetchNum = descNum;
-        }
-        for (int i = 0; i < fetchNum; i++) {
-            desc = rNic->txdescRspFifo.front();
-            rNic->txdescRspFifo.pop();
-            lowPriorityDescQue.push(desc);
-        }
-        qpStatus->tail_ptr += descNum;
     }
     else if (qpStatus->type == BW_QP || qpStatus->type == UD_QP) {
         assert(descNum >= 1);
@@ -334,6 +320,7 @@ void HanGuRnic::DescScheduler::wqeProc() {
                     // HANGU_PRINT(DescScheduler, "qpn: 0x%x, tail pointer to update: %d, head pointer: %d\n", qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr);
                     assert(qpStatus->tail_ptr < qpStatus->head_ptr);
                     qpStatus->tail_ptr++;
+                    updateNum++;
                     // if the original WQE is signaled, signal the sub WQE
                     if (desc->isSignaled()) {
                         subDesc->setCompleteSignal();
@@ -360,12 +347,17 @@ void HanGuRnic::DescScheduler::wqeProc() {
         }
         if (qpStatus->tail_ptr != qpStatus->head_ptr) {
             lowPriorityQpnQue.push(qpStatus->qpn);
+            rNic->rescPrefetcher.push(qpStatus->qpn);
             qpStatus->in_que++;
             HANGU_PRINT(DescScheduler, "push back qpn into low qpn queue, qpn: 0x%x, in_que: %d\n", qpStatus->qpn, qpStatus->in_que);
             assert(qpStatus->in_que == 1);
             if (!wqePrefetchScheduleEvent.scheduled()) {
                 rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
             }
+            if (!rNic->rescPrefetcher.prefetchProcEvent.scheduled()) {
+                rNic->schedule(rNic->rescPrefetcher.prefetchProcEvent, curTick() + rNic->clockPeriod);
+            }
+            rNic->rescPrefetcher.triggerPrefetch();
         }
         else {
             HANGU_PRINT(DescScheduler, "qp[0x%x] is idle! in_que: %d\n", qpStatus->qpn, qpStatus->in_que);
@@ -381,6 +373,14 @@ void HanGuRnic::DescScheduler::wqeProc() {
         HANGU_PRINT(DescScheduler, "UD or UC QP prefetch: type: %d\n", qpStatus->type);
         if (!wqePrefetchScheduleEvent.scheduled()) {
             rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
+        }
+    }
+    // update WQE buffer
+    if (updateNum != 0) {
+        std::pair<uint32_t, uint32_t> wqeBufferUpdateItem(qpStatus->qpn, updateNum);
+        rNic->wqeBufferUpdateQue.push(wqeBufferUpdateItem);
+        if (rNic->wqeBuffManage.wqeBufferUpdateEvent.scheduled()) {
+            rNic->schedule(rNic->wqeBuffManage.wqeBufferUpdateEvent, curTick() + rNic->clockPeriod());
         }
     }
     // unlock WQE fetching

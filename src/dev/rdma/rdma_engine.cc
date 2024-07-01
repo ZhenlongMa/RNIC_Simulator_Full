@@ -396,8 +396,7 @@ HanGuRnic::RdmaEngine::rruProcessing () {
             destQpn, ackPsn, onFlyPacketNum);
     assert(onFlyPacketNum >= 0);
 
-    if (rnic->descScheduler.qpStatusTable[destQpn]->type == LAT_QP)
-    {
+    if (rnic->descScheduler.qpStatusTable[destQpn]->type == LAT_QP) {
         HANGU_PRINT(RdmaEngine, "receive ack, qpn: 0x%x, curtick: %ld\n", destQpn, curTick());
     }
 
@@ -481,11 +480,9 @@ HanGuRnic::RdmaEngine::rruProcessing () {
         // update QP Status in descriptor scheduler
         // std::pair<uint32_t, uint32_t> qpStatusUpdate(winElem->list->front()->txDesc->qpn, 
         //                                              winElem->list->front()->txDesc->len);
-        std::pair<uint32_t, uint32_t> qpStatusUpdate(destQpn, 
-                                                     winElem->list->front()->txDesc->len);
+        std::pair<uint32_t, uint32_t> qpStatusUpdate(destQpn, winElem->list->front()->txDesc->len);
         rnic->updateQue.push(qpStatusUpdate);
-        if (!rnic->descScheduler.updateEvent.scheduled())
-        {
+        if (!rnic->descScheduler.updateEvent.scheduled()) {
             rnic->schedule(rnic->descScheduler.updateEvent, curTick() + rnic->clockPeriod());
         }
         
@@ -917,7 +914,6 @@ HanGuRnic::RdmaEngine::sauProcessing () {
 
     /**
      * unit: ps
-     * We don't use it, cause ettherswicth has done this work
      */
     Tick bwDelay = txsauFifo.front()->length * rnic->etherBandwidth;
 
@@ -930,6 +926,9 @@ HanGuRnic::RdmaEngine::sauProcessing () {
     // for (int i = 0; i < ETH_ADDR_LEN; ++i) {
     //     HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, dmac[%d]: 0x%x smac[%d] 0x%x\n", i, dmac[i], i, smac[i]);
     // }
+    if (type == PKT_TRANS_SEND_ONLY || type == PKT_TRANS_RWRITE_ONLY || type == PKT_TRANS_RREAD_ONLY ) {
+
+    }
     HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, type: %d, srv: %d, op_destQpn: 0x%x, BW %dps/byte, len %d, bwDelay %d, txsauFifo size: %d\n", 
             type, srv, bth->op_destQpn, rnic->etherBandwidth, txsauFifo.front()->length, bwDelay, txsauFifo.size());
 

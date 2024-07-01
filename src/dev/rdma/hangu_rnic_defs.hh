@@ -57,7 +57,7 @@
 // #define WQE_PREFETCH_THRESHOLD 100
 #define LAT_QP 1
 #define BW_QP 2
-#define RATE_QP 3
+// #define RATE_QP 3
 #define UC_QP 4
 #define UD_QP 5
 // UC and UD QP above is only used in QoS!
@@ -70,6 +70,7 @@
 #define BIGN 20480
 #define WINDOW_CAP 20
 // #define MAX_SUBWQE_SIZE 1024
+#define PREFETCH_WINDOW 256
 
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
@@ -422,6 +423,8 @@ const uint8_t MR_RCHNL_TX_DESC = 0x05;
 const uint8_t MR_RCHNL_RX_DESC = 0x06;
 const uint8_t MR_RCHNL_TX_DATA = 0x07;
 const uint8_t MR_RCHNL_RX_DATA = 0x08;
+const uint8_t MR_RCHNL_TX_DESC_PREFETCH = 0x09;
+const uint8_t MR_RCHNL_TX_DESC_FETCH = 0X0a;
 
 
 struct CxtReqRsp {
@@ -569,9 +572,9 @@ struct BTH {
     uint32_t needAck_psn;
 };
 const uint8_t PKT_BTH_SZ = 8; // in bytes
-const uint8_t PKT_TRANS_SEND_FIRST = 0x01;
-const uint8_t PKT_TRANS_SEND_MID   = 0x02;
-const uint8_t PKT_TRANS_SEND_LAST  = 0x03;
+const uint8_t PKT_TRANS_SEND_FIRST = 0x01; // no use
+const uint8_t PKT_TRANS_SEND_MID   = 0x02; // no use
+const uint8_t PKT_TRANS_SEND_LAST  = 0x03; // no use
 const uint8_t PKT_TRANS_SEND_ONLY  = 0x04;
 const uint8_t PKT_TRANS_RWRITE_ONLY= 0x05;
 const uint8_t PKT_TRANS_RREAD_ONLY = 0x06;
@@ -748,7 +751,7 @@ struct QPStatusItem {
         }
     }
     // queue pointers
-    uint32_t head_ptr;
+    uint32_t head_ptr; // points to the next vacant location
     // uint32_t fetch_ptr; // next WQE to fetch
     uint32_t tail_ptr;
     // window
@@ -785,18 +788,18 @@ struct WqeBufferUnit {
     TxDesc desc;
     uint16_t next;
     uint16_t prev;
-    std::queue<TxDesc> descQue;
+    // std::queue<TxDescPtr> descQue;
+    std::vector<TxDescPtr> descArray;
 }
 typedef std::shared_ptr<WqeBufferUnit> WqeBufferUnitPtr;
 
 struct WqeBufferMetadata {
     uint16_t head;
     uint16_t tail;
-    uint8_t valid;
-    uint16_t avaiNum; // WQE number available in the buffer
-    uint16_t reqNum; // WQE umber requested
-    uint16_t keepNum; // WQE number needed to keep in the buffer
-    uint16_t pendingReqNum; // panding WQE request number
+    uint16_t avaiNum; // WQE number available in the buffer, unit: WQE
+    uint16_t fetchReqNum; // WQE number requested, excluding prefetch, unit: WQE
+    uint16_t keepNum; // WQE number needed to keep in the buffer, unit: WQE
+    uint16_t pendingReqNum; // pending WQE request number, including fetch and prefetch, unit: WQE
     uint64_t replaceParam;
     bool replaceLock;
     enum wqe_state {
@@ -806,6 +809,17 @@ struct WqeBufferMetadata {
     } wqeState;
 }
 typedef std::shared_ptr<WqeBufferMetadata> WqeBufferMetadataPtr;
+
+struct WqeRsp {
+    uint32_t descNum;
+    uint32_t qpn;
+    std::queue<TxDescPtr> descList;
+    WqeRsp(uint32_t descNum, uint32_t qpn) {
+        this->descNum = descNum;
+        this->qpn = qpn;
+    }
+}
+typedef std::shared_ptr<WqeRsp> WqeRspPtr;
 
 } // namespace HanGuRnicDef
 

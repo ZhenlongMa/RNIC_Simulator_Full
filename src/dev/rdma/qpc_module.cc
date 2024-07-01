@@ -21,10 +21,10 @@ using namespace std;
 ///////////////////////////// HanGuRnic::QpcModule {begin}//////////////////////////////
 bool 
 HanGuRnic::QpcModule::postQpcReq(CxtReqRspPtr qpcReq) {
-    assert( (qpcReq->type == CXT_WREQ_QP) || 
-            (qpcReq->type == CXT_RREQ_QP) || 
+    assert( (qpcReq->type == CXT_RREQ_QP) || 
             (qpcReq->type == CXT_RREQ_SQ) ||
-            (qpcReq->type == CXT_CREQ_QP));
+            (qpcReq->type == CXT_CREQ_QP) ||
+            (qpcReq->type == CXT_PFCH_QP));
     assert( (qpcReq->chnl == CXT_CHNL_TX) || 
             (qpcReq->chnl == CXT_CHNL_RX));
     if (qpcReq->type == CXT_CREQ_QP) {
