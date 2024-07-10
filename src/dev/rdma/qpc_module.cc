@@ -37,7 +37,6 @@ HanGuRnic::QpcModule::postQpcReq(CxtReqRspPtr qpcReq) {
         rxQpcRreqFifo.push(qpcReq);
     } else if (qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_PFCH_QP) {
         txQpcPfetchFifo.push(qpcReq);
-    }
     } else {
         panic("[QpcModule.postQpcReq] invalid chnl %d or type %d", qpcReq->chnl, qpcReq->type);
     }
@@ -102,7 +101,7 @@ HanGuRnic::QpcModule::hitProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
         rxQpcRspFifo.push(qpcReq);
         e = &rnic->rdmaEngine.rpuEvent;
     } else if (chnlNum == 3) {
-        e = &rnic->rescPrefetch.qpcRspProcEvent;
+        e = &rnic->rescPrefetcher.qpcPfetchRspProcEvent;
     }
     else {
         panic("[QpcModule.readProc.hitProc] Unrecognized chnl %d or type %d", qpcReq->chnl, qpcReq->type);
@@ -121,6 +120,7 @@ HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
             return true;
         }
     }
+    accessNum++;
     /* Lookup qpnHashMap to learn that if there's 
      * pending elem for this qpn in this channel. */
     if (qpnHashMap.find(qpcReq->num) != qpnHashMap.end()) { /* related qpn is found in qpnHashMap, check if pending */
@@ -134,12 +134,14 @@ HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
         pendStruct.push_elem(pElem);
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnMap.size() %d get_size() %d\n", 
                 qpnHashMap.size(), pendStruct.get_size());
+        missNum++;
         return true;
     }
     /* Lookup QPC in QPC Cache */
     if (qpcCache.lookupHit(qpcReq->num)) { /* cache hit, and return related rsp to related fifo */
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: cache hit, qpn %d\n", qpcReq->num);
         hitProc(chnlNum, qpcReq);
+        hitNum++;
     } else { /* cache miss */
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: cache miss, qpn %d, rtnCnt %d\n", qpcReq->num, rtnCnt);
         /* save req to pending fifo */
@@ -153,6 +155,7 @@ HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
         QpnInfoPtr qpnInfo = make_shared<QpnInfo>(qpcReq->num); // new QpnInfo(qpcReq->num);
         qpnHashMap.emplace(qpcReq->num, qpnInfo);
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnHashMap.size %d rtnCnt %d\n", qpnHashMap.size(), rtnCnt);
+        missNum++;
     }
     HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: out!\n");
     return true;
@@ -202,8 +205,8 @@ HanGuRnic::QpcModule::qpcAccess() {
                     assert(qpcReq->chnl == CXT_CHNL_RX && qpcReq->type == CXT_RREQ_QP);
                     break;
                 case 3:
-                    qpcReq = txQpcPrefetchFifo.front();
-                    txQpcPrefetchFifo.pop();
+                    qpcReq = txQpcPfetchFifo.front();
+                    txQpcPfetchFifo.pop();
                     assert(qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_PFCH_QP);
                     break;
                 default:

@@ -11,42 +11,62 @@ using namespace std;
 HanGuRnic::RescPrefetcher::RescPrefetcher(HanGuRnic *rNic, const std::string name):
     rNic(rNic),
     _name(name),
-    prefetchProcEvent([this]{prefetchProc();}, name), {
+    prefetchCnt(0),
+    prefetchProcEvent([this]{prefetchProc();}, name),
+    prefetchMemProcEvent([this]{prefetchMemProc();}, name),
+    qpcPfetchRspProcEvent([this]{qpcPfetchRspProc();}, name) {
 }
 
 // launch prefetch signal, prefetch QPC, WQE, MPT
 void HanGuRnic::RescPrefetcher::prefetchProc() {
     uint32_t qpn = prefetchQue.front();
     prefetchQue.pop();
+    prefetchCnt++;
     triggerPrefetch();
     // prefetch QPC
     CxtReqRspPtr qpcRdReq = make_shared<CxtReqRsp>(CXT_PFCH_QP, CXT_CHNL_TX, qpn, 1, 0);
     rNic->qpcModule.postQpcReq(qpcRdReq);
     // prefetch WQE
-    rNic->wqeBuffManage.prefetchQpnQue.push(qpn);
-    if (!rNic->wqeBuffManage.prefetchProcEvent.scheduled()) {
-        rNic->schedule(rNic->wqeBuffManage.prefetchProcEvent, curTick() + rNic->clockPeriod());
+    rNic->wqeBufferManage.prefetchQpnQue.push(qpn);
+    if (!rNic->wqeBufferManage.wqePrefetchProcEvent.scheduled()) {
+        rNic->schedule(rNic->wqeBufferManage.wqePrefetchProcEvent, curTick() + rNic->clockPeriod());
     }
     triggerPrefetch();
 }
 
 void HanGuRnic::RescPrefetcher::prefetchMemProc() {
     assert(rNic->memPrefetchInfoQue.size() != 0);
-    // uint32_t qpn = memPrefetchInfoQue.front().first();
-    // uint32_t prefetchNum = memPrefetchInfoQue.front().second();
-    // memPrefetchInfoQue.pop();
-    // for (int i = 0; i < prefechNum; i++) {
-
-    // }
-}
-
-void HanGuRnic::RescPrefetcher::updateWqeBuffer() {
-    
+    uint32_t qpn = rNic->memPrefetchInfoQue.front().first;
+    uint32_t prefetchNum = rNic->memPrefetchInfoQue.front().second;
+    rNic->memPrefetchInfoQue.pop();
+    // get LKEY
+    MrReqRspPtr mrReq;
+    uint32_t lkey;
+    int offset;
+    for (int i = 0; i < prefetchNum; i++) {
+        lkey = rNic->memPrefetchLkeyQue.front();
+        rNic->memPrefetchLkeyQue.pop();
+        if (i == 0) {
+            offset = rNic->descScheduler.qpStatusTable[qpn]->fetch_offset;
+        }
+        else {
+            offset = 0;
+        }
+        mrReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_MPT_PREFETCH, lkey, 0, offset, qpn);
+        rNic->mptPrefetchQue.push(mrReq);
+    }
+    if (!rNic->mrRescModule.transReqEvent.scheduled()) {
+        rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
+    }
 }
 
 void HanGuRnic::RescPrefetcher::triggerPrefetch() {
-    if ((rnic->descScheduler.lowPriorityQpnQue.size() < prefetchQue.size() + PREFETCH_WINDOW) && 
+    if ((rNic->descScheduler.lowPriorityQpnQue.size() < prefetchQue.size() + PREFETCH_WINDOW) && 
         !prefetchProcEvent.scheduled()) {
-        rNic->schedule(prefetchProcEvent, curTick() + rNic->clockPeriod);
+        rNic->schedule(prefetchProcEvent, curTick() + rNic->clockPeriod());
     }
+}
+
+void HanGuRnic::RescPrefetcher::qpcPfetchRspProc() {
+    // do nothing
 }

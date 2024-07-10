@@ -47,6 +47,8 @@ Source('resc_cache.cc')
 Source('hangu_dma_engine.cc')
 Source('mr_module.cc')
 Source('pending_struct.cc')
+Source('wqe_buffer_manage.cc')
+Source('resc_prefetcher.cc')
 
 DebugFlag('HanGuDriver')
 

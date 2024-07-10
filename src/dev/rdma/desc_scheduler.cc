@@ -19,7 +19,7 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name)
     updateEvent([this]{rxUpdate();}, name),
     createQpStatusEvent([this]{createQpStatus();}, name),
     qpcRspEvent([this]{qpcRspProc();}, name),
-    wqeRspEvent([this]{wqeProc();}, name) {
+    wqeProcEvent([this]{wqeProc();}, name) {
 }
 
 /**
@@ -55,7 +55,7 @@ void HanGuRnic::DescScheduler::qpcRspProc() {
     else {
         if (qpStatus->head_ptr == qpStatus->tail_ptr) { // WARNING: consider corner case!
             lowPriorityQpnQue.push(db->qpn);
-            rNic->rescPrefetch.prefetchQue.push(db->qpn);
+            rNic->rescPrefetcher.prefetchQue.push(db->qpn);
             rNic->rescPrefetcher.triggerPrefetch();
             schedule = true;
             qpStatus->in_que++;
@@ -73,8 +73,8 @@ void HanGuRnic::DescScheduler::qpcRspProc() {
     if (!wqePrefetchScheduleEvent.scheduled() && schedule) {
         rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
     }
-    if (!rNic->rescPrefetch.prefetchProcEvent.scheduled()) {
-        rNic->schedule(rNic->rescPrefetch.prefetchProcEvent, curTick() + rNic->clockPeriod());
+    if (!rNic->rescPrefetcher.prefetchProcEvent.scheduled()) {
+        rNic->schedule(rNic->rescPrefetcher.prefetchProcEvent, curTick() + rNic->clockPeriod());
     }
     if (dbQue.size() != 0 && !qpcRspEvent.scheduled()) {
         rNic->schedule(qpcRspEvent, curTick() + rNic->clockPeriod());
@@ -109,7 +109,7 @@ void HanGuRnic::DescScheduler::qpStatusProc() {
     else {
         if (qpStatus->head_ptr == qpStatus->tail_ptr) { // WARNING: consider corner case!
             lowPriorityQpnQue.push(db->qpn);
-            rNic->rescPrefetch.prefetchQue.push(db->qpn);
+            rNic->rescPrefetcher.prefetchQue.push(db->qpn);
             schedule = true;
             qpStatus->in_que++;
             HANGU_PRINT(DescScheduler, "Inactive QP! low priority qpn: 0x%x, in que: %d\n", db->qpn, qpStatus->in_que);
@@ -131,8 +131,8 @@ void HanGuRnic::DescScheduler::qpStatusProc() {
             rNic->schedule(qpStatusRspEvent, curTick() + rNic->clockPeriod());
         }
     }
-    if (!rNic->rescPrefetch.prefetchProcEvent.scheduled()) {
-        rNic->schedule(rNic->rescPrefetch.prefetchProcEvent, curTick() + rNic->clockPeriod());
+    if (!rNic->rescPrefetcher.prefetchProcEvent.scheduled()) {
+        rNic->schedule(rNic->rescPrefetcher.prefetchProcEvent, curTick() + rNic->clockPeriod());
     }
 }
 
@@ -218,14 +218,15 @@ void HanGuRnic::DescScheduler::wqePrefetch() {
             // descReq->txDescRsp = new TxDesc[descNum];
             // rNic->descReqFifo.push(descReq);
             std::pair<uint32_t, QPStatusPtr> wqeFetchInfoPair(descNum, qpStatus);
+            // std::pair<uint32_t, uint32_t> wqeFetchInfoPair(descNum, qpStatus->qpn);
             wqeFetchInfoQue.push(wqeFetchInfoPair);
             HANGU_PRINT(DescScheduler, "WQE req sent! QPN: 0x%x, WQE num: %d, req size: %d, tail ptr: %d, WQE fetch info queue size: %d\n", 
                 qpStatus->qpn, descNum, descNum * sizeof(TxDesc), qpStatus->tail_ptr, wqeFetchInfoQue.size());
             // if (!rNic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
             //     rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
             // }
-            if (!rNic->wqeBuffManager.wqeReadReqProcessEvent.scheduled()) {
-                rNic->schedule(wqeReadReqProcessEvent, curTick() + rNic->clockPeriod());
+            if (!rNic->wqeBufferManage.wqeReadReqProcessEvent.scheduled()) {
+                rNic->schedule(rNic->wqeBufferManage.wqeReadReqProcessEvent, curTick() + rNic->clockPeriod());
             }
         }
         else {
@@ -266,8 +267,8 @@ void HanGuRnic::DescScheduler::wqeProc() {
         for (int i = 0; i < descNum; i++) {
             rNic->txdescRspFifo.pop();
         }
-        if (rNic->txdescRspFifo.size() && !wqeRspEvent.scheduled()) {
-            rNic->schedule(wqeRspEvent, curTick() + rNic->clockPeriod());
+        if (rNic->txdescRspFifo.size() && !wqeProcEvent.scheduled()) {
+            rNic->schedule(wqeProcEvent, curTick() + rNic->clockPeriod());
         }
         return;
     }
@@ -347,7 +348,7 @@ void HanGuRnic::DescScheduler::wqeProc() {
         }
         if (qpStatus->tail_ptr != qpStatus->head_ptr) {
             lowPriorityQpnQue.push(qpStatus->qpn);
-            rNic->rescPrefetcher.push(qpStatus->qpn);
+            rNic->rescPrefetcher.prefetchQue.push(qpStatus->qpn);
             qpStatus->in_que++;
             HANGU_PRINT(DescScheduler, "push back qpn into low qpn queue, qpn: 0x%x, in_que: %d\n", qpStatus->qpn, qpStatus->in_que);
             assert(qpStatus->in_que == 1);
@@ -355,7 +356,7 @@ void HanGuRnic::DescScheduler::wqeProc() {
                 rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
             }
             if (!rNic->rescPrefetcher.prefetchProcEvent.scheduled()) {
-                rNic->schedule(rNic->rescPrefetcher.prefetchProcEvent, curTick() + rNic->clockPeriod);
+                rNic->schedule(rNic->rescPrefetcher.prefetchProcEvent, curTick() + rNic->clockPeriod());
             }
             rNic->rescPrefetcher.triggerPrefetch();
         }
@@ -369,6 +370,7 @@ void HanGuRnic::DescScheduler::wqeProc() {
     }
     // write QPN back to low QPN queue in case of UD and UC QP
     if ((qpStatus->type == UD_QP || qpStatus->type == UC_QP) && (qpStatus->tail_ptr < qpStatus->head_ptr)) {
+        panic("Illegal!\n");
         lowPriorityQpnQue.push(qpStatus->qpn);
         HANGU_PRINT(DescScheduler, "UD or UC QP prefetch: type: %d\n", qpStatus->type);
         if (!wqePrefetchScheduleEvent.scheduled()) {
@@ -379,8 +381,8 @@ void HanGuRnic::DescScheduler::wqeProc() {
     if (updateNum != 0) {
         std::pair<uint32_t, uint32_t> wqeBufferUpdateItem(qpStatus->qpn, updateNum);
         rNic->wqeBufferUpdateQue.push(wqeBufferUpdateItem);
-        if (rNic->wqeBuffManage.wqeBufferUpdateEvent.scheduled()) {
-            rNic->schedule(rNic->wqeBuffManage.wqeBufferUpdateEvent, curTick() + rNic->clockPeriod());
+        if (rNic->wqeBufferManage.wqeBufferUpdateEvent.scheduled()) {
+            rNic->schedule(rNic->wqeBufferManage.wqeBufferUpdateEvent, curTick() + rNic->clockPeriod());
         }
     }
     // unlock WQE fetching
@@ -398,8 +400,8 @@ void HanGuRnic::DescScheduler::wqeProc() {
     if (!launchWqeEvent.scheduled()) {
         rNic->schedule(launchWqeEvent, curTick() + rNic->clockPeriod());
     }
-    if (rNic->txdescRspFifo.size() && !wqeRspEvent.scheduled()) {
-        rNic->schedule(wqeRspEvent, curTick() + rNic->clockPeriod());
+    if (rNic->txdescRspFifo.size() && !wqeProcEvent.scheduled()) {
+        rNic->schedule(wqeProcEvent, curTick() + rNic->clockPeriod());
     }
 }
 
@@ -472,8 +474,8 @@ void HanGuRnic::DescScheduler::rxUpdate() {
     QPStatusPtr status = qpStatusTable[qpn];
     HANGU_PRINT(DescScheduler, "rx received! qpn: 0x%x, len: %d\n", qpn, len);
     HANGU_PRINT(DescScheduler, "rx received! type: %d, head_ptr: 0x%x, tail_ptr: 0x%x\n", status->type, status->head_ptr, status->tail_ptr);
-    assert(status->type == LAT_QP || status->type == RATE_QP || status->type == BW_QP);
-    if (status->type == LAT_QP || status->type == RATE_QP) {
+    assert(status->type == LAT_QP || status->type == BW_QP);
+    if (status->type == LAT_QP) {
         // status->tail_ptr++;
         if (status->head_ptr > status->tail_ptr) {
             schedule = false;
@@ -508,7 +510,6 @@ void HanGuRnic::DescScheduler::createQpStatus() {
     HANGU_PRINT(DescScheduler, "new QP created! type: %d\n", status->type);
     assert(status->type == LAT_QP   || 
            status->type == BW_QP    || 
-           status->type == RATE_QP  || 
            status->type == UC_QP    || 
            status->type == UD_QP);
     if (rNic->createQue.size()) {

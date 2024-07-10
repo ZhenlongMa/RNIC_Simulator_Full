@@ -123,10 +123,10 @@ class HanGuRnic : public RdmaNic {
         std::queue<uint32_t> memPrefetchLkeyQue;
         /* --------------------RescPrefethcer <-> WQE Buffer {end}-----------------------------*/
 
-        /* --------------------RescPrefethcer <-> WQE Buffer {begin}-----------------------------*/
-        std::queue<std::pair<uint32_t, uint32_t>> memPrefetchInfoQue; // <qpn, lkey number>
-        std::queue<uint32_t> memPrefetchLkeyQue;
-        /* --------------------RescPrefethcer <-> WQE Buffer {end}-----------------------------*/
+        /* --------------------RescPrefethcer <-> MR {begin}-----------------------------*/
+        std::queue<MrReqRspPtr> mptPrefetchQue;
+        // std::queue<uint32_t> memPrefetchLkeyQue;
+        /* --------------------RescPrefethcer <-> MR {end}-----------------------------*/
 
         /* --------------------TPT <-> DMA Engine {begin}-------------------- */
         std::queue<DmaReqPtr> descDmaReadFifo;
@@ -345,17 +345,14 @@ class HanGuRnic : public RdmaNic {
                 void createQpStatus();
                 uint16_t sqSize = PAGE_SIZE;
                 uint16_t rqSize;
-                std::queue<DoorbellPtr> dbQue;
+                uint64_t scheduleCnt;
                 std::queue<uint32_t> highPriorityQpnQue;
-                std::queue<uint32_t> lowPriorityQpnQue;
                 std::queue<uint32_t> leastPriorityQpnQue;
                 std::queue<TxDescPtr> highPriorityDescQue;
                 std::queue<TxDescPtr> lowPriorityDescQue;
                 std::queue<DoorbellPtr> dbProcQpStatusRReqQue;
                 std::queue<std::pair<DoorbellPtr, QPStatusPtr>> dbQpStatusRspQue;
                 std::queue<uint32_t> wqePrefetchQpStatusRReqQue;
-                // std::queue<std::pair<uint32_t, QPStatusPtr>> wqeFetchInfoQue;
-                std::queue<std::pair<uint32_t, uint32_t>> wqeFetchInfoQue;
                 std::queue<DoorbellPtr> wqeProcToLaunchWqeQueH;
                 std::queue<DoorbellPtr> wqeProcToLaunchWqeQueL;
                 EventFunctionWrapper qpStatusRspEvent;
@@ -367,7 +364,11 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper updateEvent;
                 EventFunctionWrapper createQpStatusEvent;
                 EventFunctionWrapper qpcRspEvent;
-                EventFunctionWrapper wqeRspEvent;
+                EventFunctionWrapper wqeProcEvent;
+                std::queue<DoorbellPtr> dbQue;
+                std::queue<uint32_t> lowPriorityQpnQue;
+                std::queue<std::pair<uint32_t, QPStatusPtr>> wqeFetchInfoQue;
+                // std::queue<std::pair<uint32_t, uint32_t>> wqeFetchInfoQue;
                 std::unordered_map<uint8_t, uint16_t> groupTable;
                 std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
                 std::string name() {
@@ -381,16 +382,22 @@ class HanGuRnic : public RdmaNic {
         class RescPrefetcher {
             private:
                 uint16_t prefetchNum;
-                hanGuRnic *rNic;
+                HanGuRnic *rNic;
                 std::string _name;
                 void prefetchProc();
+                void prefetchMemProc();
+                uint64_t prefetchCnt;
                 // uint64_t prefetchQueTick
+                void qpcPfetchRspProc();
             public:
                 RescPrefetcher(HanGuRnic *rNic, std::string name);
                 std::queue<uint32_t> prefetchQue;
                 EventFunctionWrapper prefetchProcEvent;
+                EventFunctionWrapper prefetchMemProcEvent;
+                EventFunctionWrapper qpcPfetchRspProcEvent;
+                void triggerPrefetch();
                 std::string name() {
-                    returen _name;
+                    return _name;
                 }
         };
         RescPrefetcher rescPrefetcher;
@@ -400,6 +407,7 @@ class HanGuRnic : public RdmaNic {
         class WqeBufferManage {
             private:
                 HanGuRnic *rNic;
+                std::string _name;
                 std::queue<uint32_t> replaceQue;
                 uint64_t minReplaceParam;
                 uint64_t maxReplaceParam;
@@ -410,18 +418,31 @@ class HanGuRnic : public RdmaNic {
                 uint64_t missNum;
                 EventFunctionWrapper wqeReqReturnEvent;
                 std::queue<WqeRspPtr> wqeReturnQue;
+                void wqeReadReqProcess();
+                void wqeReadRspProcess();
+                uint16_t sqSize = PAGE_SIZE;
             public:
-                std::string _name;
+                WqeBufferManage(HanGuRnic *rNic, std::string name, int wqeCacheNum);
                 std::queue<uint16_t> vacantAddr;
                 std::queue<uint32_t> prefetchQpnQue;
                 std::queue<MrReqRspPtr> wqeRspQue;
                 std::unordered_map<uint32_t, WqeBufferUnitPtr> wqeBuffer;
                 std::unordered_map<uint32_t, WqeBufferMetadataPtr> wqeBufferMetadataTable;
+                EventFunctionWrapper wqeReadReqProcessEvent;
                 EventFunctionWrapper wqeBufferUpdateEvent;
-                EventFunctionWrapper wqeReadRspProcEvent;
+                EventFunctionWrapper wqePrefetchProcEvent;
+                // EventFunctionWrapper wqeReadRspProcEvent;
+                EventFunctionWrapper wqeReadRspEvent;
+                void wqeReqReturn();
+                void wqePrefetchProc();
+                void wqeBufferUpdate();
+                void triggerMemPrefetch(uint32_t qpn);
+                std::string name() {
+                    return _name;
+                }
         };
-        WqeBufferManage wqeBuffManage;
-        /* -------------------WQE Buffer Manage {end}---------------------------------- 
+        WqeBufferManage wqeBufferManage;
+        /* -------------------WQE Buffer Manage {end}----------------------------------*/
         
         /* -----------------------Cache {begin}------------------------ */
         template <class T, class S>
@@ -937,6 +958,9 @@ class HanGuRnic : public RdmaNic {
                 /* --------Cache related{begin}-------- */
                 IcmManage qpcIcm;
                 Cache<QpcResc> qpcCache;
+                uint64_t accessNum;
+                uint64_t missNum;
+                uint64_t hitNum;
                 /* --------Cache related{end}-------- */
 
                 /* --------RDMA Engine or CCU -(req)-> QpcModule {begin}-------- */
@@ -953,6 +977,9 @@ class HanGuRnic : public RdmaNic {
                 std::queue<CxtReqRspPtr>  txQpcRreqFifo;    // [1]
                 std::queue<CxtReqRspPtr>  rxQpcRreqFifo;    // [2]
                 /* --------RDMA Engine or CCU -(req)-> QpcModule {end}-------- */
+
+                // Resource Prefetch -> QPC module
+                std::queue<CxtReqRspPtr>  txQpcPfetchFifo; // [3]
 
                 /* --------Req Proc related {begin}-------- */
                 uint8_t chnlIdx;
@@ -1025,6 +1052,9 @@ class HanGuRnic : public RdmaNic {
                     _name(n),
                     qpcIcm(n, sizeof(QpcResc)),
                     qpcCache(n, qpcCacheNum),
+                    accessNum(0),
+                    missNum(0),
+                    hitNum(0),
                     chnlIdx(0),
                     qpcReqProcEvent ([this]{ qpcReqProc();}, n),
                     qpcRspProcEvent ([this]{ qpcRspProc();}, n),

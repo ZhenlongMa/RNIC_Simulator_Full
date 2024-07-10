@@ -102,32 +102,30 @@ HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq, uint3
     } else if (mrReq->type == DMA_TYPE_RREQ) {
         DmaReqPtr dmaRdReq;
         switch (mrReq->chnl) {
-          case MR_RCHNL_TX_DESC:
-          case MR_RCHNL_RX_DESC:
-            /* Post desc dma req to DMA engine */
-            dmaRdReq = make_shared<DmaReq>(rnic->pciToDma(pAddr), mrReq->length, 
-                    &dmaRrspEvent, mrReq->data + offset, 0); /* last parameter is useless here */
-            rnic->descDmaReadFifo.push(dmaRdReq);
-
-            // update on fly request count
-            onFlyDescDmaRdReqNum++;
-            HANGU_PRINT(MrResc, "desc DMA request sent! on-fly count: %d\n", onFlyDescDmaRdReqNum);
-            assert(onFlyDescDmaRdReqNum > 0);
-
-            break;
-          case MR_RCHNL_TX_DATA:
-          case MR_RCHNL_RX_DATA:
-            /* Post data dma req to DMA engine */
-            dmaRdReq = make_shared<DmaReq>(rnic->pciToDma(pAddr), length, 
-                    &dmaRrspEvent, mrReq->data + offset, 0); /* last parameter is useless here */
-            rnic->dataDmaReadFifo.push(dmaRdReq);
-
-            // update on fly request count
-            onFlyDataDmaRdReqNum++;
-            HANGU_PRINT(MrResc, "data DMA request sent! on-fly count: %d\n", onFlyDataDmaRdReqNum);
-            assert(onFlyDataDmaRdReqNum > 0);
-
-            break;
+            case MR_RCHNL_TX_DESC:
+            case MR_RCHNL_RX_DESC:
+            case MR_RCHNL_TX_DESC_FETCH:
+            case MR_RCHNL_TX_DESC_PREFETCH:
+                /* Post desc dma req to DMA engine */
+                dmaRdReq = make_shared<DmaReq>(rnic->pciToDma(pAddr), mrReq->length, 
+                        &dmaRrspEvent, mrReq->data + offset, 0); /* last parameter is useless here */
+                rnic->descDmaReadFifo.push(dmaRdReq);
+                // update on fly request count
+                onFlyDescDmaRdReqNum++;
+                HANGU_PRINT(MrResc, "desc DMA request sent! on-fly count: %d\n", onFlyDescDmaRdReqNum);
+                assert(onFlyDescDmaRdReqNum > 0);
+                break;
+            case MR_RCHNL_TX_DATA:
+            case MR_RCHNL_RX_DATA:
+                /* Post data dma req to DMA engine */
+                dmaRdReq = make_shared<DmaReq>(rnic->pciToDma(pAddr), length, 
+                        &dmaRrspEvent, mrReq->data + offset, 0); /* last parameter is useless here */
+                rnic->dataDmaReadFifo.push(dmaRdReq);
+                // update on fly request count
+                onFlyDataDmaRdReqNum++;
+                HANGU_PRINT(MrResc, "data DMA request sent! on-fly count: %d\n", onFlyDataDmaRdReqNum);
+                assert(onFlyDataDmaRdReqNum > 0);
+                break;
         }
 
         /* Push to Fifo, and dmaRrspProcessing 
@@ -180,6 +178,8 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
     switch (tptRsp->chnl) {
         case MR_RCHNL_TX_DESC:
         case MR_RCHNL_RX_DESC:
+        case MR_RCHNL_TX_DESC_FETCH:
+        case MR_RCHNL_TX_DESC_PREFETCH:
             onFlyDescDmaRdReqNum--;
             HANGU_PRINT(MrResc, "descriptor DMA request received by MR module! on-fly count: %d\n", onFlyDescDmaRdReqNum);
             break;
@@ -196,9 +196,12 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
         TxDescPtr txDesc;
         switch (tptRsp->chnl) {
             case MR_RCHNL_TX_DESC:
+            case MR_RCHNL_TX_DESC_PREFETCH:
+            case MR_RCHNL_TX_DESC_FETCH:
                 // event = &rnic->rdmaEngine.dduEvent;
-                // event = &rnic->descScheduler.wqeRspEvent;
-                event = &rnic->wqeBuffManage.;
+                // event = &rnic->descScheduler.wqeProcEvent;
+                event = &rnic->wqeBufferManage.wqeReadRspEvent;
+                rnic->wqeBufferManage.wqeRspQue.push(tptRsp);
 
                 for (uint32_t i = 0; (i * sizeof(TxDesc)) < tptRsp->length; ++i) {
                     txDesc = make_shared<TxDesc>(tptRsp->txDescRsp + i);
@@ -208,7 +211,7 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
                     assert(txDesc->opcode != 0);
                     rnic->txdescRspFifo.push(txDesc);
                 }
-                // assert((tptRsp->txDescRsp->len != 0) && (tptRsp->txDescRsp->lVaddr != 0));
+                assert((tptRsp->txDescRsp->len != 0) && (tptRsp->txDescRsp->lVaddr != 0));
                 // rnic->txdescRspFifo.push(tptRsp->txDescRsp);
                 // rnic->txdescRspFifo.push(tptRsp);
 
@@ -356,55 +359,57 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
     /* Post dma req */
     // dmaReqProcess(mttResc->pAddr + reqPkt->offset, reqPkt);
 
-    /* Post dma req */
-    uint32_t offset; // relative to MR request
-    uint32_t length;
-    uint64_t dmaAddr;
+    if (reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
+        /* Post dma req */
+        uint32_t offset; // relative to MR request
+        uint32_t length;
+        uint64_t dmaAddr;
 
-    // set DMA address
-    if (reqPkt->mttRspNum == 0) {
-        dmaAddr = mttResc->pAddr + reqPkt->offset % PAGE_SIZE; // WARNING: suppose MR is page-aligned
-    }
-    else {
-        dmaAddr = mttResc->pAddr;
-    }
-
-    // set offset
-    if (reqPkt->mttRspNum == 0) {
-        offset = 0;
-    }
-    else {
-        offset = (reqPkt->mttRspNum - 1) * PAGE_SIZE + (PAGE_SIZE - (reqPkt->offset % PAGE_SIZE));
-    }
-
-    // set length
-    if (reqPkt->mttRspNum == 0) { // if this is the first MTT response
-        if (reqPkt->mttRspNum + 1 == reqPkt->mttNum) {
-            length = reqPkt->length;
+        // set DMA address
+        if (reqPkt->mttRspNum == 0) {
+            dmaAddr = mttResc->pAddr + reqPkt->offset % PAGE_SIZE; // WARNING: suppose MR is page-aligned
         }
         else {
-            length = PAGE_SIZE - reqPkt->offset;
+            dmaAddr = mttResc->pAddr;
         }
-    }
-    else if (reqPkt->mttRspNum + 1 == reqPkt->mttNum) {
-        if ((reqPkt->length + reqPkt->offset) % PAGE_SIZE == 0) {
+
+        // set offset
+        if (reqPkt->mttRspNum == 0) {
+            offset = 0;
+        }
+        else {
+            offset = (reqPkt->mttRspNum - 1) * PAGE_SIZE + (PAGE_SIZE - (reqPkt->offset % PAGE_SIZE));
+        }
+
+        // set length
+        if (reqPkt->mttRspNum == 0) { // if this is the first MTT response
+            if (reqPkt->mttRspNum + 1 == reqPkt->mttNum) {
+                length = reqPkt->length;
+            }
+            else {
+                length = PAGE_SIZE - reqPkt->offset;
+            }
+        }
+        else if (reqPkt->mttRspNum + 1 == reqPkt->mttNum) {
+            if ((reqPkt->length + reqPkt->offset) % PAGE_SIZE == 0) {
+                length = PAGE_SIZE;
+            }
+            else {
+                length = (reqPkt->length + reqPkt->offset) % PAGE_SIZE; 
+            }
+        }
+        else if (reqPkt->mttRspNum + 1 < reqPkt->mttNum) {
             length = PAGE_SIZE;
         }
         else {
-            length = (reqPkt->length + reqPkt->offset) % PAGE_SIZE; 
+            panic("Wrong mtt rsp num and mtt num! mtt rsp num: %d, mtt num: %d", reqPkt->mttRspNum, reqPkt->mttNum);
         }
-    }
-    else if (reqPkt->mttRspNum + 1 < reqPkt->mttNum) {
-        length = PAGE_SIZE;
-    }
-    else {
-        panic("Wrong mtt rsp num and mtt num! mtt rsp num: %d, mtt num: %d", reqPkt->mttRspNum, reqPkt->mttNum);
-    }
-    assert(length != 0);
-    dmaReqProcess(dmaAddr, reqPkt, offset, length);
+        assert(length != 0);
+        dmaReqProcess(dmaAddr, reqPkt, offset, length);
 
-    assert(reqPkt->mttRspNum < reqPkt->mttNum);
-    reqPkt->mttRspNum++;
+        assert(reqPkt->mttRspNum < reqPkt->mttNum);
+        reqPkt->mttRspNum++;
+    }
 
     /* Schedule myself */
     if (mttCache.rrspFifo.size()) {
@@ -421,11 +426,12 @@ HanGuRnic::MrRescModule::transReqProcessing() {
 
     HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing!\n");
 
-    uint8_t CHNL_NUM = 3;
+    uint8_t CHNL_NUM = 4;
     bool isEmpty[CHNL_NUM];
     isEmpty[0] = rnic->descReqFifo.empty();
     isEmpty[1] = rnic->cqWreqFifo.empty() ;
     isEmpty[2] = rnic->dataReqFifo.empty();
+    isEmpty[3] = rnic->mptPrefetchQue.empty();
     
     HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing isEmpty[0] %d, isEmpty[1] %d, isEmpty[2] %d\n", 
             isEmpty[0], isEmpty[1], isEmpty[2]);
@@ -451,13 +457,20 @@ HanGuRnic::MrRescModule::transReqProcessing() {
                 case 2:
                     mrReq = rnic->dataReqFifo.front();
                     rnic->dataReqFifo.pop();
-                    if (mrReq->type == DMA_TYPE_RREQ)
-                    {
+                    if (mrReq->type == DMA_TYPE_RREQ) {
                         onFlyDataMrRdReqNum++;
                         assert(onFlyDataMrRdReqNum > 0);
                         HANGU_PRINT(MrResc, "MR module receive a data MR request! on-fly request count: %d\n", onFlyDataMrRdReqNum);
                     }
                     HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: Data read/Write request! data addr 0x%lx\n", (uintptr_t)(mrReq->data));
+                    break;
+                case 3:
+                    mrReq = rnic->mptPrefetchQue.front();
+                    rnic->mptPrefetchQue.pop();
+                    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: MPT prefetch request! lkey: 0x%lx\n", mrReq->lkey);
+                    break;
+                default:
+                    panic("Illegal Channel!\n");
                     break;
             }
 
@@ -476,7 +489,8 @@ HanGuRnic::MrRescModule::transReqProcessing() {
             /* Schedule this module again if there still has elem in fifo */
             if (!rnic->descReqFifo.empty() || 
                 !rnic->cqWreqFifo.empty()  || 
-                !rnic->dataReqFifo.empty()) {
+                !rnic->dataReqFifo.empty() ||
+                !rnic->mptPrefetchQue.empty()) {
                 if (!transReqEvent.scheduled()) {
                     rnic->schedule(transReqEvent, curTick() + rnic->clockPeriod());
                 }

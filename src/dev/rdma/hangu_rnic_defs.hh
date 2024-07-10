@@ -33,6 +33,7 @@
 #include "debug/HanGu.hh"
 #include "sim/eventq.hh"
 #include "dev/rdma/kfd_ioctl.h"
+#include <queue>
 
 #ifdef COLOR
 
@@ -425,7 +426,7 @@ const uint8_t MR_RCHNL_TX_DATA = 0x07;
 const uint8_t MR_RCHNL_RX_DATA = 0x08;
 const uint8_t MR_RCHNL_TX_DESC_PREFETCH = 0x09;
 const uint8_t MR_RCHNL_TX_DESC_FETCH = 0X0a;
-
+const uint8_t MR_RCHNL_TX_MPT_PREFETCH = 0x0b;
 
 struct CxtReqRsp {
     CxtReqRsp (uint8_t type, uint8_t chnl, uint32_t num, uint32_t sz = 1, uint8_t idx = 0) {
@@ -458,6 +459,7 @@ const uint8_t CXT_RREQ_CQ = 0x04;
 const uint8_t CXT_RRSP_CQ = 0x05;
 const uint8_t CXT_RREQ_SQ = 0x06; /* read sq addr */
 const uint8_t CXT_CREQ_QP = 0x07; /* create request */
+const uint8_t CXT_PFCH_QP = 0x08;
 const uint8_t CXT_CHNL_TX = 0x01;
 const uint8_t CXT_CHNL_RX = 0x02;
 
@@ -760,11 +762,6 @@ struct QPStatusItem {
     uint32_t wnd_end;
     // uint32_t wnd_fetch;
     // uint32_t current_msg_offset;
-    enum process_state {
-        PENDING,
-        WAITING_FETCH,
-        PROCESSING
-    } procState;
     uint32_t key;
     uint8_t weight;
     uint8_t type; // 1: latency, 2: bandwidth, 3: rate, 4: UC, 5: UD. In regard to librdma.h
@@ -790,7 +787,7 @@ struct WqeBufferUnit {
     uint16_t prev;
     // std::queue<TxDescPtr> descQue;
     std::vector<TxDescPtr> descArray;
-}
+};
 typedef std::shared_ptr<WqeBufferUnit> WqeBufferUnitPtr;
 
 struct WqeBufferMetadata {
@@ -807,7 +804,7 @@ struct WqeBufferMetadata {
         WAITING_FETCH,
         WAITING_PREFETCH,
     } wqeState;
-}
+};
 typedef std::shared_ptr<WqeBufferMetadata> WqeBufferMetadataPtr;
 
 struct WqeRsp {
@@ -818,7 +815,7 @@ struct WqeRsp {
         this->descNum = descNum;
         this->qpn = qpn;
     }
-}
+};
 typedef std::shared_ptr<WqeRsp> WqeRspPtr;
 
 } // namespace HanGuRnicDef

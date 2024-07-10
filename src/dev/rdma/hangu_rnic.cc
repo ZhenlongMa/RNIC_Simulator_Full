@@ -55,7 +55,8 @@ HanGuRnic::HanGuRnic(const Params *p)
     mboxEvent           ([this]{ mboxFetchCpl();    }, name()),
     rdmaEngine          (this, name() + ".RdmaEngine", p->reorder_cap),
     descScheduler       (this, name() + ".DescScheduler"),
-    wqeBuffManager      (this, name() + ".WqeBuffManager"),
+    rescPrefetcher      (this, name() + ".RescPrefetcher"),
+    wqeBufferManage     (this, name() + ".WqeBufferManage", p->wqe_cache_num),
     mrRescModule        (this, name() + ".MrRescModule", p->mpt_cache_num, p->mtt_cache_num),
     cqcModule           (this, name() + ".CqcModule", p->cqc_cache_num),
     qpcModule           (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
@@ -323,7 +324,7 @@ HanGuRnic::mboxFetchCpl () {
             HANGU_PRINT(CcuEngine, " CcuEngine.CEU.mboxFetchCpl: WRITE_QPC command! i %d qpn 0x%x(%d), addr 0x%lx\n", 
                     i, qpcReq->txQpcReq->srcQpn, qpcReq->txQpcReq->srcQpn&QPN_MASK, (uintptr_t)qpcReq->txQpcReq);
             qpcReq->num = qpcReq->txQpcReq->srcQpn;
-            assert(qpcreq->txQpcReq->sqSizeLog == PAGE_SIZE_LOG);
+            assert(qpcReq->txQpcReq->sqSizeLog == PAGE_SIZE_LOG);
             qpcModule.postQpcReq(qpcReq); /* post create request to qpcModule */
             
             // write QP status
