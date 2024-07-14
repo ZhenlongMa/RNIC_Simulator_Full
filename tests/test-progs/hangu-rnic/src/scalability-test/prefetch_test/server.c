@@ -2,6 +2,7 @@
 #include "server.h"
 
 int svr_update_qps(struct rdma_resc *resc) {
+    int weight = 2;
     for (int i = 0; i < resc->num_qp * resc->num_rem; ++i) {
         /* Modify Local QP */
         struct ibv_qp *qp = resc->qp[i];
@@ -20,11 +21,14 @@ int svr_update_qps(struct rdma_resc *resc) {
         qp->dsubnet.dlid = (i % resc->num_rem) + resc->ctx->lid + 1;
         qp->group_id = resc->qos_group[0]->id;
         qp->indicator = BW_QP;
-        qp->weight = 2;
-        RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d, group id: %d\n", 
-                qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num, i, qp->group_id);
+        qp->weight = weight;
+        RDMA_PRINT(Server, "svr_update_qps: start modify_qp, dlid %d, src_qp 0x%x, dst_qp 0x%x, cqn 0x%x, i %d, weight: %d, group id: %d, group weight: %d\n", 
+                qp->dsubnet.dlid, qp->qp_num, qp->dest_qpn, qp->cq->cq_num, i, qp->weight, qp->group_id, resc->qos_group[0]->weight);
+        // ibv_modify_qp(resc->ctx, qp);
+        // weight++;
     }
     ibv_modify_batch_qp(resc->ctx, resc->qp[0], resc->num_qp * resc->num_rem);
+
     return 0;
 }
 
@@ -47,23 +51,28 @@ int svr_update_info(struct rdma_resc *resc) {
     int sum = 0, num;
     struct rdma_cr *cr_info;
     uint16_t *dest_info = (uint16_t *)malloc(sizeof(uint16_t) * resc->num_rem);
+
     while (sum < resc->num_rem) {
         cr_info = rdma_listen(resc, &num); /* listen connection request from client (QP0) */
         if (num == 0) { /* no cr_info is acquired */
             continue;
         }
         RDMA_PRINT(Server, "svr_update_info: rdma_listen end, Polled %d CR data\n", num);
+        
         for (int i = 0; i < num; ++i) {
+
             /* get remote addr information */
             resc->rinfo[sum].dlid  = cr_info[i].src_lid;
             resc->rinfo[sum].raddr = cr_info[i].raddr;
             resc->rinfo[sum].rkey  = cr_info[i].rkey;
             ++sum;
+
             /* Generate Connect Request to respond client */
             cr_info[i].flag = CR_TYPE_ACK;
             cr_info[i].raddr = (uintptr_t)resc->mr[0]->addr;
             cr_info[i].rkey  = resc->mr[0]->lkey;
             dest_info[i] = cr_info[i].src_lid;
+
             RDMA_PRINT(Server, "svr_update_info: sum %d resc_num_rem %d, cr_info[i].raddr %ld cr_info[i].rkey %d dest_info[i] %d\n", 
                     sum, resc->num_rem, cr_info[i].raddr, cr_info[i].rkey, dest_info[i]);
         }
@@ -72,8 +81,10 @@ int svr_update_info(struct rdma_resc *resc) {
         free(cr_info);
     }
     free(dest_info);
+
     /* modify qp in server side */
     svr_update_qps(resc);
+
     return 0;
 }
 
@@ -100,54 +111,12 @@ static void usage(const char *argv0) {
     printf("  -m, --op-mode=<op_mode>           opcode mode (default 0, which is RDMA Write)\n");
 }
 
-void generate_wqe(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, uint32_t offset, int wr_num)
-{
-    resc->wqe = (struct ibv_wqe *)malloc(sizeof(struct ibv_wqe) * THPT_WR_NUM);
-    struct ibv_mr *local_mr = (resc->mr)[0];
-
-    if (op_mode == OPMODE_RDMA_WRITE) 
-    {
-        for (int i = 0; i < wr_num; ++i) 
-        {
-            // wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
-            resc->wqe[i].length = msg_size;
-            resc->wqe[i].mr = local_mr;
-            resc->wqe[i].offset = offset;
-
-            /* Add RDMA Write element */
-            resc->wqe[i].trans_type = IBV_TYPE_RDMA_WRITE;
-            resc->wqe[i].flag       = (i == wr_num - 1) ? WR_FLAG_SIGNALED : 0;
-            resc->wqe[i].rdma.raddr = resc->rinfo->raddr + (sizeof(TRANS_WRDMA_DATA) - 1) * i + offset;
-            resc->wqe[i].rdma.rkey  = resc->rinfo->rkey;
-        }
-    } 
-    else if (op_mode == OPMODE_RDMA_READ) 
-    {
-        for (int i = 0; i < wr_num; ++i) 
-        {
-            resc->wqe[i].length = sizeof(TRANS_RRDMA_DATA);
-            resc->wqe[i].mr = local_mr;
-            resc->wqe[i].offset = (sizeof(TRANS_RRDMA_DATA) - 1) * i + offset;
-
-            /* Add RDMA Read element */
-            resc->wqe[i].trans_type = IBV_TYPE_RDMA_READ;
-            resc->wqe[i].flag       = (i == wr_num - 1) ? WR_FLAG_SIGNALED : 0;
-            resc->wqe[i].rdma.raddr = resc->rinfo->raddr + offset;
-            resc->wqe[i].rdma.rkey  = resc->rinfo->rkey;
-        }
-        
-    }
-}
-
-struct ibv_wqe *generate_wqe_new(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, uint32_t offset, int wr_num)
-{
+struct ibv_wqe *generate_wqe_new(struct rdma_resc *resc, uint8_t op_mode, uint32_t msg_size, uint32_t offset, int wr_num) {
     struct ibv_wqe *wqe_list = (struct ibv_wqe *)malloc(sizeof(struct ibv_wqe) * THPT_WR_NUM);
     struct ibv_mr *local_mr = (resc->mr)[0];
 
-    if (op_mode == OPMODE_RDMA_WRITE) 
-    {
-        for (int i = 0; i < wr_num; ++i) 
-        {
+    if (op_mode == OPMODE_RDMA_WRITE) {
+        for (int i = 0; i < wr_num; ++i) {
             // wqe[i].length = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
             wqe_list[i].length = msg_size;
             wqe_list[i].mr = local_mr;
@@ -160,11 +129,9 @@ struct ibv_wqe *generate_wqe_new(struct rdma_resc *resc, uint8_t op_mode, uint32
             wqe_list[i].rdma.rkey  = resc->rinfo->rkey;
         }
     } 
-    else if (op_mode == OPMODE_RDMA_READ) 
-    {
-        for (int i = 0; i < wr_num; ++i) 
-        {
-            wqe_list[i].length = sizeof(TRANS_RRDMA_DATA);
+    else if (op_mode == OPMODE_RDMA_READ) {
+        for (int i = 0; i < wr_num; ++i) {
+            wqe_list[i].length = msg_size;
             wqe_list[i].mr = local_mr;
             wqe_list[i].offset = (sizeof(TRANS_RRDMA_DATA) - 1) * i + offset;
 
@@ -183,8 +150,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     uint8_t ibv_type[] = {IBV_TYPE_RDMA_WRITE, IBV_TYPE_RDMA_READ};
     int num_qp = 0;
     int qos_group_num = ctx->group_num - 1;
-    for (int i = 0; i < qos_group_num; i++)
-    {
+    for (int i = 0; i < qos_group_num; i++) {
         num_qp += grp_resc[i]->num_qp;
     }
     RDMA_PRINT(Server, "into throughput test, num_qp: %d, num_client: %d, qos_group_num: %d\n", num_qp, num_client, qos_group_num);
@@ -199,69 +165,46 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     uint32_t elephant_msg_size;
     uint32_t mice_msg_size;
     mice_wr_num = THPT_WR_NUM;
-    mice_msg_size = sizeof(TRANS_WRDMA_DATA) * 64;
+    mice_msg_size = sizeof(TRANS_WRDMA_DATA);
     #ifdef TEST_THPT_PEAK
         elephant_wr_num = mice_wr_num;
         elephant_msg_size = mice_msg_size;
     #else
         elephant_wr_num = BW_WR_NUM;
-        elephant_msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 512;
+        elephant_msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
     #endif
-    struct ibv_wqe *mice_wqe_list;
+    // struct ibv_wqe *mice_wqe_list;
     struct ibv_wqe *elephant_wqe_list;
     struct ibv_qp *elephant_qp;
     
     // generate WQE
-    for (int i = 0; i < qos_group_num; i++)
-    {
-        if (i != 0)
-        {
-            mice_wqe_list = generate_wqe_new(grp_resc[i], op_mode, mice_msg_size, offset, mice_wr_num);
-            elephant_wqe_list = generate_wqe_new(grp_resc[i], op_mode, elephant_msg_size, offset, elephant_wr_num);
-        }
+    for (int i = 0; i < qos_group_num; i++) {
+        mice_wqe_list = generate_wqe_new(grp_resc[i], op_mode, mice_msg_size, offset, mice_wr_num);
+        elephant_wqe_list = generate_wqe_new(grp_resc[i], op_mode, elephant_msg_size, offset, elephant_wr_num);
     }
 
     /* Start to post all the QPs at beginning */
-    for (int k = 0; k < qos_group_num; k++) // exclude CM group
-    {
-        // if (cpu_id == 0 && k == 0)
-        // {
-        //     continue;
-        // }
+    for (int k = 0; k < qos_group_num; k++) { // exclude CM group
         struct rdma_resc *resc = grp_resc[k];
         for (int i = 0; i < num_client; ++i) {
             for (int j = 0; j < resc->num_qp; ++j) {
-                if (j == 0) // elephant flow
-                {
-                    elephant_qp = resc->qp[i * resc->num_qp + j];
-                    for (int k = 0; k < 1; k++)
-                    {
-                        ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
-                    }
-                }
-                else // mice flows
-                {
-                    for (int k = 0; k < 1; k++)
-                    {
-                        ibv_post_send(resc->ctx, mice_wqe_list, resc->qp[i * resc->num_qp + j], mice_wr_num);
-                    }
-                }
+                ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
+                ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
             }
         }
     }
     
     /* polling for completion */
     do { // snd_cnt < (num_qp * TEST_WR_NUM * num_client)
-        for (int grp_id = 0; grp_id < qos_group_num; grp_id++)
-        {
+        for (int grp_id = 0; grp_id < qos_group_num; grp_id++) {
             // RDMA_PRINT(Server, "work on grp[%d]\n", grp_id);
             struct rdma_resc *resc = grp_resc[grp_id];
             struct cpl_desc **desc = resc->desc;
             int num_cq = resc->num_cq;
             for (int i = 0; i < num_cq; ++i) {
                 int res = ibv_poll_cpl(resc->cq[i], desc, MAX_CPL_NUM);
+                // RDMA_PRINT(Server, "cpu[%d] get cqe num: %d\n", cpu_id, res);
                 if (res) {
-                    RDMA_PRINT(Server, "cpu[%d] get cqe num: %d\n", cpu_id, res);
                     if (*start_time == 0) {
                         *start_time = get_time(resc->ctx);
                     }
@@ -270,26 +213,14 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                         if (desc[j]->trans_type == ibv_type[op_mode]) {
                             record.cqe_count[(desc[j]->qp_num & RESC_LIM_MASK) - 1]++;
                             struct ibv_qp* qp;
-                            for (int m = 0; m < resc->num_qp; m++)
-                            {
-                                if (desc[j]->qp_num == resc->qp[m]->qp_num)
-                                {
+                            for (int m = 0; m < resc->num_qp; m++) {
+                                if (desc[j]->qp_num == resc->qp[m]->qp_num) {
                                     qp = resc->qp[m];
                                 }
                             }
-
-                            if (qp->qp_num == elephant_qp->qp_num)
-                            {
-                                // WARNING: ONLY ONE ELEPHANT QP!
-                                ibv_post_send(resc->ctx, elephant_wqe_list, qp, elephant_wr_num);
-                            }
-                            else
-                            {
-                                ibv_post_send(resc->ctx, mice_wqe_list, qp, mice_wr_num);
-                            }
+                            ibv_post_send(resc->ctx, elephant_wqe_list, qp, elephant_wr_num);
                         }
-                        else
-                        {
+                        else {
                             fprintf(stderr, "Wrong trans type! trans type: %d, ibv type: %d\n", desc[j]->trans_type, ibv_type[op_mode]);
                         }
                     }
@@ -301,13 +232,12 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     } while ((*con_time < TEST_TIME * MS) || (*start_time == 0));
 
     int cqe_sum = 0;
-    for (int i = 0; i < num_client * num_qp; i++)
-    {
+    for (int i = 0; i < num_client * num_qp; i++) {
         // note that this is not indexed by QPN!
         RDMA_PRINT(Server, "QP[%d] cqe count: %ld\n", i + 1, record.cqe_count[i]);
         cqe_sum += record.cqe_count[i];
     }
-    RDMA_PRINT(Server, "CPU[%d] cqe sum: %d\n", cpu_id, cqe_sum);
+    RDMA_PRINT(Server, "CPU[%d] cqe count sum: %d\n", cpu_id, cqe_sum);
     RDMA_PRINT(Server, "time: %ld\n", *con_time);
     return (*snd_cnt * 1000000.0) / *con_time; /* message rate */
 }
@@ -410,35 +340,25 @@ int main (int argc, char **argv) {
 
     int num_mr = 1;
     int num_cq = TEST_CQ_NUM;
-    int grp1_num_qp;
-    int grp2_num_qp;
-    int grp1_weight;
-    int grp2_weight;
-
-    if (cpu_id == 0)
-    {
-        grp1_num_qp = 1;
-        grp2_num_qp = 1;
+    int group_num = 4;
+    int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
+    int *group_weight = (int *)malloc(sizeof(int) * group_num);
+    for (int i = 0; i < group_num; i++) {
+        group_qp_num[i] = 2;
+        group_weight[i] = 10;
     }
-    else 
-    {
-        grp1_num_qp = 1;
-        grp2_num_qp = 1;
-    }
-    grp1_weight = 10;
-    grp2_weight = 10;
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
+    struct rdma_resc **grp_resc = (struct rdma_resc**)malloc(sizeof(struct rdma_resc *) * group_num);
 
     /* device initialization */
     ibv_open_device(ib_context, svr_lid);
     RDMA_PRINT(Server, "ibv_open_device : doorbell address 0x%lx\n", (long int)ib_context->dvr);
-    struct rdma_resc *grp1_resc = set_group_resource(ib_context, num_mr, num_cq, grp1_num_qp, svr_lid, num_client, grp1_weight);
-    RDMA_PRINT(Server, "group1 resource created!\n");
-    struct rdma_resc *grp2_resc = set_group_resource(ib_context, num_mr, num_cq, grp2_num_qp, svr_lid, num_client, grp2_weight);
-    RDMA_PRINT(Server, "group2 resource created!\n");
+    for (int i = 0; i < group_num; i++) {
+        grp_resc[i] = set_group_resource(ib_context, num_mr, num_cq, group_qp_num[i], svr_lid, num_client, group_weight[i]);
+    }
 
     /* sync to make sure that we could get start */
-    rdma_recv_sync(grp1_resc);
+    rdma_recv_sync(grp_resc[0]);
     
     /* Inform other CPUs that we can start the message rate test */
     cpu_sync(ib_context);
@@ -447,27 +367,15 @@ int main (int argc, char **argv) {
     start_time = get_time(ib_context);
     RDMA_PRINT(Server, "start rdma_post_send0: %ld\n", start_time);
     start_time = 0;
-    struct rdma_resc **grp_resc = (struct rdma_resc**)malloc(sizeof(struct rdma_resc *) * (ib_context->group_num - 1));
-    grp_resc[0] = grp1_resc;
-    grp_resc[1] = grp2_resc;
 
-    if (judge_latency(cpu_id) == LAT_QP)
-    {
-        /* Start Latency test */
-        // latency = latency_test(grp1_resc, 1, op_mode, 1000);
-        RDMA_PRINT(Server, "latency test end!\n");
+    msg_rate = throughput_test(ib_context, grp_resc, op_mode, offset, &start_time, &end_time, &con_time, &snd_cnt);
+    if (op_mode == OPMODE_RDMA_WRITE) {
+        bandwidth = msg_rate * sizeof(TRANS_WRDMA_DATA);
+    } else if (op_mode == OPMODE_RDMA_READ) {
+        bandwidth = msg_rate * sizeof(TRANS_RRDMA_DATA);
     }
-    else
-    {
-        msg_rate = throughput_test(ib_context, grp_resc, op_mode, offset, &start_time, &end_time, &con_time, &snd_cnt);
-        if (op_mode == OPMODE_RDMA_WRITE) {
-            bandwidth = msg_rate * sizeof(TRANS_WRDMA_DATA);
-        } else if (op_mode == OPMODE_RDMA_READ) {
-            bandwidth = msg_rate * sizeof(TRANS_RRDMA_DATA);
-        }
-        RDMA_PRINT(Server, "start time %lu end time %lu consumed time is %lu, send cnt: %lu, bandwidth %.2lf MB/s, msg_rate %.2lf Mops/s, latency %.2lf ns\n", 
-                start_time, end_time, con_time, snd_cnt, bandwidth, msg_rate, latency);
-    }
+    RDMA_PRINT(Server, "start time %lu end time %lu consumed time is %lu, send cnt: %lu, bandwidth %.2lf MB/s, msg_rate %.2lf Mops/s, latency %.2lf ns\n", 
+            start_time, end_time, con_time, snd_cnt, bandwidth, msg_rate, latency);
 
     /* Inform Client that Transmission has completed */
     rdma_recv_sync(grp1_resc);

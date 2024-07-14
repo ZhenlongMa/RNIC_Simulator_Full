@@ -647,8 +647,7 @@ int ibv_poll_cpl(struct ibv_cq *cq, struct cpl_desc **desc, int max_num) {
 /**
  * @note create one QoS group
 */
-struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight)
-{
+struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight) {
     context->group_num++;
     struct hghca_context *dvr = (struct hghca_context *)context->dvr;
     struct kfd_ioctl_alloc_group_args *args = (struct kfd_ioctl_alloc_group_args *)malloc(sizeof(struct kfd_ioctl_alloc_group_args));
@@ -673,13 +672,11 @@ struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight)
 /**
  * @note set QoS group scheduling weight. This function updates all group granularity
 */
-int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint8_t group_num, uint16_t *weight)
-{
+int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint8_t group_num, uint16_t *weight) {
     struct kfd_ioctl_set_group_args *args = (struct kfd_ioctl_set_group_args *)malloc(sizeof(struct kfd_ioctl_set_group_args));
     struct hghca_context *dvr = (struct hghca_context *)context->dvr;
     args->group_num = group_num;
-    for (int i = 0; i < args->group_num; i++)
-    {
+    for (int i = 0; i < args->group_num; i++) {
         args->group_id[i] = group[i].id;
         args->weight[i] = weight[i];
         // HGRNIC_PRINT("QoS group granularity set! id: %d, weight: %d\n", group[i].id, weight[i]);
@@ -688,8 +685,7 @@ int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint
     free(args);
 }
 
-void update_all_group_granularity(struct ibv_context *context)
-{
+void update_all_group_granularity(struct ibv_context *context) {
     struct kfd_ioctl_set_group_args *args = (struct kfd_ioctl_set_group_args *)malloc(sizeof(struct kfd_ioctl_set_group_args));
     struct hghca_context *dvr = (struct hghca_context *)context->dvr;
     args->group_num = 0;

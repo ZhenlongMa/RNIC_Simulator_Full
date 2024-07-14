@@ -158,21 +158,30 @@ int main (int argc, char **argv) {
     }
 
     sprintf(id_name, "%d", llid);
-    // RDMA_PRINT(Client, "num_client %d\n", num_client);
-
-    // RDMA_PRINT(Client, "llid is 0x%x\n", llid);
-    // RDMA_PRINT(Client, "dlid is 0x%x\n", svr_lid);
+    RDMA_PRINT(Client, "num_client %d\n", num_client);
+    RDMA_PRINT(Client, "llid is 0x%x\n", llid);
+    RDMA_PRINT(Client, "dlid is 0x%x\n", svr_lid);
     
     num_mr = 1;
     num_cq = TEST_CQ_NUM;
     num_qp = TEST_QP_NUM;
 
-    // int num_mr = 1;
-    // int num_cq = TEST_CQ_NUM;
+    int group_num = 4;
     int grp1_num_qp = 10;
     int grp2_num_qp = 20;
+    int grp3_num_qp = 10;
+    int grp4_num_qp = 20;
     int grp1_weight = 3;
     int grp2_weight = 2;
+    int grp3_weight = 3;
+    int grp4_weight = 2;
+    int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
+    int *group_weight = (int *)malloc(sizeof(int) * group_num);
+
+    for (int i = 0; i < group_num; i++) {
+        group_qp_num[i] = 10;
+        group_weight[i] = 10;
+    }
 
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
 
@@ -183,13 +192,15 @@ int main (int argc, char **argv) {
 
     struct rdma_resc *resc1 = rdma_resc_init(ib_context, num_mr, num_cq, grp1_num_qp, llid, 1);
     struct rdma_resc *resc2 = rdma_resc_init(ib_context, num_mr, num_cq, grp2_num_qp, llid, 1);
+    struct rdma_resc *resc3 = rdma_resc_init(ib_context, num_mr, num_cq, grp3_num_qp, llid, 1);
+    struct rdma_resc *resc4 = rdma_resc_init(ib_context, num_mr, num_cq, grp4_num_qp, llid, 1);
 
     /* Connect QPs to server's QP */
     // clt_connect_qps(resc, svr_lid);
     clt_update_info(resc1, svr_lid);
-    RDMA_PRINT(Client, "clt_connect_qps 1 end\n");
     clt_update_info(resc2, svr_lid);
-    RDMA_PRINT(Client, "clt_connect_qps 2 end\n");
+    clt_update_info(resc3, svr_lid);
+    clt_update_info(resc4, svr_lid);
 
     /* sync to make sure that we could get start */
     rdma_send_sync(resc1);
