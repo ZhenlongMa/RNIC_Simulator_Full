@@ -65,8 +65,8 @@ int cm_post_send(struct ibv_context *ctx, struct rdma_cr *cr_info, int wr_num, u
         send_wqe[i].send.dqpn = ctx->cm_qp->qp_num;
         send_wqe[i].send.qkey = QKEY_CM;
 
-        RDMA_PRINT(librdma, "cm_post_send[%d]: flag 0x%x base addr 0x%lx, off 0x%lx\n", 
-            i, cr_info[i].flag, (uint64_t)send_wqe[i].mr->addr, (uint64_t)send_wqe[i].offset);
+        RDMA_PRINT(librdma, "cm_post_send[%d]: flag 0x%x base addr 0x%lx, off 0x%lx, wr_num: %d\n", 
+            i, cr_info[i].flag, (uint64_t)send_wqe[i].mr->addr, (uint64_t)send_wqe[i].offset, wr_num);
 
         ctx->cm_snd_off += sizeof(struct rdma_cr);
         if (ctx->cm_snd_off + sizeof(struct rdma_cr) > SND_WR_BASE + SND_WR_MAX * sizeof(struct rdma_cr)) {

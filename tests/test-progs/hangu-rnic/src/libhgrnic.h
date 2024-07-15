@@ -37,9 +37,15 @@ uint8_t  cpu_id;
 uint32_t num_client;
 uint16_t qp_num;
 
+#ifdef SERVER
 #define HGRNIC_PRINT(x, ...) do {                       \
-    printf("%s-%d [libhgrnic] " x, id_name, cpu_id, ##__VA_ARGS__);\
+    printf("%s-%d [SERVER: libhgrnic] " x, id_name, cpu_id, ##__VA_ARGS__);\
 } while (0)
+#else
+#define HGRNIC_PRINT(x, ...) do {                       \
+    printf("%s-%d [CLIENT: libhgrnic] " x, id_name, cpu_id, ##__VA_ARGS__);\
+} while (0)
+#endif
 
 /* --------Useful API{end}-------- */
 

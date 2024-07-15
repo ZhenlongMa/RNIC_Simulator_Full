@@ -105,7 +105,7 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
     cq_attr.size_log = PAGE_SIZE_LOG;
     context->cm_cq = ibv_create_cq(context, &cq_attr);
     // HGRNIC_PRINT(" ibv_open_device cq lkey: 0x%x, vaddr 0x%lx, mtt_index 0x%x, paddr 0x%lx\n", 
-            context->cm_cq->mr->lkey, (uint64_t)context->cm_cq->mr->addr, context->cm_cq->mr->mtt->mtt_index, context->cm_cq->mr->mtt->paddr);
+            // context->cm_cq->mr->lkey, (uint64_t)context->cm_cq->mr->addr, context->cm_cq->mr->mtt->mtt_index, context->cm_cq->mr->mtt->paddr);
 
     struct ibv_qp_create_attr qp_attr;
     qp_attr.sq_size_log = PAGE_SIZE_LOG;
@@ -127,7 +127,7 @@ int ibv_open_device(struct ibv_context *context, uint16_t lid) {
     ibv_modify_qp(context, context->cm_qp);
 
     // HGRNIC_PRINT("CM QP created! QPN: %d, indicator: %d, weight: %d, group id: %d\n", 
-        context->cm_qp->qp_num, context->cm_qp->indicator, context->cm_qp->weight, context->cm_qp->group_id);
+        // context->cm_qp->qp_num, context->cm_qp->indicator, context->cm_qp->weight, context->cm_qp->group_id);
     // HGRNIC_PRINT("CM group created! group_id: %d, group weight: %d\n", cm_group->id, cm_group->weight);
 
     context->cm_rcv_posted_off = RCV_WR_BASE;
@@ -220,7 +220,7 @@ struct ibv_qp * ibv_create_batch_qp(struct ibv_context *context, struct ibv_qp_c
         qp[i].rcv_mr = &(tmp_mr[2 * i]);
         qp[i].snd_mr = &(tmp_mr[2 * i + 1]);
         // HGRNIC_PRINT(" Get out of ibv_reg_batch_mr in create_qp! qpn is : 0x%x rcv_mr 0x%x snd_mr 0x%x\n", 
-                qp[i].qp_num, qp[i].rcv_mr->lkey, qp[i].snd_mr->lkey);
+                // qp[i].qp_num, qp[i].rcv_mr->lkey, qp[i].snd_mr->lkey);
     }
     free(mr_attr);
 
@@ -305,7 +305,7 @@ int ibv_modify_batch_qp(struct ibv_context *context, struct ibv_qp *qp, uint32_t
             qpc_args->groupID[i]    = qp[batch_cnt + i].group_id;
 
             // HGRNIC_PRINT(" ibv_modify_batch_qp! qpn 0x%x, indicator: %d, weight: %d, group: %d\n", 
-                qp[batch_cnt + i].qp_num, qp[batch_cnt + i].indicator, qp[batch_cnt + i].weight, qp[batch_cnt + i].group_id);
+                // qp[batch_cnt + i].qp_num, qp[batch_cnt + i].indicator, qp[batch_cnt + i].weight, qp[batch_cnt + i].group_id);
         }
         write_cmd(dvr->fd, HGKFD_IOC_WRITE_QPC, qpc_args);
         
@@ -355,7 +355,7 @@ int ibv_modify_qp(struct ibv_context *context, struct ibv_qp *qp) {
     qpc_args->weight[0]     = qp->weight;
     qpc_args->groupID[0]    = qp->group_id;
     // HGRNIC_PRINT(" ibv_modify_qp! qpn 0x%x, indicator: %d, weight: %d, group: %d\n", 
-                qp->qp_num, qp->indicator, qp->weight, qp->group_id);
+                // qp->qp_num, qp->indicator, qp->weight, qp->group_id);
     write_cmd(dvr->fd, HGKFD_IOC_WRITE_QPC, qpc_args);
     write_cmd(dvr->fd, HGKFD_IOC_UPDATE_QP_WEIGHT, qpc_args);
     free(qpc_args);

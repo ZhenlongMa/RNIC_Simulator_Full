@@ -173,7 +173,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
         elephant_wr_num = BW_WR_NUM;
         elephant_msg_size = sizeof(TRANS_WRDMA_DATA) * 16 * 128;
     #endif
-    // struct ibv_wqe *mice_wqe_list;
+    struct ibv_wqe *mice_wqe_list;
     struct ibv_wqe *elephant_wqe_list;
     struct ibv_qp *elephant_qp;
     
@@ -197,7 +197,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     /* polling for completion */
     do { // snd_cnt < (num_qp * TEST_WR_NUM * num_client)
         for (int grp_id = 0; grp_id < qos_group_num; grp_id++) {
-            // RDMA_PRINT(Server, "work on grp[%d]\n", grp_id);
+            RDMA_PRINT(Server, "work on grp[%d]\n", grp_id);
             struct rdma_resc *resc = grp_resc[grp_id];
             struct cpl_desc **desc = resc->desc;
             int num_cq = resc->num_cq;
@@ -344,7 +344,7 @@ int main (int argc, char **argv) {
     int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
     int *group_weight = (int *)malloc(sizeof(int) * group_num);
     for (int i = 0; i < group_num; i++) {
-        group_qp_num[i] = 2;
+        group_qp_num[i] = 10;
         group_weight[i] = 10;
     }
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
@@ -355,10 +355,12 @@ int main (int argc, char **argv) {
     RDMA_PRINT(Server, "ibv_open_device : doorbell address 0x%lx\n", (long int)ib_context->dvr);
     for (int i = 0; i < group_num; i++) {
         grp_resc[i] = set_group_resource(ib_context, num_mr, num_cq, group_qp_num[i], svr_lid, num_client, group_weight[i]);
+        RDMA_PRINT(Server, "finish group [%d] resource init! i: %d\n", grp_resc[i]->qos_group[0]->id, i);
     }
 
     /* sync to make sure that we could get start */
     rdma_recv_sync(grp_resc[0]);
+    RDMA_PRINT(Server, "finish rdma recv sync! cpu id: %d\n", cpu_id);
     
     /* Inform other CPUs that we can start the message rate test */
     cpu_sync(ib_context);
@@ -378,7 +380,7 @@ int main (int argc, char **argv) {
             start_time, end_time, con_time, snd_cnt, bandwidth, msg_rate, latency);
 
     /* Inform Client that Transmission has completed */
-    rdma_recv_sync(grp1_resc);
+    rdma_recv_sync(grp_resc[0]);
 
     RDMA_PRINT(Server, "rdma_recv_sync finished!\n");
 

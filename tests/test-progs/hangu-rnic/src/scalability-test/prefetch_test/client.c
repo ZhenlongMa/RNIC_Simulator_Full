@@ -166,23 +166,6 @@ int main (int argc, char **argv) {
     num_cq = TEST_CQ_NUM;
     num_qp = TEST_QP_NUM;
 
-    int group_num = 4;
-    int grp1_num_qp = 10;
-    int grp2_num_qp = 20;
-    int grp3_num_qp = 10;
-    int grp4_num_qp = 20;
-    int grp1_weight = 3;
-    int grp2_weight = 2;
-    int grp3_weight = 3;
-    int grp4_weight = 2;
-    int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
-    int *group_weight = (int *)malloc(sizeof(int) * group_num);
-
-    for (int i = 0; i < group_num; i++) {
-        group_qp_num[i] = 10;
-        group_weight[i] = 10;
-    }
-
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
 
     /* device initialization */
@@ -190,28 +173,36 @@ int main (int argc, char **argv) {
 
     RDMA_PRINT(Client, "Open device!\n");
 
-    struct rdma_resc *resc1 = rdma_resc_init(ib_context, num_mr, num_cq, grp1_num_qp, llid, 1);
-    struct rdma_resc *resc2 = rdma_resc_init(ib_context, num_mr, num_cq, grp2_num_qp, llid, 1);
-    struct rdma_resc *resc3 = rdma_resc_init(ib_context, num_mr, num_cq, grp3_num_qp, llid, 1);
-    struct rdma_resc *resc4 = rdma_resc_init(ib_context, num_mr, num_cq, grp4_num_qp, llid, 1);
+    int group_num = 4;
+    int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
+    int *group_weight = (int *)malloc(sizeof(int) * group_num);
+    struct rdma_resc **grp_resc = (struct rdma_resc**)malloc(sizeof(struct rdma_resc *) * group_num);
+
+    for (int i = 0; i < group_num; i++) {
+        group_qp_num[i] = 10;
+        group_weight[i] = 10;
+        grp_resc[i] = rdma_resc_init(ib_context, num_mr, num_cq, group_qp_num[i], llid, 1);
+        RDMA_PRINT(Client, "group [%d] resouce initialized! i: %d, cpu id: %d\n", grp_resc[i]->qos_group[0]->id, i, cpu_id);
+    }
+
+    RDMA_PRINT(Client, "client ready to update info! cpu id: %d\n", cpu_id);
 
     /* Connect QPs to server's QP */
-    // clt_connect_qps(resc, svr_lid);
-    clt_update_info(resc1, svr_lid);
-    clt_update_info(resc2, svr_lid);
-    clt_update_info(resc3, svr_lid);
-    clt_update_info(resc4, svr_lid);
+    for (int i = 0; i < group_num; i++) {
+        clt_update_info(grp_resc[i], svr_lid);
+        RDMA_PRINT(Client, "group [%d] update info! i: %d, cpu id: %d\n", grp_resc[i]->qos_group[0]->id, i, cpu_id);
+    }
 
     /* sync to make sure that we could get start */
-    rdma_send_sync(resc1);
+    rdma_send_sync(grp_resc[0]);
     RDMA_PRINT(Client, "ready for server send RDMA write\n");
 
     /* Wait for Completion of rdma write processing */
-    rdma_send_sync(resc1);
+    rdma_send_sync(grp_resc[0]);
 
     /* close the fd */
-    RDMA_PRINT(Client, "fd : %d\n", ((struct hghca_context*)resc1->ctx->dvr)->fd);
-    close(((struct hghca_context*)resc1->ctx->dvr)->fd);
+    RDMA_PRINT(Client, "fd : %d\n", ((struct hghca_context*)grp_resc[0]->ctx->dvr)->fd);
+    close(((struct hghca_context*)grp_resc[0]->ctx->dvr)->fd);
     
     return 0;
 }
