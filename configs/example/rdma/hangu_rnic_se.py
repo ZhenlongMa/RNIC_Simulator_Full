@@ -160,8 +160,15 @@ def config_rnic(system, options, node_num):
     system.platform.rdma_nic.pci_speed     = options.pci_linkspeed
     system.platform.rdma_nic.ether_speed   = options.ethernet_linkspeed
     system.platform.rdma_nic.qpc_cache_cap = options.qpc_cache_cap
+    system.platform.rdma_nic.wqe_cache_cap = options.wqe_cache_cap
     system.platform.rdma_nic.reorder_cap   = options.reorder_cap
     system.platform.rdma_nic.cpu_num       = options.num_cpus
+    if mac_addr == svr_mac:
+        system.platform.rdma_nic.mpt_cache_cap = 256
+        system.platform.rdma_nic.mtt_cache_cap = 1024
+    else :
+        system.platform.rdma_nic.mpt_cache_cap = 20000
+        system.platform.rdma_nic.mtt_cache_cap = 100000
     
     system.platform.attachIO(system.iobus)
     system.intrctrl = IntrControl()
@@ -259,6 +266,12 @@ def get_hangu_rnic_options():
     parser.add_option("--reorder-cap", default=100,
                         action="store", type="int",
                         help="capacity of qpc cache\nDEFAULT: 50 entries")
+    # parser.add_option("--mpt-cache-cap", default=100,
+    #                     action="store", type="int",
+    #                     help="capacity of MPT cache\nDEFAULT: 200 entries")
+    # parser.add_option("--mtt-cache-cap", default=100,
+    #                     action="store", type="int",
+    #                     help="capacity of MTT cache\nDEFAULT: 50 entries")
 
     (options, args) = parser.parse_args()
 
