@@ -173,7 +173,7 @@ int main (int argc, char **argv) {
 
     RDMA_PRINT(Client, "Open device!\n");
 
-    int group_num = 4;
+    int group_num = 1;
     int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
     int *group_weight = (int *)malloc(sizeof(int) * group_num);
     struct rdma_resc **grp_resc = (struct rdma_resc**)malloc(sizeof(struct rdma_resc *) * group_num);

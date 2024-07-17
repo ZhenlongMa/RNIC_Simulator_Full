@@ -205,13 +205,16 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
 
                 for (uint32_t i = 0; (i * sizeof(TxDesc)) < tptRsp->length; ++i) {
                     txDesc = make_shared<TxDesc>(tptRsp->txDescRsp + i);
-                    HANGU_PRINT(MrResc, "txDesc length: %d, lVaddr: 0x%x, opcode: %d\n", txDesc->len, txDesc->lVaddr, txDesc->opcode);
+                    HANGU_PRINT(MrResc, "channel: %d, txDesc length: %d, lVaddr: 0x%x, opcode: %d, qpn: 0x%x\n", 
+                        tptRsp->chnl, txDesc->len, txDesc->lVaddr, txDesc->opcode, tptRsp->qpn);
                     assert(txDesc->len != 0);
                     assert(txDesc->lVaddr != 0);
                     assert(txDesc->opcode != 0);
-                    rnic->txdescRspFifo.push(txDesc);
+                    // rnic->txdescRspFifo.push(txDesc);
                 }
-                assert((tptRsp->txDescRsp->len != 0) && (tptRsp->txDescRsp->lVaddr != 0));
+                // assert((tptRsp->txDescRsp->len != 0) && (tptRsp->txDescRsp->lVaddr != 0));
+                
+                
                 // rnic->txdescRspFifo.push(tptRsp->txDescRsp);
                 // rnic->txdescRspFifo.push(tptRsp);
 

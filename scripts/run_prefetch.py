@@ -4,7 +4,7 @@ import sys
 
 SERVER_LID  = 10
 
-NUM_CPUS  = 4
+NUM_CPUS  = 1
 CPU_CLK   = "4GHz"
 EN_SPEED  = "100Gbps"
 PCI_SPEED = "128Gbps"
@@ -45,7 +45,7 @@ def cmd_run_sim(debug, test_prog, option, params):
     cmd += " --qpc-cache-cap "  + str(params.qpc_cache_cap)
     cmd += " --reorder-cap "    + str(params.reorder_cap)
     cmd += " --mem-size 2048MB"
-    cmd += " > scripts/" + params.test_case + ".txt"
+    cmd += " > scripts/" + params.test_case.split("/")[-1] + ".txt"
 
     return cmd
 
@@ -60,7 +60,7 @@ def execute_program(debug, test_prog, option, params):
     cmd_list.append("echo $(date +%Y-%m-%d/%H:%M:%S)")
     # run simulation
     cmd_list.append(cmd_run_sim(debug, test_prog, option, params))
-    #record end time
+    # record end time
     cmd_list.append("echo $(date +%Y-%m-%d/%H:%M:%S)")
 
     # execute cmd_list sequentially
@@ -84,12 +84,14 @@ def main():
     num_nodes = params.num_nodes
     svr_lid = SERVER_LID
 
-    debug = ""
-    debug = "HanGuDriver"
-    debug += ",CxtResc"
+    # debug = ""
+    # debug = "HanGuDriver"
+    # debug += ",CxtResc"
     debug = "PioEngine,CcuEngine,MrResc,HanGuDriver,RescCache,Ethernet,RdmaEngine,"
     debug +="HanGuRnic,CxtResc,DmaEngine,"
-    debug +="DescScheduler"
+    debug +="DescScheduler,"
+    debug +="WqeBufferManage,"
+    debug +="RescPrefetcher"
 
     # add server program
     test_prog = "'tests/test-progs/hangu-rnic/src/" + testcase + "/server"

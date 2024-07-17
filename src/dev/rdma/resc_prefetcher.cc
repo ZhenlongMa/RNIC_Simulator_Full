@@ -19,7 +19,9 @@ HanGuRnic::RescPrefetcher::RescPrefetcher(HanGuRnic *rNic, const std::string nam
 
 // launch prefetch signal, prefetch QPC, WQE, MPT
 void HanGuRnic::RescPrefetcher::prefetchProc() {
+    assert(prefetchQue.size() > 0);
     uint32_t qpn = prefetchQue.front();
+    HANGU_PRINT(RescPrefetcher, "prefetchProc: launch prefetch! qpn: 0x%x\n", qpn);
     prefetchQue.pop();
     prefetchCnt++;
     triggerPrefetch();
@@ -62,6 +64,7 @@ void HanGuRnic::RescPrefetcher::prefetchMemProc() {
 
 void HanGuRnic::RescPrefetcher::triggerPrefetch() {
     if ((rNic->descScheduler.lowPriorityQpnQue.size() < prefetchQue.size() + PREFETCH_WINDOW) && 
+        prefetchQue.size() != 0 &&
         !prefetchProcEvent.scheduled()) {
         rNic->schedule(prefetchProcEvent, curTick() + rNic->clockPeriod());
     }

@@ -338,7 +338,7 @@ int post_sync(struct rdma_resc *resc) {
 
 
 int poll_sync(struct rdma_resc *resc) {
-    RDMA_PRINT(librdma, "into poll_sync function1!\n");
+    RDMA_PRINT(librdma, "into poll_sync function!\n");
     /* Recv Sync CR Data */
     struct ibv_context *ctx = resc->ctx;
     struct rdma_cr *cr_info;
@@ -346,8 +346,6 @@ int poll_sync(struct rdma_resc *resc) {
 
     int cnt;
     int polled_sync_num = 0;
-
-    RDMA_PRINT(librdma, "into poll_sync function2!\n");
 
     /* count already synced */
     for (int i = 0; i < resc->num_rem; ++i) {
@@ -414,8 +412,9 @@ int poll_sync(struct rdma_resc *resc) {
 
             /* This is a sync pkt, update related information */
             if (cr_info->flag == CR_TYPE_SYNC) {
-
+                RDMA_PRINT(librdma, "poll_sync: received sync packet!\n");
                 for (int j = 0; j < resc->num_rem; ++j) {
+                    RDMA_PRINT(librdma, "poll_sync: cr_info->src_lid: %d, resc->rinfo[%d].dlid: %d!\n", cr_info->src_lid, j, resc->rinfo[j].dlid);
                     if (cr_info->src_lid == resc->rinfo[j].dlid) {
                         if (resc->rinfo[j].sync_flag == 0) {
                             resc->rinfo[j].sync_flag = 1;
@@ -425,9 +424,14 @@ int poll_sync(struct rdma_resc *resc) {
                     }
                 }
             }
+            else {
+                RDMA_PRINT(librdma, "poll_sync: not sync packet! type: %d\n", cr_info->flag);
+            }
 
             /* Clear CR cpl data */
             cr_info->flag = CR_TYPE_NULL;
+
+            RDMA_PRINT(librdma, "poll_sync: polled num: %d, num_rem: %d\n", polled_sync_num, resc->num_rem);
 
             /* Sync polled all, Exit */
             if (polled_sync_num == resc->num_rem) {

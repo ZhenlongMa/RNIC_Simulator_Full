@@ -344,6 +344,10 @@ HanGuRnic::mboxFetchCpl () {
             if (!descScheduler.createQpStatusEvent.scheduled()) {
                 schedule(descScheduler.createQpStatusEvent, curTick() + clockPeriod());
             }
+            createWqeBufferQue.push(qpStatus->qpn);
+            if (!wqeBufferManage.createWqeBufferEvent.scheduled()) {
+                schedule(wqeBufferManage.createWqeBufferEvent, curTick() + clockPeriod());
+            }
         }
         delete[] mboxBuf;
         break;

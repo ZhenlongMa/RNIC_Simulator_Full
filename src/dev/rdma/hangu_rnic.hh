@@ -113,6 +113,10 @@ class HanGuRnic : public RdmaNic {
         std::queue<QPStatusPtr> createQue;
         /* --------------------DescScheduler <-> CCU {end}-----------------------------*/
 
+        /* --------------------Wqe Buffer Manage <-> CCU {begin}---------------------------*/
+        std::queue<uint32_t> createWqeBufferQue;
+        /* --------------------Wqe Buffer Manage <-> CCU {end}-----------------------------*/
+
         /* --------------------DescScheduler <-> WQE Buffer {begin}-----------------------------*/
         std::queue<std::pair<uint32_t, uint32_t>> wqeRspInfoQue; // <descNum, qpn>
         std::queue<std::pair<uint32_t, uint32_t>> wqeBufferUpdateQue; // <qpn, descNum>
@@ -355,7 +359,6 @@ class HanGuRnic : public RdmaNic {
                 std::queue<uint32_t> wqePrefetchQpStatusRReqQue;
                 std::queue<DoorbellPtr> wqeProcToLaunchWqeQueH;
                 std::queue<DoorbellPtr> wqeProcToLaunchWqeQueL;
-                EventFunctionWrapper qpStatusRspEvent;
                 EventFunctionWrapper wqePrefetchEvent;
                 EventFunctionWrapper wqePrefetchScheduleEvent;
                 EventFunctionWrapper launchWqeEvent;
@@ -420,6 +423,7 @@ class HanGuRnic : public RdmaNic {
                 std::queue<WqeRspPtr> wqeReturnQue;
                 void wqeReadReqProcess();
                 void wqeReadRspProcess();
+                void createWqeBuffer();
                 uint16_t sqSize = PAGE_SIZE;
             public:
                 WqeBufferManage(HanGuRnic *rNic, std::string name, int wqeCacheNum);
@@ -431,8 +435,9 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper wqeReadReqProcessEvent;
                 EventFunctionWrapper wqeBufferUpdateEvent;
                 EventFunctionWrapper wqePrefetchProcEvent;
-                // EventFunctionWrapper wqeReadRspProcEvent;
                 EventFunctionWrapper wqeReadRspEvent;
+                EventFunctionWrapper createWqeBufferEvent;
+                // EventFunctionWrapper wqeReadRspProcEvent;
                 void wqeReqReturn();
                 void wqePrefetchProc();
                 void wqeBufferUpdate();

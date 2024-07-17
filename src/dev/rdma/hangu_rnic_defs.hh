@@ -791,19 +791,20 @@ struct WqeBufferUnit {
 typedef std::shared_ptr<WqeBufferUnit> WqeBufferUnitPtr;
 
 struct WqeBufferMetadata {
-    uint16_t head;
-    uint16_t tail;
-    uint16_t avaiNum; // WQE number available in the buffer, unit: WQE
-    uint16_t fetchReqNum; // WQE number requested, excluding prefetch, unit: WQE
-    uint16_t keepNum; // WQE number needed to keep in the buffer, unit: WQE
+    uint16_t avaiNum;       // WQE number available in the buffer, unit: WQE
+    uint16_t fetchReqNum;   // WQE number requested, excluding prefetch, unit: WQE
+    uint16_t keepNum;       // WQE number needed to keep in the buffer, unit: WQE
     uint16_t pendingReqNum; // pending WQE request number, including fetch and prefetch, unit: WQE
     uint64_t replaceParam;
     bool replaceLock;
-    enum wqe_state {
-        IDLE,
-        WAITING_FETCH,
-        WAITING_PREFETCH,
-    } wqeState;
+    WqeBufferMetadata() {
+        this->avaiNum = 0;
+        this->fetchReqNum = 0;
+        this->keepNum = 0;
+        this->pendingReqNum = 0;
+        this->replaceParam = 0;
+        this->replaceLock = false;
+    }
 };
 typedef std::shared_ptr<WqeBufferMetadata> WqeBufferMetadataPtr;
 

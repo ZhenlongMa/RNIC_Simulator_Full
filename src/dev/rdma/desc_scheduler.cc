@@ -12,7 +12,6 @@ using namespace std;
 HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name):
     rNic(rNic),
     _name(name),
-    qpStatusRspEvent([this]{qpStatusProc();}, name),
     wqePrefetchEvent([this]{wqePrefetch();}, name),
     wqePrefetchScheduleEvent([this]{wqePrefetchSchedule();}, name),
     launchWqeEvent([this]{launchWQE();}, name),
@@ -20,6 +19,7 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name)
     createQpStatusEvent([this]{createQpStatus();}, name),
     qpcRspEvent([this]{qpcRspProc();}, name),
     wqeProcEvent([this]{wqeProc();}, name) {
+        // HANGU_PRINT(DescScheduler, "desc scheduler init!\n");
 }
 
 /**
@@ -73,66 +73,8 @@ void HanGuRnic::DescScheduler::qpcRspProc() {
     if (!wqePrefetchScheduleEvent.scheduled() && schedule) {
         rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
     }
-    if (!rNic->rescPrefetcher.prefetchProcEvent.scheduled()) {
-        rNic->schedule(rNic->rescPrefetcher.prefetchProcEvent, curTick() + rNic->clockPeriod());
-    }
     if (dbQue.size() != 0 && !qpcRspEvent.scheduled()) {
         rNic->schedule(qpcRspEvent, curTick() + rNic->clockPeriod());
-    }
-}
-
-/**
- * @note
- * This function checks QP status and push WQE prefetch request into prefetch QPN queue.
-*/
-void HanGuRnic::DescScheduler::qpStatusProc() {
-    assert(dbQpStatusRspQue.size());
-    DoorbellPtr db = dbQpStatusRspQue.front().first;
-    QPStatusPtr qpStatus = dbQpStatusRspQue.front().second;
-    bool schedule = false;
-    dbQpStatusRspQue.pop();
-    // delete this line in the future
-    assert(db->qpn == qpStatus->qpn);
-    assert(qpStatus->type == BW_QP || qpStatus->type == UD_QP || qpStatus->type == LAT_QP);
-    HANGU_PRINT(DescScheduler, "Before updating head. qpn: 0x%x, head: %d, tail:  %d\n", 
-        qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr);
-    if (qpStatus->type == LAT_QP) {
-        panic("latency QP!\n");
-        HANGU_PRINT(DescScheduler, "Inactive QP! high priority qpn: 0x%x, in que: %d, head pointer: %d, tail pointer: %d, curtick: %ld\n", 
-            db->qpn, qpStatus->in_que, qpStatus->head_ptr, qpStatus->tail_ptr, curTick());
-        assert(qpStatus->head_ptr == qpStatus->tail_ptr);
-        highPriorityQpnQue.push(db->qpn);
-        schedule = true;
-        qpStatus->in_que++;
-        // HANGU_PRINT(DescScheduler, "Inactive QP! high priority qpn: 0x%x, in que: %d\n", db->qpn, qpStatus->in_que);
-    }
-    else {
-        if (qpStatus->head_ptr == qpStatus->tail_ptr) { // WARNING: consider corner case!
-            lowPriorityQpnQue.push(db->qpn);
-            rNic->rescPrefetcher.prefetchQue.push(db->qpn);
-            schedule = true;
-            qpStatus->in_que++;
-            HANGU_PRINT(DescScheduler, "Inactive QP! low priority qpn: 0x%x, in que: %d\n", db->qpn, qpStatus->in_que);
-        }
-        else {
-            HANGU_PRINT(DescScheduler, "Active QP! Do not push QPN into QPN queue! qpn: 0x%x\n", db->qpn);
-        }
-    }
-    qpStatus->head_ptr += db->num;
-    // If this QP has no unfinished WQE, schedule WQE prefetch event
-    if (!wqePrefetchScheduleEvent.scheduled() && schedule) {
-        rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
-    }
-    // update QP status
-    // WARNING: QP status update could lead to QP death
-    qpStatusTable[qpStatus->qpn]->head_ptr = qpStatus->head_ptr;
-    if (dbQpStatusRspQue.size()) {
-        if (!qpStatusRspEvent.scheduled()) {
-            rNic->schedule(qpStatusRspEvent, curTick() + rNic->clockPeriod());
-        }
-    }
-    if (!rNic->rescPrefetcher.prefetchProcEvent.scheduled()) {
-        rNic->schedule(rNic->rescPrefetcher.prefetchProcEvent, curTick() + rNic->clockPeriod());
     }
 }
 
@@ -318,10 +260,11 @@ void HanGuRnic::DescScheduler::wqeProc() {
                 // or otherwise generate CQE, and switch to the next descriptor
                 if (qpStatus->fetch_offset + subDesc->len >= desc->len) {
                     // update tail pointer
-                    // HANGU_PRINT(DescScheduler, "qpn: 0x%x, tail pointer to update: %d, head pointer: %d\n", qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr);
+                    HANGU_PRINT(DescScheduler, "wqeProc: update tail pointer! qpn: 0x%x, tail: %d, head: %d\n", qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr);
                     assert(qpStatus->tail_ptr < qpStatus->head_ptr);
                     qpStatus->tail_ptr++;
                     updateNum++;
+                    HANGU_PRINT(DescScheduler, "wqeProc: update num: %d\n", updateNum);
                     // if the original WQE is signaled, signal the sub WQE
                     if (desc->isSignaled()) {
                         subDesc->setCompleteSignal();
@@ -355,9 +298,6 @@ void HanGuRnic::DescScheduler::wqeProc() {
             if (!wqePrefetchScheduleEvent.scheduled()) {
                 rNic->schedule(wqePrefetchScheduleEvent, curTick() + rNic->clockPeriod());
             }
-            if (!rNic->rescPrefetcher.prefetchProcEvent.scheduled()) {
-                rNic->schedule(rNic->rescPrefetcher.prefetchProcEvent, curTick() + rNic->clockPeriod());
-            }
             rNic->rescPrefetcher.triggerPrefetch();
         }
         else {
@@ -379,9 +319,10 @@ void HanGuRnic::DescScheduler::wqeProc() {
     }
     // update WQE buffer
     if (updateNum != 0) {
+        HANGU_PRINT(DescScheduler, "update wqe buffer! updateNum: %d, qpn: 0x%x\n", updateNum, qpStatus->qpn);
         std::pair<uint32_t, uint32_t> wqeBufferUpdateItem(qpStatus->qpn, updateNum);
         rNic->wqeBufferUpdateQue.push(wqeBufferUpdateItem);
-        if (rNic->wqeBufferManage.wqeBufferUpdateEvent.scheduled()) {
+        if (!rNic->wqeBufferManage.wqeBufferUpdateEvent.scheduled()) {
             rNic->schedule(rNic->wqeBufferManage.wqeBufferUpdateEvent, curTick() + rNic->clockPeriod());
         }
     }
@@ -507,7 +448,7 @@ void HanGuRnic::DescScheduler::createQpStatus() {
     QPStatusPtr status = rNic->createQue.front();
     rNic->createQue.pop();
     qpStatusTable[status->qpn] = status;
-    HANGU_PRINT(DescScheduler, "new QP created! type: %d\n", status->type);
+    HANGU_PRINT(DescScheduler, "new QP created! type: %d, qpn: 0x%x\n", status->type, status->qpn);
     assert(status->type == LAT_QP   || 
            status->type == BW_QP    || 
            status->type == UC_QP    || 

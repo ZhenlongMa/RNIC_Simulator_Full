@@ -62,6 +62,8 @@ DebugFlag('RdmaEngine')
 DebugFlag('MrResc')
 
 DebugFlag('DescScheduler')
+DebugFlag('WqeBufferManage')
+DebugFlag('RescPrefetcher')
 
 CompoundFlag('HanGu', ['HanGuDriver', 'HanGuRnic', 'PioEngine', 'CcuEngine', 'RescCache', 'CxtResc', 'DmaEngine',
-    'RdmaEngine', 'MrResc', 'DescScheduler'])
+    'RdmaEngine', 'MrResc', 'DescScheduler', 'WqeBufferManage', 'RescPrefetcher'])
