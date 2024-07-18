@@ -24,7 +24,7 @@ void HanGuRnic::RescPrefetcher::prefetchProc() {
     HANGU_PRINT(RescPrefetcher, "prefetchProc: launch prefetch! qpn: 0x%x\n", qpn);
     prefetchQue.pop();
     prefetchCnt++;
-    triggerPrefetch();
+    // triggerPrefetch();
     // prefetch QPC
     CxtReqRspPtr qpcRdReq = make_shared<CxtReqRsp>(CXT_PFCH_QP, CXT_CHNL_TX, qpn, 1, 0);
     rNic->qpcModule.postQpcReq(qpcRdReq);

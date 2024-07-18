@@ -388,7 +388,8 @@ struct MrReqRsp {
 
     uint8_t  type  ; /* 1 - wreq; 2 - rreq, 3 - rrsp; */
     uint8_t  chnl  ; /* 1 - wreq TX cq; 2 - wreq RX cq; 3 - wreq TX data; 4 - wreq RX data;
-                      * 5 - rreq TX Desc; 6 - rreq RX Desc; 7 - rreq TX Data; 8 - rreq RX Data */
+                      * 5 - rreq TX Desc; 6 - rreq RX Desc; 7 - rreq TX Data; 8 - rreq RX Data 
+                      * 9 - desc prefetch; 10 - desc fetch; 11 - mpt prefetch*/
     uint32_t lkey  ;
     uint32_t length; /* in Bytes */
     uint32_t offset; /* Accessed VAddr, used to compare with vaddr in MPT, 
@@ -803,6 +804,14 @@ struct WqeBufferMetadata {
         this->keepNum = 0;
         this->pendingReqNum = 0;
         this->replaceParam = 0;
+        this->replaceLock = false;
+    }
+    WqeBufferMetadata(uint16_t keepNum, uint64_t replaceParam) {
+        this->avaiNum = 0;
+        this->fetchReqNum = 0;
+        this->keepNum = keepNum;
+        this->pendingReqNum = 0;
+        this->replaceParam = replaceParam;
         this->replaceLock = false;
     }
 };

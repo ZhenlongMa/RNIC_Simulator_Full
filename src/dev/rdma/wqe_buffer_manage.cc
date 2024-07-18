@@ -31,6 +31,8 @@ void HanGuRnic::WqeBufferManage::wqeReadReqProcess() {
     uint32_t descNum = rNic->descScheduler.wqeFetchInfoQue.front().first;
     QPStatusPtr qpStatus = rNic->descScheduler.wqeFetchInfoQue.front().second;
     rNic->descScheduler.wqeFetchInfoQue.pop();
+    // wqeBufferMetadataTable[qpStatus->qpn]->replaceParam = maxReplaceParam;
+    // maxReplaceParam++;
     if (descNum > wqeBufferMetadataTable[qpStatus->qpn]->avaiNum + wqeBufferMetadataTable[qpStatus->qpn]->pendingReqNum) { // WQEs in the buffer is not sufficient
         HANGU_PRINT(WqeBufferManage, "wqeReadReqProcess: WQEs in the buffer and pending requests is not sufficient! Launch more WQE request! qpn: 0x%x\n", qpStatus->qpn);
         missNum++;
@@ -71,9 +73,6 @@ void HanGuRnic::WqeBufferManage::wqeReadReqProcess() {
         if (!wqeReqReturnEvent.scheduled()) {
             rNic->schedule(wqeReqReturnEvent, curTick() + rNic->clockPeriod());
         }
-        // if (!rNic->descScheduler.wqeProcEvent.scheduled()) {
-        //     rNic->schedule(rNic->descScheduler.wqeProcEvent, curTick() + rNic->clockPeriod());
-        // }
     }
     if (rNic->descScheduler.wqeFetchInfoQue.size() != 0 && !wqeReadReqProcessEvent.scheduled()) {
         rNic->schedule(wqeReadReqProcessEvent, curTick() + rNic->clockPeriod());
@@ -85,14 +84,22 @@ void HanGuRnic::WqeBufferManage::wqeReadRspProcess() {
     MrReqRspPtr resp = wqeRspQue.front();
     wqeRspQue.pop();
     uint32_t qpn = resp->qpn;
+    uint32_t respQueOffset = resp->offset / sizeof(TxDesc);
+    uint32_t modTail = rNic->descScheduler.qpStatusTable[qpn]->tail_ptr % (sqSize / sizeof(TxDesc));
     HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: enter wqeReadRspProcess! qpn: 0x%x\n", qpn);
+    HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: respQueOffset: %d, modTail: %d, avai num: %d, rsp num: %d, queue cap: %d, rsp chnl: %d\n", 
+        respQueOffset, modTail, wqeBufferMetadataTable[qpn]->avaiNum, resp->length / sizeof(TxDesc), sqSize / sizeof(TxDesc), resp->chnl);
+    HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: pending num: %d\n", wqeBufferMetadataTable[qpn]->pendingReqNum);
     assert(wqeBufferMetadataTable[qpn]->replaceLock == true);
+    // make sure the response is the correct next WQEs
+    assert(modTail + wqeBufferMetadataTable[qpn]->avaiNum == respQueOffset);
+    assert(wqeBufferMetadataTable[qpn]->pendingReqNum >= resp->length / sizeof(TxDesc));
     // store WQEs
     uint32_t replaceQpn;
     int min = 0;
     TxDescPtr txDesc;
+    // in case of desc buffer capacity is not enough, pick some descriptors and replace
     while (descBufferCap - descBufferUsed < resp->length / sizeof(TxDesc)) {
-        // replace
         assert(wqeBufferMetadataTable.size() < 500);
         for (auto it = wqeBufferMetadataTable.begin(); it != wqeBufferMetadataTable.end(); it++) {
             if (min > it->second->replaceParam && it->second->replaceLock == false) {
@@ -103,10 +110,12 @@ void HanGuRnic::WqeBufferManage::wqeReadRspProcess() {
         }
         descBufferUsed -= wqeBufferMetadataTable[replaceQpn]->avaiNum;
         wqeBufferMetadataTable.erase(replaceQpn);
+        HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: erase qpn: 0x%x\n", replaceQpn);
     }
     for (uint32_t i = 0; (i * sizeof(TxDesc)) < resp->length; ++i) {
         txDesc = make_shared<TxDesc>(resp->txDescRsp + i);
-        HANGU_PRINT(WqeBufferManage, "txDesc length: %d, lVaddr: 0x%x, opcode: %d, qpn: 0x%x\n", txDesc->len, txDesc->lVaddr, txDesc->opcode, resp->qpn);
+        HANGU_PRINT(WqeBufferManage, "txDesc length: %d, lVaddr: 0x%x, opcode: %d, qpn: 0x%x, cq tag: %s\n", 
+            txDesc->len, txDesc->lVaddr, txDesc->opcode, resp->qpn, txDesc->isSignaled() ? "true" : "false");
         assert(txDesc->len != 0);
         assert(txDesc->lVaddr != 0);
         assert(txDesc->opcode != 0);
@@ -174,6 +183,7 @@ void HanGuRnic::WqeBufferManage::wqePrefetchProc() {
     assert(rNic->descScheduler.qpStatusTable.find(qpn) != rNic->descScheduler.qpStatusTable.end());
     int keepNum, activeNum;
     activeNum = rNic->descScheduler.qpStatusTable[qpn]->head_ptr - rNic->descScheduler.qpStatusTable[qpn]->tail_ptr;
+    HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: active num: %d\n", activeNum);
     if (activeNum > MAX_PREFETCH_NUM) {
         keepNum = MAX_PREFETCH_NUM;
     }
@@ -182,8 +192,7 @@ void HanGuRnic::WqeBufferManage::wqePrefetchProc() {
     }
     HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: keepNum: %d!\n", keepNum);
     if (wqeBufferMetadataTable.find(qpn) == wqeBufferMetadataTable.end()) {
-        WqeBufferMetadataPtr metaData = std::make_shared<WqeBufferMetadata>();
-        wqeBufferMetadataTable[qpn] = metaData;
+        wqeBufferMetadataTable[qpn] = std::make_shared<WqeBufferMetadata>();
         HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: create WQE buffer metadata!\n");
     }
     wqeBufferMetadataTable[qpn]->keepNum = keepNum;
@@ -196,24 +205,27 @@ void HanGuRnic::WqeBufferManage::wqePrefetchProc() {
         QPStatusPtr qpStatus = rNic->descScheduler.qpStatusTable[qpn];
         wqeBufferMetadataTable[qpn]->replaceLock = true;
         int sqWqeCap = sqSize / sizeof(TxDesc);
-        // int tailOffset = qpStatus->tail_ptr % sqWqeCap;
         int prefetchNum = wqeBufferMetadataTable[qpn]->keepNum - wqeBufferMetadataTable[qpn]->avaiNum;
+        assert(wqeBufferMetadataTable[qpn]->pendingReqNum == 0);
+        assert(prefetchNum > 0);
+        // WQE request exceeds the border of a QP, needs to send TWO MR request
         if ((qpStatus->tail_ptr + wqeBufferMetadataTable[qpn]->avaiNum) % sqWqeCap + prefetchNum > sqWqeCap) { 
             HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: fetch two MR for WQE!\n");
-            // WQE request exceeds the border of a QP, needs to send TWO MR request
             assert((qpStatus->tail_ptr + wqeBufferMetadataTable[qpn]->avaiNum) % sqWqeCap + prefetchNum < sqWqeCap * 2);
             int tempPrefetchNum = sqWqeCap - (qpStatus->tail_ptr + wqeBufferMetadataTable[qpn]->avaiNum) % sqWqeCap;
             int tempPrefetchOffset = ((qpStatus->tail_ptr + wqeBufferMetadataTable[qpn]->avaiNum) % sqWqeCap) * sizeof(TxDesc);
             int tempPrefetchByte = tempPrefetchNum * sizeof(TxDesc);
             MrReqRspPtr descPrefetchReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC_PREFETCH, qpStatus->key, tempPrefetchByte, tempPrefetchOffset, qpStatus->qpn);
-            HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: first prefetch num: %d, prefetch byte: %d, offset: %d!\n", tempPrefetchNum, tempPrefetchByte, tempPrefetchOffset);
+            HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: first prefetch num: %d, prefetch byte: %d, offset: %d, avai num: %d!\n", 
+                tempPrefetchNum, tempPrefetchByte, tempPrefetchOffset, wqeBufferMetadataTable[qpn]->avaiNum);
             descPrefetchReq->txDescRsp = new TxDesc[tempPrefetchNum];
             rNic->descReqFifo.push(descPrefetchReq);
             tempPrefetchNum = prefetchNum - tempPrefetchNum;
             tempPrefetchOffset = 0;
             tempPrefetchByte = tempPrefetchNum * sizeof(TxDesc);
             descPrefetchReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC_PREFETCH, qpStatus->key, tempPrefetchByte, tempPrefetchOffset, qpStatus->qpn);
-            HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: second prefetch num: %d, prefetch byte: %d, offset: %d!\n", tempPrefetchNum, tempPrefetchByte, tempPrefetchOffset);
+            HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: second prefetch num: %d, prefetch byte: %d, offset: %d, avai num: %d!\n", 
+                tempPrefetchNum, tempPrefetchByte, tempPrefetchOffset, wqeBufferMetadataTable[qpn]->avaiNum);
             descPrefetchReq->txDescRsp = new TxDesc[tempPrefetchNum];
             rNic->descReqFifo.push(descPrefetchReq);
         } else {
@@ -224,7 +236,8 @@ void HanGuRnic::WqeBufferManage::wqePrefetchProc() {
             MrReqRspPtr descPrefetchReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DESC_PREFETCH, qpStatus->key, prefetchByte, tempPrefetchOffset, qpStatus->qpn);
             descPrefetchReq->txDescRsp = new TxDesc[prefetchNum];
             rNic->descReqFifo.push(descPrefetchReq);
-            HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: prefetch num: %d, prefetch byte: %d, offset: %d!\n", prefetchNum, prefetchByte, tempPrefetchOffset);
+            HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: prefetch num: %d, prefetch byte: %d, offset: %d, avai num: %d!\n", 
+                prefetchNum, prefetchByte, tempPrefetchOffset, wqeBufferMetadataTable[qpn]->avaiNum);
         }
         wqeBufferMetadataTable[qpn]->pendingReqNum += prefetchNum;
         if (!rNic->mrRescModule.transReqEvent.scheduled()) { /* Schedule MrRescModule.transReqProcessing */
@@ -233,7 +246,7 @@ void HanGuRnic::WqeBufferManage::wqePrefetchProc() {
         wqeBufferMetadataTable[qpn]->replaceLock = true;
     }
     else {
-        HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: prefetch enough!\n");
+        HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: prefetch enough, trigger mem prefetch!\n");
         // trigger MPT and MTT prefetch
         triggerMemPrefetch(qpn);
     }
@@ -256,8 +269,9 @@ void HanGuRnic::WqeBufferManage::wqeBufferUpdate() {
         wqeBuffer[qpn]->descArray.erase(wqeBuffer[qpn]->descArray.begin());
         wqeBufferMetadataTable[qpn]->avaiNum--;
         descBufferUsed--;
-        if (wqeBufferMetadataTable[qpn]->avaiNum == 0) {
+        if (wqeBufferMetadataTable[qpn]->avaiNum == 0 && wqeBufferMetadataTable[qpn]->pendingReqNum == 0) {
             wqeBufferMetadataTable.erase(qpn);
+            HANGU_PRINT(WqeBufferManage, "wqeBufferUpdate: erase qpn: 0x%x\n", qpn);
         }
     }
     if (rNic->wqeBufferUpdateQue.size() != 0 && !wqeBufferUpdateEvent.scheduled()) {
