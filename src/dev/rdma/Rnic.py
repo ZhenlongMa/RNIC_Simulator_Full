@@ -59,6 +59,8 @@ class HanGuRnic(RdmaNic):
         "Number of qpc cache enteries")
     cqc_cache_num = Param.Int(2000,
         "Number of cqc cache enteries")
+    wqe_cache_num = Param.Int(256,
+        "Number of wqe cache enteries")
     
     VendorID = 0x8086
     DeviceID = 0x1075
