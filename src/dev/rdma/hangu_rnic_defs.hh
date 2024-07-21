@@ -72,6 +72,7 @@
 #define WINDOW_CAP 20
 // #define MAX_SUBWQE_SIZE 1024
 #define PREFETCH_WINDOW 256
+#define UNSENT_BATCH_NUM_THRESHOLD 50
 
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
@@ -284,15 +285,15 @@ struct TxDesc {
         this->flags = this->flags & ~(1 << 31);
     }
 
-    // bool isQueUpdate()
-    // {
-    //     return (this->flags & (1 << 30));
-    // }
+    bool isQueUpdate()
+    {
+        return (this->flags & (1 << 30));
+    }
 
-    // void setQueUpdate()
-    // {
-    //     this->flags = this->flags | (1 << 30);
-    // }
+    void setQueUpdate()
+    {
+        this->flags = this->flags | (1 << 30);
+    }
 
     uint32_t len;
     uint32_t lkey;
@@ -315,7 +316,7 @@ struct TxDesc {
     // uint8_t opcode;
 
     union {
-        uint32_t flags; // 32nd bit indicates CQE generation, 31st bit indicates QPN queue update
+        uint32_t flags; // [31] indicates CQE generation, [30] indicates QPN queue update
         uint8_t  opcode;
     };
 };
@@ -569,8 +570,8 @@ struct BTH {
      */
     uint32_t op_destQpn;
 
-    /* needAck :  psn
-     * [31:24]   [23:0]
+    /* batchEnd : needAck :  psn
+     *   [25]      [24]    [23:0]
      */
     uint32_t needAck_psn;
 };

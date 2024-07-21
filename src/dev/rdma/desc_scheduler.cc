@@ -84,6 +84,9 @@ void HanGuRnic::DescScheduler::qpcRspProc() {
 */
 void HanGuRnic::DescScheduler::wqePrefetchSchedule() {
     // HANGU_PRINT(DescScheduler, "into wqePrefetchSchedule! wqePrefetchQpStatusRReqQue size: %d\n", wqePrefetchQpStatusRReqQue.size());
+    if (unsentBatchNum > UNSENT_BATCH_NUM_THRESHOLD) {
+        return;
+    }
     uint32_t batchSize;
     Tick bwDelay;
     uint32_t qpn;
@@ -102,19 +105,23 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule() {
         rNic->rescPrefetcher.triggerPrefetch();
     }
     else {
-        HANGU_PRINT(DescScheduler, "Empty QPN queue!\n");
-        return;
+        // HANGU_PRINT(DescScheduler, "Empty QPN queue!\n");
+        // return;
+        panic("Empty QPN queue!\n");
     }
+    unsentBatchNum++;
     batchSize = qpStatusTable[qpn]->weight * groupTable[qpStatusTable[qpn]->group_id];
     bwDelay = (batchSize + 44) * rNic->etherBandwidth;
     // bwDelay = rNic->clockPeriod();
     HANGU_PRINT(DescScheduler, "Schedule wqePrefetchScheduleEvent! QPN: 0x%x, batchSize: %d, bwDelay: %d\n", 
         qpn, batchSize, bwDelay);
-    if (wqePrefetchScheduleEvent.scheduled()) {
-        rNic->reschedule(wqePrefetchScheduleEvent, curTick() + bwDelay);
-    }
-    else {
-        rNic->schedule(wqePrefetchScheduleEvent, curTick() + bwDelay);
+    if (highPriorityQpnQue.size() > 0 || lowPriorityQpnQue.size() > 0) {
+        if (wqePrefetchScheduleEvent.scheduled()) {
+            rNic->reschedule(wqePrefetchScheduleEvent, curTick() + bwDelay);
+        }
+        else {
+            rNic->schedule(wqePrefetchScheduleEvent, curTick() + bwDelay);
+        }
     }
     if (!wqePrefetchEvent.scheduled()) {
         rNic->schedule(wqePrefetchEvent, curTick() + rNic->clockPeriod());
@@ -281,6 +288,12 @@ void HanGuRnic::DescScheduler::wqeProc() {
                     HANGU_PRINT(DescScheduler, "Do not signal the sub desc! QPN: 0x%x, flag: 0x%x\n", qpStatus->qpn, subDesc->flags);
                 }
                 procSize += subDesc->len;
+                // if this is the last one sub desc in this batch, label queue update
+                if (procSize >= batchSize || i == descNum - 1) {
+                    subDesc->setQueUpdate();
+                    HANGU_PRINT(DescScheduler, "signal the queue update! QPN: 0x%x, descNum: %d, i: %d, procSize: %d, batchSize: %d, flag: 0x%x\n", 
+                        qpStatus->qpn, descNum, i, procSize, batchSize, subDesc->flags);
+                }
                 HANGU_PRINT(DescScheduler, "finish WQE split: type: %d, sub WQE length: %d, qpn: 0x%x, descNum: %d, sub WQE flag: 0x%x\n", 
                     qpStatus->type, subDesc->len, qpStatus->qpn, descNum, subDesc->flags);
                 assert(subDesc->opcode != 0);

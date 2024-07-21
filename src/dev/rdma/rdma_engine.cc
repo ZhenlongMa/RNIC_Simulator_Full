@@ -714,7 +714,12 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
 
         /* Add BTH header */
         bthOp = ((qpc->qpType << 5) | PKT_TRANS_SEND_ONLY) << 24;
-        needAck = 0x01;
+        if (desc->isQueUpdate()) {
+            needAck = 0x03;
+        }
+        else {
+            needAck = 0x01;
+        }
         ((BTH *) pktPtr)->op_destQpn = bthOp | qpc->destQpn;
         ((BTH *) pktPtr)->needAck_psn = (needAck << 24) | qpc->sndPsn; // TODO: change sndPsn
 
@@ -729,7 +734,12 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
         
         /* Add BTH header */
         bthOp = ((qpc->qpType << 5) | PKT_TRANS_SEND_ONLY) << 24;
-        needAck = 0x00;
+        if (desc->isQueUpdate()) {
+            needAck = 0x02;
+        }
+        else {
+            needAck = 0x00;
+        }
         ((BTH *) pktPtr)->op_destQpn = bthOp | desc->sendType.destQpn;
         ((BTH *) pktPtr)->needAck_psn = (needAck << 24) | qpc->sndPsn;
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: "
@@ -751,7 +761,12 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
         
         // Add BTH header
         bthOp = ((qpc->qpType << 5) | PKT_TRANS_RWRITE_ONLY) << 24;
-        needAck = 0x01;
+        if (desc->isQueUpdate()) {
+            needAck = 0x03;
+        }
+        else {
+            needAck = 0x01;
+        }
         ((BTH *) pktPtr)->op_destQpn = bthOp | qpc->destQpn;
         ((BTH *) pktPtr)->needAck_psn = (needAck << 24) | qpc->sndPsn;
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: BTH head: 0x%x 0x%x, src qpn: %d, dst qpn: %d\n", 
@@ -775,7 +790,12 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
         
         // Add BTH header
         bthOp = ((qpc->qpType << 5) | PKT_TRANS_RREAD_ONLY) << 24;
-        needAck = 0x01;
+        if (desc->isQueUpdate()) {
+            needAck = 0x03;
+        }
+        else {
+            needAck = 0x01;
+        }
         ((BTH *) pktPtr)->op_destQpn = bthOp | qpc->destQpn;
         ((BTH *) pktPtr)->needAck_psn = (needAck << 24) | qpc->sndPsn;
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: "
@@ -931,6 +951,18 @@ HanGuRnic::RdmaEngine::sauProcessing () {
     }
     HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, type: %d, srv: %d, op_destQpn: 0x%x, BW %dps/byte, len %d, bwDelay %d, txsauFifo size: %d\n", 
             type, srv, bth->op_destQpn, rnic->etherBandwidth, txsauFifo.front()->length, bwDelay, txsauFifo.size());
+
+    assert(rnic->descScheduler.unsentBatchNum--)
+    if (bth->needAck_psn >> 1 == 1) {
+        rnic->descScheduler.unsentBatchNum--;
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, finish a batch! unsentBatchNum: %d\n", unsentBatchNum);
+    }
+    if (rnic->descScheduler.unsentBatchNum < UNSENT_BATCH_NUM_THRESHOLD) {
+        if ((rnic->descScheduler.highPriorityQpnQue.size() > 0 || rnic->descScheduler.lowPriorityQpnQue.size() > 0) && 
+            !rnic->descScheduler.wqePrefetchScheduleEvent.scheduled()) {
+            rnic->schedule(rnic->descScheduler.wqePrefetchScheduleEvent, curTick() + rnic->clockPeriod());
+        }
+    }
 
     if (rnic->etherInt->sendPacket(txsauFifo.front())) {
         
