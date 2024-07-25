@@ -141,7 +141,7 @@ struct rdma_resc *rdma_resc_init(struct ibv_context *ctx,int num_mr, int num_cq,
     struct ibv_qp *qp_tmp = ibv_create_batch_qp(ctx, &qp_attr, num_qp * num_rem);
     for (i = 0; i < num_qp * num_rem; ++i) {
         resc->qp[i] = &(qp_tmp[i]);
-        // RDMA_PRINT(librdma, "ibv_create_qp: qpn 0x%x(%d)\n", resc->qp[i]->qp_num, resc->qp[i]->qp_num&RESC_LIM_MASK);
+        RDMA_PRINT(librdma, "ibv_create_qp: qpn 0x%x(%d)\n", resc->qp[i]->qp_num, resc->qp[i]->qp_num&RESC_LIM_MASK);
     }
     RDMA_PRINT(librdma, "Init QP finish\n");
 

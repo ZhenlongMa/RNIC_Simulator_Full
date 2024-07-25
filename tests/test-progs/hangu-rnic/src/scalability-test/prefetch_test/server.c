@@ -197,13 +197,13 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
     /* polling for completion */
     do { // snd_cnt < (num_qp * TEST_WR_NUM * num_client)
         for (int grp_id = 0; grp_id < qos_group_num; grp_id++) {
-            RDMA_PRINT(Server, "work on grp[%d]\n", grp_id);
+            // RDMA_PRINT(Server, "work on grp[%d]\n", grp_id);
             struct rdma_resc *resc = grp_resc[grp_id];
             struct cpl_desc **desc = resc->desc;
             int num_cq = resc->num_cq;
             for (int i = 0; i < num_cq; ++i) {
                 int res = ibv_poll_cpl(resc->cq[i], desc, MAX_CPL_NUM);
-                RDMA_PRINT(Server, "cpu[%d] get cqe num: %d\n", cpu_id, res);
+                // RDMA_PRINT(Server, "cpu[%d] get cqe num: %d\n", cpu_id, res);
                 if (res) {
                     if (*start_time == 0) {
                         *start_time = get_time(resc->ctx);
@@ -219,7 +219,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
                                 }
                             }
                             ibv_post_send(resc->ctx, elephant_wqe_list, qp, elephant_wr_num);
-                            RDMA_PRINT(Server, "cpu[%d] post send qpn: 0x%x\n", cpu_id, desc[j]->qp_num);
+                            // RDMA_PRINT(Server, "cpu[%d] post send qpn: 0x%x\n", cpu_id, desc[j]->qp_num);
                         }
                         else {
                             fprintf(stderr, "Wrong trans type! trans type: %d, ibv type: %d\n", desc[j]->trans_type, ibv_type[op_mode]);
@@ -341,11 +341,11 @@ int main (int argc, char **argv) {
 
     int num_mr = 1;
     int num_cq = TEST_CQ_NUM;
-    int group_num = 1;
+    int group_num = 8;
     int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
     int *group_weight = (int *)malloc(sizeof(int) * group_num);
     for (int i = 0; i < group_num; i++) {
-        group_qp_num[i] = 10;
+        group_qp_num[i] = 128;
         group_weight[i] = 10;
     }
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
@@ -356,7 +356,7 @@ int main (int argc, char **argv) {
     RDMA_PRINT(Server, "ibv_open_device : doorbell address 0x%lx\n", (long int)ib_context->dvr);
     for (int i = 0; i < group_num; i++) {
         grp_resc[i] = set_group_resource(ib_context, num_mr, num_cq, group_qp_num[i], svr_lid, num_client, group_weight[i]);
-        RDMA_PRINT(Server, "finish group [%d] resource init! i: %d, group num: %d\n", grp_resc[i]->qos_group[0]->id, i, group_num);
+        RDMA_PRINT(Server, "finish group[%d] resource init! i: %d, group num: %d\n", grp_resc[i]->qos_group[0]->id, i, group_num);
     }
 
     /* sync to make sure that we could get start */
