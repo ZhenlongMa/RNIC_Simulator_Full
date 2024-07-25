@@ -13,8 +13,9 @@ HanGuRnic::DescScheduler::DescScheduler(HanGuRnic *rNic, const std::string name)
     rNic(rNic),
     _name(name),
     wqePrefetchEvent([this]{wqePrefetch();}, name),
-    wqePrefetchScheduleEvent([this]{wqePrefetchSchedule();}, name),
     launchWqeEvent([this]{launchWQE();}, name),
+    unsentBatchNum(0),
+    wqePrefetchScheduleEvent([this]{wqePrefetchSchedule();}, name),
     updateEvent([this]{rxUpdate();}, name),
     createQpStatusEvent([this]{createQpStatus();}, name),
     qpcRspEvent([this]{qpcRspProc();}, name),
@@ -239,7 +240,11 @@ void HanGuRnic::DescScheduler::wqeProc() {
         uint32_t batchSize; // the size of data that should be transmitted in this schedule period
         assert(qpStatus->weight > 0);
         assert(groupTable[qpStatus->group_id] > 0);
+        # ifdef ENABLE_QOS
         batchSize = qpStatus->weight * groupTable[qpStatus->group_id];
+        # else 
+        batchSize = 4096;
+        # endif
         assert(batchSize > 0);
         for (int i = 0; i < descNum; i++) {
             HANGU_PRINT(DescScheduler, "new BW/UD desc received by wqe proc! qpn: 0x%x\n", qpStatus->qpn);

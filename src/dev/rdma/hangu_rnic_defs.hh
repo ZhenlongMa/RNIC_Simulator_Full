@@ -74,6 +74,8 @@
 #define PREFETCH_WINDOW 256
 #define UNSENT_BATCH_NUM_THRESHOLD 50
 
+// #define ENABLE_QOS
+
 #define PAGE_SIZE_LOG 12
 #define PAGE_SIZE (1 << PAGE_SIZE_LOG)
 
