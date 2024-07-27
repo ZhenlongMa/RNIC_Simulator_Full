@@ -276,7 +276,10 @@ void HanGuRnic::RescCache<T, S>::readProc() {
     HANGU_PRINT(RescCache, " RescCache.readProc! capacity: %d, rescIdx %d, is_write %d, rescSz: %d, size: %d\n", 
             capacity, rescIdx, (rreq.cplEvent == nullptr), sizeof(T), cache.size());
     if (cache.find(rescIdx) != cache.end()) { /* Cache hit */
-        HANGU_PRINT(RescCache, " RescCache.readProc: Cache hit\n");
+        if (rreq.reqPkt->type != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->type != MR_RCHNL_TX_MPT_PREFETCH) {
+            hitNum++;
+        }
+        HANGU_PRINT(RescCache, " RescCache.readProc: Cache hit! hitNum: %d, missNum: %d\n", hitNum, missNum);
         /** 
          * If rspResc is not nullptr, which means 
          * it need to put resc to rspResc, copy 
@@ -309,7 +312,10 @@ void HanGuRnic::RescCache<T, S>::readProc() {
             }
         }
     } else if (cache.size() <= capacity) { /* Cache miss & read elem */
-        HANGU_PRINT(RescCache, " RescCache.readProc: Cache miss & read elem!\n");
+        if (rreq.reqPkt->type != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->type != MR_RCHNL_TX_MPT_PREFETCH) {
+            missNum++;
+        }
+        HANGU_PRINT(RescCache, " RescCache.readProc: Cache miss & read elem! hitNum: %d, missNum: %d\n", hitNum, missNum);
         /* Fetch required data */
         uint64_t pAddr = rescNum2phyAddr(rescIdx);
         fetchReq(pAddr, rreq.cplEvent, rescIdx, rreq.reqPkt, rreq.rspResc, rreq.rescUpdate);

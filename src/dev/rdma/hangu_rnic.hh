@@ -350,8 +350,7 @@ class HanGuRnic : public RdmaNic {
                 uint16_t sqSize = PAGE_SIZE;
                 uint16_t rqSize;
                 uint64_t scheduleCnt;
-                std::queue<uint32_t> highPriorityQpnQue;
-                std::queue<uint32_t> leastPriorityQpnQue;
+                // std::queue<uint32_t> leastPriorityQpnQue;
                 std::queue<TxDescPtr> highPriorityDescQue;
                 std::queue<TxDescPtr> lowPriorityDescQue;
                 std::queue<DoorbellPtr> dbProcQpStatusRReqQue;
@@ -360,15 +359,17 @@ class HanGuRnic : public RdmaNic {
                 std::queue<DoorbellPtr> wqeProcToLaunchWqeQueH;
                 std::queue<DoorbellPtr> wqeProcToLaunchWqeQueL;
                 EventFunctionWrapper wqePrefetchEvent;
-                EventFunctionWrapper wqePrefetchScheduleEvent;
                 EventFunctionWrapper launchWqeEvent;
             public:
                 DescScheduler(HanGuRnic *rNic, std::string name);
+                int unsentBatchNum;
+                EventFunctionWrapper wqePrefetchScheduleEvent;
                 EventFunctionWrapper updateEvent;
                 EventFunctionWrapper createQpStatusEvent;
                 EventFunctionWrapper qpcRspEvent;
                 EventFunctionWrapper wqeProcEvent;
                 std::queue<DoorbellPtr> dbQue;
+                std::queue<uint32_t> highPriorityQpnQue;
                 std::queue<uint32_t> lowPriorityQpnQue;
                 std::queue<std::pair<uint32_t, QPStatusPtr>> wqeFetchInfoQue;
                 // std::queue<std::pair<uint32_t, uint32_t>> wqeFetchInfoQue;
@@ -516,6 +517,9 @@ class HanGuRnic : public RdmaNic {
                 * Used only in Read Cache miss. */
                 std::queue<CacheRdPkt> rreq2rrspFifo;
 
+                int hitNum;
+                int missNum;
+
             public:
 
                 RescCache (HanGuRnic *i, uint32_t cacheSize, const std::string n) 
@@ -523,7 +527,12 @@ class HanGuRnic : public RdmaNic {
                     _name(n),
                     capacity(cacheSize),
                     readProcEvent([this]{ readProc(); }, n),
-                    fetchCplEvent([this]{ fetchRsp(); }, n) { icmPage = new uint64_t [ICM_MAX_PAGE_NUM]; rescSz = sizeof(T); }
+                    fetchCplEvent([this]{ fetchRsp(); }, n) { 
+                    icmPage = new uint64_t [ICM_MAX_PAGE_NUM]; 
+                    rescSz = sizeof(T); 
+                    hitNum = 0;
+                    missNum = 0;
+                }
 
                 /* Set base address of ICM space */
                 void setBase(uint64_t base);

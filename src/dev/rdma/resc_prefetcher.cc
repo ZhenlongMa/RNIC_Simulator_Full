@@ -46,6 +46,7 @@ void HanGuRnic::RescPrefetcher::prefetchMemProc() {
     MrReqRspPtr mrReq;
     uint32_t lkey;
     int offset;
+    HANGU_PRINT(RescPrefetcher, "prefetchMemProc: prefetch memory metadata! qpn: 0x%x, prefetchNum: %d\n", qpn, prefetchNum);
     for (int i = 0; i < prefetchNum; i++) {
         lkey = rNic->memPrefetchLkeyQue.front();
         rNic->memPrefetchLkeyQue.pop();

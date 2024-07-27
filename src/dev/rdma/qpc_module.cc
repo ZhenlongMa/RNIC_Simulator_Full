@@ -115,6 +115,7 @@ HanGuRnic::QpcModule::hitProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
 bool 
 HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
     HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc!\n");
+    assert(qpcReq->txQpcRsp != nullptr);
     if (qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_PFCH_QP) {
         if (qpcCache.lookupHit(qpcReq->num)) {
             return true;

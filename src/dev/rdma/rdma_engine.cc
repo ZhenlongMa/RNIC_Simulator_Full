@@ -271,7 +271,7 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
             * Fetch data from host memory */
             // HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: Push Data read request to MrRescModule.transReqProcessing: len %d vaddr 0x%x\n", desc->len, desc->lVaddr);
             rreq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DATA,
-                    desc->lkey, desc->len, (uint32_t)(desc->lVaddr&0xFFF));
+                    desc->lkey, desc->len, (uint32_t)(desc->lVaddr&0xFFF), dp2rg->qpc->srcQpn);
             rreq->rdDataRsp = txPkt->data + txPkt->length; /* Address Rsp data (from host memory) should be located */
             rnic->dataReqFifo.push(rreq);
             if (!rnic->mrRescModule.transReqEvent.scheduled()) {
@@ -599,7 +599,7 @@ HanGuRnic::RdmaEngine::rguProcessing () {
 
     /* if the packet need ack, post pkt 
      * info into send window */
-    if (needAck) {
+    if (needAck % 2 != 0) {
 
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: Need ACK (RC type)!\n");
 
@@ -632,7 +632,7 @@ HanGuRnic::RdmaEngine::rguProcessing () {
         ++windowSize;
         windowFull = (windowSize >= windowCap);
 
-        HANGU_PRINT(RdmaEngine, "need ACK! RdmaEngine.RGRRU.rguProcessing: qpn: %d, first psn: %d, last psn: %d, windowSize %d\n", 
+        HANGU_PRINT(RdmaEngine, "need ACK! RdmaEngine.RGRRU.rguProcessing: qpn: 0x%x, first psn: %d, last psn: %d, windowSize %d\n", 
             qpc->srcQpn, sndWindowList[qpc->srcQpn]->firstPsn, sndWindowList[qpc->srcQpn]->lastPsn, windowSize);
     }
     
@@ -645,7 +645,7 @@ HanGuRnic::RdmaEngine::rguProcessing () {
     messageEnd = true; /* Just ignore it now. */
 
     // update on fly packet number, ONLY FOR RC CONNECTIONS
-    if (needAck) {
+    if (needAck % 2 != 0) {
         onFlyPacketNum++;
     }
 
@@ -661,7 +661,7 @@ HanGuRnic::RdmaEngine::rguProcessing () {
     }
     
     /* Post CQ if no need to acks. */
-    if (!needAck && messageEnd) {
+    if ((needAck % 2 == 0) && messageEnd) {
         postTxCpl(qpc->qpType, qpc->srcQpn, qpc->cqn, desc);
     }
 
@@ -952,10 +952,13 @@ HanGuRnic::RdmaEngine::sauProcessing () {
     HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, type: %d, srv: %d, op_destQpn: 0x%x, BW %dps/byte, len %d, bwDelay %d, txsauFifo size: %d\n", 
             type, srv, bth->op_destQpn, rnic->etherBandwidth, txsauFifo.front()->length, bwDelay, txsauFifo.size());
 
-    assert(rnic->descScheduler.unsentBatchNum--)
-    if (bth->needAck_psn >> 1 == 1) {
+    // if this is the end of a subWQE batch, self-minus unsentBatchNum to control the pop rate of descScheduler
+    if (bth->needAck_psn >> 25 == 1) {
+        assert(rnic->descScheduler.unsentBatchNum > 0);
         rnic->descScheduler.unsentBatchNum--;
-        HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, finish a batch! unsentBatchNum: %d\n", unsentBatchNum);
+        HANGU_PRINT(RdmaEngine, "type: %d\n", type);
+        assert(type == PKT_TRANS_SEND_ONLY || type == PKT_TRANS_RWRITE_ONLY || type == PKT_TRANS_RREAD_ONLY);
+        HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing, finish a batch! unsentBatchNum: %d, op_destQpn: 0x%x\n", rnic->descScheduler.unsentBatchNum, bth->op_destQpn);
     }
     if (rnic->descScheduler.unsentBatchNum < UNSENT_BATCH_NUM_THRESHOLD) {
         if ((rnic->descScheduler.highPriorityQpnQue.size() > 0 || rnic->descScheduler.lowPriorityQpnQue.size() > 0) && 

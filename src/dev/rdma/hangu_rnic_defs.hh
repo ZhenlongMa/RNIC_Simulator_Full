@@ -375,7 +375,7 @@ struct MrReqRsp {
         this->lkey = lkey;
         this->length = len;
         this->offset = vaddr;
-        
+        this->qpn = 0xffffffff;
         this->wrDataReq = nullptr;
     }
     MrReqRsp(uint8_t type, uint8_t chnl, uint32_t lkey, 

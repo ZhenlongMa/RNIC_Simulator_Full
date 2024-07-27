@@ -31,11 +31,14 @@ void HanGuRnic::WqeBufferManage::wqeReadReqProcess() {
     uint32_t descNum = rNic->descScheduler.wqeFetchInfoQue.front().first;
     QPStatusPtr qpStatus = rNic->descScheduler.wqeFetchInfoQue.front().second;
     rNic->descScheduler.wqeFetchInfoQue.pop();
-    // wqeBufferMetadataTable[qpStatus->qpn]->replaceParam = maxReplaceParam;
-    // maxReplaceParam++;
+    // assert(wqeBufferMetadataTable.find(qpStatus->qpn) != wqeBufferMetadataTable.end());
+    wqeBufferMetadataTable[qpStatus->qpn]->replaceParam = maxReplaceParam;
+    maxReplaceParam++;
+    HANGU_PRINT(WqeBufferManage, "wqeReadReqProcess: fetch wqe! qpn: 0x%x\n", qpStatus->qpn);
     if (descNum > wqeBufferMetadataTable[qpStatus->qpn]->avaiNum + wqeBufferMetadataTable[qpStatus->qpn]->pendingReqNum) { // WQEs in the buffer is not sufficient
-        HANGU_PRINT(WqeBufferManage, "wqeReadReqProcess: WQEs in the buffer and pending requests is not sufficient! Launch more WQE request! qpn: 0x%x\n", qpStatus->qpn);
         missNum++;
+        HANGU_PRINT(WqeBufferManage, "wqeReadReqProcess: WQEs in the buffer and pending requests is not sufficient! Launch more WQE request! qpn: 0x%x, hitNum: %d, missNum: %d\n", 
+            qpStatus->qpn, hitNum, missNum);
         int fetchNum;
         int fetchByte;
         int fetchOffset;
@@ -58,13 +61,15 @@ void HanGuRnic::WqeBufferManage::wqeReadReqProcess() {
         wqeBufferMetadataTable[qpStatus->qpn]->replaceLock = true;
     }
     else if (descNum > wqeBufferMetadataTable[qpStatus->qpn]->avaiNum) {
-        HANGU_PRINT(WqeBufferManage, "wqeReadReqProcess: WQEs in the buffer is not sufficient, wait for pending requests! qpn: 0x%x\n", qpStatus->qpn);
+        missNum++;
+        HANGU_PRINT(WqeBufferManage, "wqeReadReqProcess: WQEs in the buffer is not sufficient, wait for pending requests! qpn: 0x%x, hitNum: %d, missNum: %d\n", 
+            qpStatus->qpn, hitNum, missNum);
         wqeBufferMetadataTable[qpStatus->qpn]->fetchReqNum += descNum;
         wqeBufferMetadataTable[qpStatus->qpn]->replaceLock = true;
     }
     else { // WQEs in the buffer is sufficient
         hitNum++;
-        HANGU_PRINT(WqeBufferManage, "wqeReadReqProcess: WQEs in the buffer is sufficient! qpn: 0x%x, hitNum: %ld\n", qpStatus->qpn, hitNum);
+        HANGU_PRINT(WqeBufferManage, "wqeReadReqProcess: WQEs in the buffer is sufficient! qpn: 0x%x, hitNum: %ld, missNum:\n", qpStatus->qpn, hitNum, missNum);
         WqeRspPtr wqeRsp = std::make_shared<WqeRsp>(descNum, qpStatus->qpn);
         for (int i = 0; i < descNum; i++) {
             wqeRsp->descList.push(wqeBuffer[qpStatus->qpn]->descArray[i]);
@@ -85,32 +90,41 @@ void HanGuRnic::WqeBufferManage::wqeReadRspProcess() {
     wqeRspQue.pop();
     uint32_t qpn = resp->qpn;
     uint32_t respQueOffset = resp->offset / sizeof(TxDesc);
-    uint32_t modTail = rNic->descScheduler.qpStatusTable[qpn]->tail_ptr % (sqSize / sizeof(TxDesc));
-    HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: enter wqeReadRspProcess! qpn: 0x%x\n", qpn);
-    HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: respQueOffset: %d, modTail: %d, avai num: %d, rsp num: %d, queue cap: %d, rsp chnl: %d\n", 
-        respQueOffset, modTail, wqeBufferMetadataTable[qpn]->avaiNum, resp->length / sizeof(TxDesc), sqSize / sizeof(TxDesc), resp->chnl);
-    HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: pending num: %d\n", wqeBufferMetadataTable[qpn]->pendingReqNum);
+    uint32_t tailOffset = rNic->descScheduler.qpStatusTable[qpn]->tail_ptr % (sqSize / sizeof(TxDesc));
+    HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: qpn: 0x%x, respQueOffset: %d, tailOffset: %d, avai num: %d, rsp num: %d, queue cap: %d, rsp chnl: %d\n", 
+        qpn, respQueOffset, tailOffset, wqeBufferMetadataTable[qpn]->avaiNum, resp->length / sizeof(TxDesc), sqSize / sizeof(TxDesc), resp->chnl);
+    HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: pending num: %d, fetch req num: %d\n", wqeBufferMetadataTable[qpn]->pendingReqNum, wqeBufferMetadataTable[qpn]->fetchReqNum);
     assert(wqeBufferMetadataTable[qpn]->replaceLock == true);
     // make sure the response is the correct next WQEs
-    assert(modTail + wqeBufferMetadataTable[qpn]->avaiNum == respQueOffset);
+    assert((tailOffset + wqeBufferMetadataTable[qpn]->avaiNum) % (sqSize / sizeof(TxDesc)) == respQueOffset);
     assert(wqeBufferMetadataTable[qpn]->pendingReqNum >= resp->length / sizeof(TxDesc));
+    HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: assertion passed!\n");
     // store WQEs
-    uint32_t replaceQpn;
-    int min = 0;
+    int min = maxReplaceParam;
     TxDescPtr txDesc;
     // in case of desc buffer capacity is not enough, pick some descriptors and replace
     while (descBufferCap - descBufferUsed < resp->length / sizeof(TxDesc)) {
-        assert(wqeBufferMetadataTable.size() < 500);
+        int replaceQpn = -1;
+        // assert(wqeBufferMetadataTable.size() < 500);
         for (auto it = wqeBufferMetadataTable.begin(); it != wqeBufferMetadataTable.end(); it++) {
-            if (min > it->second->replaceParam && it->second->replaceLock == false) {
+            if (min > it->second->replaceParam && it->second->replaceLock == false && it->second->avaiNum > 0) {
                 min = it->second->replaceParam;
                 replaceQpn = it->first;
-                assert(it->second->avaiNum > 0);
+                // assert(it->second->avaiNum > 0);
+            }
+        }
+        HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: replace qpn: 0x%x, maxReplaceParam: %d, min: %d\n", replaceQpn, maxReplaceParam, min);
+        // assert(replaceQpn >= 0);
+        if (replaceQpn < 0) {
+            wqeRspQue.push(resp);
+            if (wqeRspQue.size() != 0 && !wqeReadRspEvent.scheduled()) {
+                rNic->schedule(wqeReadRspEvent, curTick() + rNic->clockPeriod());
             }
         }
         descBufferUsed -= wqeBufferMetadataTable[replaceQpn]->avaiNum;
-        wqeBufferMetadataTable.erase(replaceQpn);
-        HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: erase qpn: 0x%x\n", replaceQpn);
+        wqeBufferMetadataTable[replaceQpn]->avaiNum = 0;
+        wqeBuffer[replaceQpn]->descArray.clear();
+        // wqeBufferMetadataTable.erase(replaceQpn);
     }
     for (uint32_t i = 0; (i * sizeof(TxDesc)) < resp->length; ++i) {
         txDesc = make_shared<TxDesc>(resp->txDescRsp + i);
@@ -198,8 +212,8 @@ void HanGuRnic::WqeBufferManage::wqePrefetchProc() {
         wqeBufferMetadataTable[qpn] = std::make_shared<WqeBufferMetadata>(keepNum, maxReplaceParam);
         HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: create WQE buffer metadata!\n");
     }
-    // wqeBufferMetadataTable[qpn]->keepNum = keepNum;
-    // wqeBufferMetadataTable[qpn]->replaceParam = maxReplaceParam;
+    wqeBufferMetadataTable[qpn]->keepNum = keepNum;
+    wqeBufferMetadataTable[qpn]->replaceParam = maxReplaceParam;
     maxReplaceParam++;
     HANGU_PRINT(WqeBufferManage, "wqePrefetchProc: maxReplaceParam: %d\n", maxReplaceParam);
     int baseNum = wqeBufferMetadataTable[qpn]->avaiNum + wqeBufferMetadataTable[qpn]->pendingReqNum;
@@ -269,15 +283,16 @@ void HanGuRnic::WqeBufferManage::wqeBufferUpdate() {
     uint32_t qpn = rNic->wqeBufferUpdateQue.front().first;
     uint32_t eraseNum = rNic->wqeBufferUpdateQue.front().second;
     rNic->wqeBufferUpdateQue.pop();
+    HANGU_PRINT(WqeBufferManage, "wqeBufferUpdate: erase! qpn: 0x%x, eraseNum: %d, avaiNum: %d, descArray size: %d\n", 
+        qpn, eraseNum, wqeBufferMetadataTable[qpn]->avaiNum, wqeBuffer[qpn]->descArray.size());
     assert(wqeBuffer[qpn]->descArray.size() == wqeBufferMetadataTable[qpn]->avaiNum);
     assert(wqeBuffer[qpn]->descArray.size() != 0);
-    HANGU_PRINT(WqeBufferManage, "wqeBufferUpdate: erase! qpn: 0x%x, eraseNum: %d\n", qpn, eraseNum);
     for (int i = 0; i < eraseNum; i++) {
         wqeBuffer[qpn]->descArray.erase(wqeBuffer[qpn]->descArray.begin());
         wqeBufferMetadataTable[qpn]->avaiNum--;
         descBufferUsed--;
         if (wqeBufferMetadataTable[qpn]->avaiNum == 0 && wqeBufferMetadataTable[qpn]->pendingReqNum == 0) {
-            wqeBufferMetadataTable.erase(qpn);
+            // wqeBufferMetadataTable.erase(qpn);
             HANGU_PRINT(WqeBufferManage, "wqeBufferUpdate: erase qpn: 0x%x\n", qpn);
         }
     }

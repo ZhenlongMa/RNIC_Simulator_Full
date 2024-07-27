@@ -86,6 +86,7 @@ void HanGuRnic::DescScheduler::qpcRspProc() {
 void HanGuRnic::DescScheduler::wqePrefetchSchedule() {
     // HANGU_PRINT(DescScheduler, "into wqePrefetchSchedule! wqePrefetchQpStatusRReqQue size: %d\n", wqePrefetchQpStatusRReqQue.size());
     if (unsentBatchNum > UNSENT_BATCH_NUM_THRESHOLD) {
+        HANGU_PRINT(DescScheduler, "Too many unsentBatchNum! %d\n", unsentBatchNum);
         return;
     }
     uint32_t batchSize;
@@ -116,6 +117,8 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule() {
     // bwDelay = rNic->clockPeriod();
     HANGU_PRINT(DescScheduler, "Schedule wqePrefetchScheduleEvent! QPN: 0x%x, batchSize: %d, bwDelay: %d\n", 
         qpn, batchSize, bwDelay);
+    HANGU_PRINT(DescScheduler, "high queue size: %d, low queue size: %d\n", 
+        highPriorityQpnQue.size(), lowPriorityQpnQue.size());
     if (highPriorityQpnQue.size() > 0 || lowPriorityQpnQue.size() > 0) {
         if (wqePrefetchScheduleEvent.scheduled()) {
             rNic->reschedule(wqePrefetchScheduleEvent, curTick() + bwDelay);

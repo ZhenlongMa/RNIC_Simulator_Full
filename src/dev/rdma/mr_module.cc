@@ -53,7 +53,7 @@ HanGuRnic::MrRescModule::isMRMatching (MptResc * mptResc, MrReqRspPtr mrReq) {
 void 
 HanGuRnic::MrRescModule::mptReqProcess (MrReqRspPtr mrReq) {
     
-    HANGU_PRINT(MrResc, " mptReqProcess enter\n");
+    HANGU_PRINT(MrResc, " mptReqProcess enter! qpn: 0x%x\n", mrReq->qpn);
 
     /* Read MPT entry */
     mptCache.rescRead(mrReq->lkey, &mptRspEvent, mrReq);
@@ -62,7 +62,7 @@ HanGuRnic::MrRescModule::mptReqProcess (MrReqRspPtr mrReq) {
 void 
 HanGuRnic::MrRescModule::mttReqProcess (uint64_t mttIdx, MrReqRspPtr mrReq) {
 
-    HANGU_PRINT(MrResc, " mttReqProcess enter\n");
+    HANGU_PRINT(MrResc, " mttReqProcess enter! qpn: 0x%x\n", mrReq->qpn);
     
     /* Read MTT entry */
     mttCache.rescRead(mttIdx, &mttRspEvent, mrReq);
@@ -71,7 +71,7 @@ HanGuRnic::MrRescModule::mttReqProcess (uint64_t mttIdx, MrReqRspPtr mrReq) {
 void 
 HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq, uint32_t offset, uint32_t length) {
     
-    HANGU_PRINT(MrResc, " MrRescModule.dmaReqProcess!\n");
+    HANGU_PRINT(MrResc, " MrRescModule.dmaReqProcess! qpn: 0x%x\n", mrReq->qpn);
     
     if (mrReq->type == DMA_TYPE_WREQ) {
 
@@ -126,6 +126,8 @@ HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq, uint3
                 HANGU_PRINT(MrResc, "data DMA request sent! on-fly count: %d\n", onFlyDataDmaRdReqNum);
                 assert(onFlyDataDmaRdReqNum > 0);
                 break;
+            default:
+                panic("Illegal MR request channel: %d!\n", mrReq->chnl);
         }
 
         /* Push to Fifo, and dmaRrspProcessing 
@@ -158,8 +160,8 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
 
     /* Get dma rrsp data */
     MrReqRspPtr tptRsp = dmaReq2RspFifo.front().first;
-    HANGU_PRINT(MrResc, "DMA read response received by MR module, MR request length: %d, DMA request length: %d, dmaRspNum: %d, mttNum: %d, mttRspNum: %d\n", 
-        tptRsp->length, dmaReq2RspFifo.front().second->size, tptRsp->dmaRspNum, tptRsp->mttNum, tptRsp->mttRspNum);
+    HANGU_PRINT(MrResc, "DMA read response received by MR module, MR request length: %d, DMA request length: %d, dmaRspNum: %d, mttNum: %d, mttRspNum: %d, qpn: 0x%x\n", 
+        tptRsp->length, dmaReq2RspFifo.front().second->size, tptRsp->dmaRspNum, tptRsp->mttNum, tptRsp->mttRspNum, tptRsp->qpn);
     assert(tptRsp->dmaRspNum < tptRsp->mttNum);
     assert(tptRsp->dmaRspNum < tptRsp->mttRspNum);
     tptRsp->dmaRspNum++;
@@ -181,12 +183,12 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
         case MR_RCHNL_TX_DESC_FETCH:
         case MR_RCHNL_TX_DESC_PREFETCH:
             onFlyDescDmaRdReqNum--;
-            HANGU_PRINT(MrResc, "descriptor DMA request received by MR module! on-fly count: %d\n", onFlyDescDmaRdReqNum);
+            HANGU_PRINT(MrResc, "descriptor DMA response received by MR module! on-fly count: %d\n", onFlyDescDmaRdReqNum);
             break;
         case MR_RCHNL_TX_DATA:
         case MR_RCHNL_RX_DATA:
             onFlyDataDmaRdReqNum--;
-            HANGU_PRINT(MrResc, "dataDMA request received by MR module! on-fly count: %d\n", onFlyDataDmaRdReqNum);
+            HANGU_PRINT(MrResc, "data DMA response received by MR module! on-fly count: %d, qpn: 0x%x\n", onFlyDataDmaRdReqNum, tptRsp->qpn);
             break;
     }
 
@@ -413,6 +415,9 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
         assert(reqPkt->mttRspNum < reqPkt->mttNum);
         reqPkt->mttRspNum++;
     }
+    else {
+        HANGU_PRINT(MrResc, " MrRescModule.mttRspProcessing: finish memory metadata prefetch! qpn: 0x%x\n", reqPkt->qpn);
+    }
 
     /* Schedule myself */
     if (mttCache.rrspFifo.size()) {
@@ -470,7 +475,7 @@ HanGuRnic::MrRescModule::transReqProcessing() {
                 case 3:
                     mrReq = rnic->mptPrefetchQue.front();
                     rnic->mptPrefetchQue.pop();
-                    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: MPT prefetch request! lkey: 0x%lx\n", mrReq->lkey);
+                    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: MPT prefetch request! lkey: 0x%lx, qpn: 0x%x\n", mrReq->lkey, mrReq->qpn);
                     break;
                 default:
                     panic("Illegal Channel!\n");

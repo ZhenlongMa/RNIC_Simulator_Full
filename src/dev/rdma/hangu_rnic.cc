@@ -56,7 +56,7 @@ HanGuRnic::HanGuRnic(const Params *p)
     rdmaEngine          (this, name() + ".RdmaEngine", p->reorder_cap),
     descScheduler       (this, name() + ".DescScheduler"),
     rescPrefetcher      (this, name() + ".RescPrefetcher"),
-    wqeBufferManage     (this, name() + ".WqeBufferManage", p->wqe_cache_num),
+    wqeBufferManage     (this, name() + ".WqeBufferManage", p->wqe_cache_cap),
     mrRescModule        (this, name() + ".MrRescModule", p->mpt_cache_num, p->mtt_cache_num),
     cqcModule           (this, name() + ".CqcModule", p->cqc_cache_num),
     qpcModule           (this, name() + ".QpcModule", p->qpc_cache_cap, p->reorder_cap),
