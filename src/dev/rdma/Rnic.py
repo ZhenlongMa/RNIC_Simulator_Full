@@ -59,7 +59,7 @@ class HanGuRnic(RdmaNic):
         "Number of qpc cache enteries")
     cqc_cache_num = Param.Int(2000,
         "Number of cqc cache enteries")
-    wqe_cache_num = Param.Int(256,
+    wqe_cache_cap = Param.Int(512,
         "Number of wqe cache enteries")
     
     VendorID = 0x8086
@@ -82,8 +82,8 @@ class HanGuRnic(RdmaNic):
     InterruptPin = 0x01
     BAR0Size = '1kB'
     
-    dma_read_delay = Param.Latency('1000ns', "delay after desc fetch occurs")
-    dma_write_delay = Param.Latency('500ns', "delay after desc wb occurs")
+    dma_read_delay = Param.Latency('400ns', "delay after desc fetch occurs")
+    dma_write_delay = Param.Latency('200ns', "delay after desc wb occurs")
 
     pci_speed = Param.NetworkBandwidth('1Gbps', "pci speed in bits per second")
     ether_speed = Param.NetworkBandwidth('1Gbps', "NIC speed in bits per second")
