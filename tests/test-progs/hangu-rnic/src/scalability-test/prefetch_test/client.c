@@ -1,4 +1,5 @@
 #include "librdma.h"
+#include "test.h"
 
 int clt_update_qps(struct rdma_resc *resc, uint16_t svr_lid) {
 
@@ -173,13 +174,13 @@ int main (int argc, char **argv) {
 
     RDMA_PRINT(Client, "Open device!\n");
 
-    int group_num = 8;
+    // int group_num = 4;
     int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
     int *group_weight = (int *)malloc(sizeof(int) * group_num);
     struct rdma_resc **grp_resc = (struct rdma_resc**)malloc(sizeof(struct rdma_resc *) * group_num);
 
     for (int i = 0; i < group_num; i++) {
-        group_qp_num[i] = 128;
+        group_qp_num[i] = qp_pre_group;
         group_weight[i] = 10;
         grp_resc[i] = rdma_resc_init(ib_context, num_mr, num_cq, group_qp_num[i], llid, 1);
         RDMA_PRINT(Client, "group[%d] resouce initialized! i: %d, cpu id: %d\n", grp_resc[i]->qos_group[0]->id, i, cpu_id);

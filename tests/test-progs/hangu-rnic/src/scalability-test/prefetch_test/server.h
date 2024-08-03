@@ -3,7 +3,7 @@
 
 // #define TEST_QP_NUM   1
 // #define TEST_CQ_NUM ((TEST_QP_NUM / (300 / num_client) ) + 1)
-#define THPT_WR_NUM 50
+#define THPT_WR_NUM 32
 #define BW_WR_NUM 1
 // #define LATENCY_WR_NUM 1
 #define TEST_TIME 10UL // milisecond

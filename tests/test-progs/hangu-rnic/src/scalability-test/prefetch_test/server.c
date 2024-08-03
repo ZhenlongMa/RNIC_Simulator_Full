@@ -1,5 +1,6 @@
 #include "librdma.h"
 #include "server.h"
+#include "test.h"
 
 int svr_update_qps(struct rdma_resc *resc) {
     int weight = 2;
@@ -341,11 +342,11 @@ int main (int argc, char **argv) {
 
     int num_mr = 1;
     int num_cq = TEST_CQ_NUM;
-    int group_num = 8;
+    // int group_num = 4;
     int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
     int *group_weight = (int *)malloc(sizeof(int) * group_num);
     for (int i = 0; i < group_num; i++) {
-        group_qp_num[i] = 128;
+        group_qp_num[i] = qp_pre_group;
         group_weight[i] = 10;
     }
     struct ibv_context *ib_context = (struct ibv_context *)malloc(sizeof(struct ibv_context));
