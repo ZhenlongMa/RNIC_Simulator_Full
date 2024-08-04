@@ -113,10 +113,10 @@ void HanGuRnic::DescScheduler::wqePrefetchSchedule() {
     }
     unsentBatchNum++;
     batchSize = qpStatusTable[qpn]->weight * groupTable[qpStatusTable[qpn]->group_id];
-    bwDelay = (batchSize + 44) * rNic->etherBandwidth;
-    // bwDelay = rNic->clockPeriod();
-    HANGU_PRINT(DescScheduler, "Schedule wqePrefetchScheduleEvent! QPN: 0x%x, batchSize: %d, bwDelay: %d\n", 
-        qpn, batchSize, bwDelay);
+    // HANGU_PRINT(DescScheduler, "Schedule wqePrefetchScheduleEvent! QPN: 0x%x, batchSize: %d, bwDelay: %d\n", 
+        // qpn, batchSize, bwDelay);
+    // bwDelay = (batchSize + 44) * rNic->etherBandwidth;
+    bwDelay = rNic->clockPeriod();
     HANGU_PRINT(DescScheduler, "high queue size: %d, low queue size: %d\n", 
         highPriorityQpnQue.size(), lowPriorityQpnQue.size());
     if (highPriorityQpnQue.size() > 0 || lowPriorityQpnQue.size() > 0) {
@@ -144,7 +144,7 @@ void HanGuRnic::DescScheduler::wqePrefetch() {
     QPStatusPtr qpStatus = qpStatusTable[qpn];
     if (qpStatus->fetch_lock == 0) {
         uint32_t descNum;
-        HANGU_PRINT(DescScheduler, "wqe prefetch! qpn: 0x%x, head_ptr: 0x%x, tail pointer: 0x%x, fetch offset: 0x%x\n", 
+        HANGU_PRINT(DescScheduler, "wqe fetch! qpn: 0x%x, head_ptr: %d, tail pointer: %d, fetch offset: %d\n", 
             qpStatus->qpn, qpStatus->head_ptr, qpStatus->tail_ptr, qpStatus->fetch_offset);
         HANGU_PRINT(DescScheduler, "QP num: 0x%x, type: %d, group ID: %d, weight: %d, group granularity: %d\n", 
             qpStatus->qpn, qpStatus->type, qpStatus->group_id, qpStatus->weight, groupTable[qpStatus->group_id]);

@@ -92,6 +92,7 @@ HanGuRnic::DmaEngine::dmaWriteProcessing () {
             // unit: ps
             Tick bwDelay = (dmaReq->size + 32) * rnic->pciBandwidth;
             Tick delay = rnic->dmaWriteDelay + bwDelay;
+            writeByte += dmaReq->size + 32;
             
             HANGU_PRINT(DmaEngine, " DMAEngine.dmaWrite: dmaReq->addr 0x%x, dmaReq->size %d, delay %d, bwDelay %d!\n", 
             dmaReq->addr, dmaReq->size, delay, bwDelay);
@@ -149,6 +150,7 @@ HanGuRnic::DmaEngine::dmaReadCplProcessing() {
         assert(dmaReq->size == 256);
         rnic->qpcDmaRdCplFifo.push(dmaReq);
     }
+    readByte += dmaReq->size + 32;
 
     /* Schedule related completion event */
     if (!(dmaReq->event)->scheduled()) {
@@ -292,5 +294,19 @@ HanGuRnic::DmaEngine::dmaChnlProc () {
             rnic->schedule(dmaChnlProcEvent, curTick() + rnic->clockPeriod());
         }
     }
+    if (startDetect == false) {
+        if (!detectRateEvent.scheduled()) {
+            rnic->schedule(detectRateEvent, curTick() + rnic->clockPeriod());
+        }
+    }
+}
+
+void HanGuRnic::DmaEngine::detectRate() {
+    rnic->schedule(detectRateEvent, curTick() + rnic->clockPeriod() * DMA_DETECT_PERIOD);
+    HANGU_PRINT(DmaEngine, " DMAEngine.detectRate: read byte: %d, rate : %.2f Gbps! write byte: %d, rate : %.2f Gbps!\n", 
+        (float)readByte * 1000000000 / DMA_DETECT_PERIOD / 1024 / 1024 / 1024 * 8,
+        (float)writeByte * 1000000000 / DMA_DETECT_PERIOD / 1024 / 1024 / 1024 * 8);
+    readByte = 0;
+    writeByte = 0;
 }
 ///////////////////////////// HanGuRnic::DMA Engine {end}//////////////////////////////

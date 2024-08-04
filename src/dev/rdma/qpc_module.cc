@@ -62,7 +62,7 @@ bool qpcTxUpdate (QpcResc &resc, uint32_t sz) {
 bool qpcRxUpdate (QpcResc &resc) {
     if (resc.qpType == QP_TYPE_RC) {
         resc.expPsn += 1;
-        HANGU_PRINT(CxtResc, "RC QP qpcRxUpdate, QPN: %d, dst QPN: %d, epsn: %d\n", resc.srcQpn, resc.destQpn, resc.expPsn);
+        HANGU_PRINT(CxtResc, "RC QP qpcRxUpdate, QPN: 0x%x, dst QPN: 0x%x, epsn: %d\n", resc.srcQpn, resc.destQpn, resc.expPsn);
     }
     resc.rcvWqeOffset += sizeof(RxDesc);
     if (resc.rcvWqeOffset + sizeof(RxDesc) > (1 << resc.rqSizeLog)) {
@@ -78,7 +78,7 @@ HanGuRnic::QpcModule::hitProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
     qpcCache.readEntry(qpcReq->num, qpcReq->txQpcRsp);
     assert(qpcReq->num == qpcReq->txQpcRsp->srcQpn);
 
-    HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc.hitProc: qpn %d hit, chnlNum %d idx %d\n", 
+    HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc.hitProc: qpn 0x%x hit, chnlNum %d idx %d\n", 
             qpcReq->txQpcRsp->srcQpn, chnlNum, qpcReq->idx);
 
     /* Post rsp to related fifo, schedule related rsp receiving module */
@@ -114,9 +114,9 @@ HanGuRnic::QpcModule::hitProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
 
 bool 
 HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
-    HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc!\n");
+    HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc! qpn: 0x%x\n", qpcReq->num);
     assert(qpcReq->txQpcRsp != nullptr);
-    if (qpcReq->chnl == CXT_CHNL_TX && qpcReq->type == CXT_PFCH_QP) {
+    if (qpcReq->type == CXT_PFCH_QP) {
         if (qpcCache.lookupHit(qpcReq->num)) {
             return true;
         }
@@ -126,7 +126,7 @@ HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
      * pending elem for this qpn in this channel. */
     if (qpnHashMap.find(qpcReq->num) != qpnHashMap.end()) { /* related qpn is found in qpnHashMap, check if pending */
         qpnHashMap[qpcReq->num]->reqCnt += 1;
-        HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: related qpn is found in qpnHashMap qpn %d idx %d\n", 
+        HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: related qpn is found in qpnHashMap qpn 0x%x idx %d\n", 
                 qpcReq->num, qpcReq->idx);
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnMap.size() %d get_size() %d\n", 
                 qpnHashMap.size(), pendStruct.get_size());
@@ -135,16 +135,18 @@ HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
         pendStruct.push_elem(pElem);
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnMap.size() %d get_size() %d\n", 
                 qpnHashMap.size(), pendStruct.get_size());
-        missNum++;
+        if (qpcReq->type != CXT_PFCH_QP) {
+            missNum++;
+        }
         return true;
     }
     /* Lookup QPC in QPC Cache */
     if (qpcCache.lookupHit(qpcReq->num)) { /* cache hit, and return related rsp to related fifo */
-        HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: cache hit, qpn %d\n", qpcReq->num);
+        HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: cache hit, qpn 0x%x\n", qpcReq->num);
         hitProc(chnlNum, qpcReq);
         hitNum++;
     } else { /* cache miss */
-        HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: cache miss, qpn %d, rtnCnt %d\n", qpcReq->num, rtnCnt);
+        HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: cache miss, qpn 0x%x, rtnCnt %d\n", qpcReq->num, rtnCnt);
         /* save req to pending fifo */
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnMap.size() %d get_size() %d\n", 
                 qpnHashMap.size(), pendStruct.get_size());
@@ -156,9 +158,11 @@ HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
         QpnInfoPtr qpnInfo = make_shared<QpnInfo>(qpcReq->num); // new QpnInfo(qpcReq->num);
         qpnHashMap.emplace(qpcReq->num, qpnInfo);
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: qpnHashMap.size %d rtnCnt %d\n", qpnHashMap.size(), rtnCnt);
-        missNum++;
+        if (qpcReq->type != CXT_PFCH_QP) {
+            missNum++;
+        }
     }
-    HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: out!\n");
+    HANGU_PRINT(CxtResc, " readProc: out! qpn: 0x%x, hitNum: %d, missNum: %d, accessNum: %d\n", qpcReq->num, hitNum, missNum, accessNum);
     return true;
 }
 
@@ -169,7 +173,7 @@ HanGuRnic::QpcModule::qpcCreate() {
     assert(qpcReq->type == CXT_CREQ_QP);
     assert(qpcReq->num == qpcReq->txQpcReq->srcQpn);
 
-    HANGU_PRINT(CxtResc, " QpcModule.qpcCreate: srcQpn %d sndBaseLkey %d\n", qpcReq->txQpcReq->srcQpn, qpcReq->txQpcReq->sndWqeBaseLkey);
+    HANGU_PRINT(CxtResc, " QpcModule.qpcCreate: srcQpn 0x%x sndBaseLkey %d\n", qpcReq->txQpcReq->srcQpn, qpcReq->txQpcReq->sndWqeBaseLkey);
     writeOne(qpcReq);
 
     /* delete useless qpc, cause writeEntry use memcpy 
@@ -214,7 +218,7 @@ HanGuRnic::QpcModule::qpcAccess() {
                     panic("[QpcModule.qpcReqProc.qpcAccess] chnlIdx error! %d", this->chnlIdx);
                     break;
             }
-            HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.qpcAccess: qpn: %d, chnlIdx %d, idx %d rtnCnt %d\n", 
+            HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.qpcAccess: qpn: 0x%x, chnlIdx %d, idx %d rtnCnt %d\n", 
                     qpcReq->num, this->chnlIdx, qpcReq->idx, rtnCnt);
             assert((qpcReq->num & QPN_MASK) <= QPN_NUM);
             readProc(this->chnlIdx, qpcReq);
@@ -271,11 +275,11 @@ HanGuRnic::QpcModule::storeMem(uint64_t paddr, QpcResc *qpc) {
 DmaReqPtr 
 HanGuRnic::QpcModule::loadMem(CxtReqRspPtr qpcReq) {
 
-    HANGU_PRINT(CxtResc, " QpcModule.loadMem: Post qpn %d to dmaEngine, idx %d, pending size %d\n", 
+    HANGU_PRINT(CxtResc, " QpcModule.loadMem: Post qpn 0x%x to dmaEngine, idx %d, pending size %d\n", 
             qpcReq->num, qpcReq->idx, pendStruct.get_size());
     
     PendingElemPtr pElem = pendStruct.front_elem();
-    HANGU_PRINT(CxtResc, " QpcModule.loadMem: qpn %d chnl %d has_dma %d, idx %d\n", 
+    HANGU_PRINT(CxtResc, " QpcModule.loadMem: qpn 0x%x chnl %d has_dma %d, idx %d\n", 
             pElem->qpn, pElem->chnl, pElem->has_dma, pElem->idx);
     assert((pElem->qpn & QPN_MASK) <= QPN_NUM);
 
@@ -337,7 +341,7 @@ HanGuRnic::QpcModule::qpcRspProc() {
     for (auto &item : qpnHashMap) {
         uint32_t   key = item.first;
         QpnInfoPtr val = item.second;
-        HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc: key %d qpn %d reqCnt %d\n\n", 
+        HANGU_PRINT(CxtResc, " QpcModule.qpcRspProc: key %d qpn 0x%x reqCnt %d\n\n", 
                 key, val->qpn, val->reqCnt);
     }
     if (rnic->qpcDmaRdCplFifo.size()) { /* processing dmaRsp pkt */
