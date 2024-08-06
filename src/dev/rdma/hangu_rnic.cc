@@ -218,7 +218,7 @@ HanGuRnic::write(PacketPtr pkt) {
             schedule(doorbellProcEvent, curTick() + clockPeriod());
         }
 
-        HANGU_PRINT(HanGuRnic, " PioEngine.write: qpn %d, opcode %x, num %d\n", 
+        HANGU_PRINT(HanGuRnic, " PioEngine.write: qpn 0x%x, opcode %x, num %d\n", 
                 regs.db.qpn(), regs.db.opcode(), regs.db.num());
     } else if (daddr == 0x20 && pkt->getSize() == sizeof(uint32_t)) { /* latency sync */
         

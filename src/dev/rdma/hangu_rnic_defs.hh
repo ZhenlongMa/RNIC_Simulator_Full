@@ -74,6 +74,8 @@
 #define PREFETCH_WINDOW 256
 #define UNSENT_BATCH_NUM_THRESHOLD 50
 
+#define DMA_DETECT_PERIOD 5000 // nanosecond
+
 // #define ENABLE_QOS
 
 #define PAGE_SIZE_LOG 12

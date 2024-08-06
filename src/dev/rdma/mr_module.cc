@@ -71,7 +71,7 @@ HanGuRnic::MrRescModule::mttReqProcess (uint64_t mttIdx, MrReqRspPtr mrReq) {
 void 
 HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq, uint32_t offset, uint32_t length) {
     
-    HANGU_PRINT(MrResc, " MrRescModule.dmaReqProcess! qpn: 0x%x\n", mrReq->qpn);
+    HANGU_PRINT(MrResc, "dmaReqProcess! qpn: 0x%x\n", mrReq->qpn);
     
     if (mrReq->type == DMA_TYPE_WREQ) {
 
@@ -147,7 +147,7 @@ HanGuRnic::MrRescModule::dmaReqProcess (uint64_t pAddr, MrReqRspPtr mrReq, uint3
 void 
 HanGuRnic::MrRescModule::dmaRrspProcessing() {
 
-    HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing! FIFO size: %d\n", dmaReq2RspFifo.size());
+    HANGU_PRINT(MrResc, "dmaRrspProcessing! FIFO size: %d\n", dmaReq2RspFifo.size());
     
     // assert(!dmaReq2RspFifo.empty());
     // assert(dmaReq2RspFifo.front().second->rdVld);
@@ -173,7 +173,7 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
     }
     tptRsp->type = DMA_TYPE_RRSP;
 
-    HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: tptRsp lkey %d length %d offset %d!\n", 
+    HANGU_PRINT(MrResc, "dmaRrspProcessing: tptRsp lkey %d length %d offset %d!\n", 
                 tptRsp->lkey, tptRsp->length, tptRsp->offset);
 
     // update DMA on fly request count
@@ -223,7 +223,7 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
                 onFlyDescMrRdReqNum--;
                 HANGU_PRINT(MrResc, "MR module receives a complete desc MR response, on-fly request count: %d\n", onFlyDescMrRdReqNum);
                 assert(onFlyDescMrRdReqNum >= 0);
-                HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: size is %d, desc total len is %d!\n", 
+                HANGU_PRINT(MrResc, "dmaRrspProcessing: size is %d, desc total len is %d!\n", 
                         rnic->txdescRspFifo.size(), tptRsp->length);
                 break;
             case MR_RCHNL_RX_DESC:
@@ -235,7 +235,7 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
                 }
                 // rnic->rxdescRspFifo.push(tptRsp);
                 delete tptRsp->rxDescRsp;
-                HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: rnic->rxdescRspFifo.size() is %d!\n", 
+                HANGU_PRINT(MrResc, "dmaRrspProcessing: rnic->rxdescRspFifo.size() is %d!\n", 
                         rnic->rxdescRspFifo.size());
                 break;
             case MR_RCHNL_TX_DATA:
@@ -271,13 +271,13 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
         }
     }
 
-    HANGU_PRINT(MrResc, " MrRescModule.dmaRrspProcessing: out!\n");
+    HANGU_PRINT(MrResc, "dmaRrspProcessing: out!\n");
 
 }
 
 void
 HanGuRnic::MrRescModule::mptRspProcessing() {
-    HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing!\n");
+    HANGU_PRINT(MrResc, "mptRspProcessing!\n");
 
     /* Get mpt resource & MR req pkt from mptCache rsp fifo */
     MptResc *mptResc   = mptCache.rrspFifo.front().first;
@@ -288,11 +288,11 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
 
     assert(mptResc->startVAddr % PAGE_SIZE == 0);
 
-    HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: mptResc->lkey 0x%x, len %d, chnl 0x%x, type 0x%x, offset %d\n", 
+    HANGU_PRINT(MrResc, "mptRspProcessing: mptResc->lkey 0x%x, len %d, chnl 0x%x, type 0x%x, offset %d\n", 
             mptResc->key, reqPkt->length, reqPkt->chnl, reqPkt->type, reqPkt->offset);
     // if (reqPkt->type == 1) {
     //     for (int i = 0; i < reqPkt->length; ++i) {
-    //         HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: data[%d] 0x%x\n", i, reqPkt->data[i]);
+    //         HANGU_PRINT(MrResc, "mptRspProcessing: data[%d] 0x%x\n", i, reqPkt->data[i]);
     //     }
     // }
 
@@ -305,7 +305,7 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     // uint64_t mttIdx = mptResc->mttSeg + ((reqPkt->offset - (mptResc->startVAddr & 0xFFFF)) >> PAGE_SIZE_LOG);
     // reqPkt->offset = reqPkt->offset & 0xFFF;
     // uint64_t mttIdx = mptResc->mttSeg;
-    // HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: reqPkt->offset 0x%x, mptResc->startVAddr 0x%x, mptResc->mttSeg 0x%x, mttIdx 0x%x\n", 
+    // HANGU_PRINT(MrResc, "mptRspProcessing: reqPkt->offset 0x%x, mptResc->startVAddr 0x%x, mptResc->mttSeg 0x%x, mttIdx 0x%x\n", 
     //         reqPkt->offset, mptResc->startVAddr, mptResc->mttSeg, mttIdx);
 
     // Calculate MTT index, modified by mazhenlong
@@ -321,7 +321,7 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     reqPkt->mttRspNum   = 0;
     reqPkt->dmaRspNum   = 0;
     reqPkt->sentPktNum  = 0;
-    HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: reqPkt->offset 0x%x, mptResc->startVAddr 0x%x, mptResc->mttSeg 0x%x, mttIdx 0x%x, mttNum: %d\n", 
+    HANGU_PRINT(MrResc, "mptRspProcessing: reqPkt->offset 0x%x, mptResc->startVAddr 0x%x, mptResc->mttSeg 0x%x, mttIdx 0x%x, mttNum: %d\n", 
         reqPkt->offset, mptResc->startVAddr, mptResc->mttSeg, mttIdx, reqPkt->mttNum);
 
     if (reqPkt->chnl == MR_RCHNL_TX_DESC) {
@@ -346,17 +346,17 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
         }
     }
 
-    HANGU_PRINT(MrResc, " MrRescModule.mptRspProcessing: out!\n");
+    HANGU_PRINT(MrResc, "mptRspProcessing: out!\n");
 }
 
 void
 HanGuRnic::MrRescModule::mttRspProcessing() {
-    // HANGU_PRINT(MrResc, " MrRescModule.mttRspProcessing!\n");
+    // HANGU_PRINT(MrResc, "mttRspProcessing!\n");
     /* Get mttResc from mttCache Rsp fifo */
     MttResc *mttResc   = mttCache.rrspFifo.front().first;
     MrReqRspPtr reqPkt = mttCache.rrspFifo.front().second;
     mttCache.rrspFifo.pop();
-    // HANGU_PRINT(MrResc, " MrRescModule.mttRspProcessing: mttResc->paddr 0x%lx size %d mttCache.rrspFifo %d\n", 
+    // HANGU_PRINT(MrResc, "mttRspProcessing: mttResc->paddr 0x%lx size %d mttCache.rrspFifo %d\n", 
     //         mttResc->pAddr, reqPkt->length, mttCache.rrspFifo.size());
     // HANGU_PRINT(MrResc, "MTT response received! reqPkt->mttRspNum: %d, dmaRspNum: %d\n", 
     //         reqPkt->mttRspNum, reqPkt->dmaRspNum);
@@ -416,7 +416,7 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
         reqPkt->mttRspNum++;
     }
     else {
-        HANGU_PRINT(MrResc, " MrRescModule.mttRspProcessing: finish memory metadata prefetch! qpn: 0x%x\n", reqPkt->qpn);
+        HANGU_PRINT(MrResc, "mttRspProcessing: finish memory metadata prefetch! qpn: 0x%x\n", reqPkt->qpn);
     }
 
     /* Schedule myself */
@@ -426,13 +426,14 @@ HanGuRnic::MrRescModule::mttRspProcessing() {
         }
     }
 
-    HANGU_PRINT(MrResc, " MrRescModule.mttRspProcessing: out!\n");
+    HANGU_PRINT(MrResc, "mttRspProcessing: out!\n");
 }
 
 void
 HanGuRnic::MrRescModule::transReqProcessing() {
 
-    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing!\n");
+    HANGU_PRINT(MrResc, "transReqProcessing! desc: %d, cq: %d, data: %d, pfetch: %d\n", 
+        rnic->descReqFifo.size(), rnic->cqWreqFifo.size(), rnic->dataReqFifo.size(), rnic->mptPrefetchQue.size());
 
     uint8_t CHNL_NUM = 4;
     bool isEmpty[CHNL_NUM];
@@ -441,8 +442,8 @@ HanGuRnic::MrRescModule::transReqProcessing() {
     isEmpty[2] = rnic->dataReqFifo.empty();
     isEmpty[3] = rnic->mptPrefetchQue.empty();
     
-    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing isEmpty[0] %d, isEmpty[1] %d, isEmpty[2] %d\n", 
-            isEmpty[0], isEmpty[1], isEmpty[2]);
+    // HANGU_PRINT(MrResc, "transReqProcessing isEmpty[0] %d, isEmpty[1] %d, isEmpty[2] %d\n", 
+    //         isEmpty[0], isEmpty[1], isEmpty[2]);
     
     MrReqRspPtr mrReq;
     for (uint8_t cnt = 0; cnt < CHNL_NUM; ++cnt) {
@@ -453,14 +454,14 @@ HanGuRnic::MrRescModule::transReqProcessing() {
                     rnic->descReqFifo.pop();
                     onFlyDescMrRdReqNum++;
                     assert(onFlyDescMrRdReqNum > 0);
-                    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: Desc read request! on-fly request count: %d\n", 
+                    HANGU_PRINT(MrResc, "transReqProcessing: Desc read request! on-fly request count: %d\n", 
                         onFlyDescMrRdReqNum);
                     assert(mrReq->type == DMA_TYPE_RREQ);
                     break;
                 case 1:
                     mrReq = rnic->cqWreqFifo.front();
                     rnic->cqWreqFifo.pop();
-                    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: Completion Queue write request, offset %d\n", mrReq->offset);
+                    HANGU_PRINT(MrResc, "transReqProcessing: CQ write request, offset %d\n", mrReq->offset);
                     break;
                 case 2:
                     mrReq = rnic->dataReqFifo.front();
@@ -470,12 +471,12 @@ HanGuRnic::MrRescModule::transReqProcessing() {
                         assert(onFlyDataMrRdReqNum > 0);
                         HANGU_PRINT(MrResc, "MR module receive a data MR request! on-fly request count: %d\n", onFlyDataMrRdReqNum);
                     }
-                    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: Data read/Write request! data addr 0x%lx\n", (uintptr_t)(mrReq->data));
+                    HANGU_PRINT(MrResc, "transReqProcessing: Data read/Write request! data addr 0x%lx\n", (uintptr_t)(mrReq->data));
                     break;
                 case 3:
                     mrReq = rnic->mptPrefetchQue.front();
                     rnic->mptPrefetchQue.pop();
-                    HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: MPT prefetch request! lkey: 0x%lx, qpn: 0x%x\n", mrReq->lkey, mrReq->qpn);
+                    HANGU_PRINT(MrResc, "transReqProcessing: MPT prefetch request! lkey: 0x%lx, qpn: 0x%x\n", mrReq->lkey, mrReq->qpn);
                     break;
                 default:
                     panic("Illegal Channel!\n");
@@ -483,10 +484,10 @@ HanGuRnic::MrRescModule::transReqProcessing() {
             }
 
             // for (int i = 0; i < mrReq->length; ++i) {
-            //     HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: data[%d] 0x%x\n", i, (mrReq->data)[i]);
+            //     HANGU_PRINT(MrResc, "transReqProcessing: data[%d] 0x%x\n", i, (mrReq->data)[i]);
             // }
 
-            HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: lkey 0x%x, offset 0x%x, length %d, type: %d\n", 
+            HANGU_PRINT(MrResc, "transReqProcessing: lkey 0x%x, offset 0x%x, length %d, type: %d\n", 
                         mrReq->lkey, mrReq->offset, mrReq->length, mrReq->type);
             assert(mrReq->type == DMA_TYPE_WREQ || mrReq->type == DMA_TYPE_RREQ);
 
@@ -507,7 +508,7 @@ HanGuRnic::MrRescModule::transReqProcessing() {
             /* Read MPT entry */
             mptReqProcess(mrReq);
 
-            HANGU_PRINT(MrResc, " MrRescModule.transReqProcessing: out!\n");
+            HANGU_PRINT(MrResc, "transReqProcessing: out!\n");
             
             return;
         } else {

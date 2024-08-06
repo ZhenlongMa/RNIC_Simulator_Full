@@ -303,9 +303,9 @@ HanGuRnic::DmaEngine::dmaChnlProc () {
 
 void HanGuRnic::DmaEngine::detectRate() {
     rnic->schedule(detectRateEvent, curTick() + rnic->clockPeriod() * DMA_DETECT_PERIOD);
-    HANGU_PRINT(DmaEngine, " DMAEngine.detectRate: read byte: %d, rate : %.2f Gbps! write byte: %d, rate : %.2f Gbps!\n", 
-        (float)readByte * 1000000000 / DMA_DETECT_PERIOD / 1024 / 1024 / 1024 * 8,
-        (float)writeByte * 1000000000 / DMA_DETECT_PERIOD / 1024 / 1024 / 1024 * 8);
+    HANGU_PRINT(DmaEngine, "detectRate: read byte: %d, rate: %.2f Gbps! write byte: %d, rate : %.2f Gbps!\n", 
+        readByte, (float)readByte * 1000000000 / DMA_DETECT_PERIOD / 1024 / 1024 / 1024 * 8,
+        writeByte, (float)writeByte * 1000000000 / DMA_DETECT_PERIOD / 1024 / 1024 / 1024 * 8);
     readByte = 0;
     writeByte = 0;
 }

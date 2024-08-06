@@ -258,6 +258,7 @@ void HanGuRnic::DescScheduler::wqeProc() {
                     qpStatus->qpn, qpStatus->fetch_offset, desc->len, batchSize, descNum, groupTable[qpStatus->group_id], qpStatus->weight);
                 HANGU_PRINT(DescScheduler, "ready to split WQE! qpn: 0x%x, tail pointer: %d, head pointer: %d, fetch offset: 0x%x\n", 
                     qpStatus->qpn, qpStatus->tail_ptr, qpStatus->head_ptr, qpStatus->fetch_offset);
+                assert(desc->len <= batchSize); // temp check to avoid message overlong in connection establishment
                 assert(qpStatus->tail_ptr < qpStatus->head_ptr);
                 assert(qpStatus->fetch_offset < desc->len);
                 TxDescPtr subDesc = make_shared<TxDesc>(desc);
