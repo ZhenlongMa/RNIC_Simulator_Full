@@ -4,7 +4,7 @@ import sys
 
 SERVER_LID  = 10
 
-NUM_CPUS  = 1
+NUM_CPUS  = 8
 CPU_CLK   = "4GHz"
 EN_SPEED  = "100Gbps"
 PCI_SPEED = "128Gbps"
@@ -79,7 +79,11 @@ def main():
     else:
         testcase = sys.argv[1]
 
-    params = Param(2, 100, 64, WRITE, testcase)
+    node_num = 2
+    qpc_cache_cap = 512
+    reorder_cap = 512
+
+    params = Param(node_num, qpc_cache_cap, reorder_cap, WRITE, testcase)
 
     num_nodes = params.num_nodes
     svr_lid = SERVER_LID
