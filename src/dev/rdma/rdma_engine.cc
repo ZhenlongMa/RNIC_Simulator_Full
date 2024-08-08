@@ -265,30 +265,30 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
         /* Post Data read request to Memory Region Module (TPT) */
         MrReqRspPtr rreq;
         switch(desc->opcode) {
-        case OPCODE_SEND :
-        case OPCODE_RDMA_WRITE:
-            /* Post Data read request to Data Read Request FIFO.
-            * Fetch data from host memory */
-            // HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: Push Data read request to MrRescModule.transReqProcessing: len %d vaddr 0x%x\n", desc->len, desc->lVaddr);
-            rreq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DATA,
-                    desc->lkey, desc->len, (uint32_t)(desc->lVaddr&0xFFF), dp2rg->qpc->srcQpn);
-            rreq->rdDataRsp = txPkt->data + txPkt->length; /* Address Rsp data (from host memory) should be located */
-            rnic->dataReqFifo.push(rreq);
-            if (!rnic->mrRescModule.transReqEvent.scheduled()) {
-                rnic->schedule(rnic->mrRescModule.transReqEvent, curTick() + rnic->clockPeriod());
-            }
+            case OPCODE_SEND :
+            case OPCODE_RDMA_WRITE:
+                /* Post Data read request to Data Read Request FIFO.
+                * Fetch data from host memory */
+                // HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing: Push Data read request to MrRescModule.transReqProcessing: len %d vaddr 0x%x\n", desc->len, desc->lVaddr);
+                rreq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_DATA,
+                        desc->lkey, desc->len, (uint32_t)(desc->lVaddr&0xFFF), dp2rg->qpc->srcQpn);
+                rreq->rdDataRsp = txPkt->data + txPkt->length; /* Address Rsp data (from host memory) should be located */
+                rnic->dataReqFifo.push(rreq);
+                if (!rnic->mrRescModule.transReqEvent.scheduled()) {
+                    rnic->schedule(rnic->mrRescModule.transReqEvent, curTick() + rnic->clockPeriod());
+                }
 
-            break;
-        case OPCODE_RDMA_READ:
-            /* Schedule rg&rru to start Processing RDMA read. 
-            * Cause RDMA read don't need to read data from host memory */
-            if (!rgrrEvent.scheduled()) { /* Schedule RdmaEngine.rgrrProcessing */
-                rnic->schedule(rgrrEvent, curTick() + rnic->clockPeriod());
-            }
-            break;
-        default:
-            panic("Error! Post wrong descriptor type to send queue. desc->opcode %d\n", desc->opcode);
-            break;
+                break;
+            case OPCODE_RDMA_READ:
+                /* Schedule rg&rru to start Processing RDMA read. 
+                * Cause RDMA read don't need to read data from host memory */
+                if (!rgrrEvent.scheduled()) { /* Schedule RdmaEngine.rgrrProcessing */
+                    rnic->schedule(rgrrEvent, curTick() + rnic->clockPeriod());
+                }
+                break;
+            default:
+                panic("Error! Post wrong descriptor type to send queue. desc->opcode %d\n", desc->opcode);
+                break;
         }
     }
     else
@@ -531,8 +531,7 @@ HanGuRnic::RdmaEngine::rguProcessing () {
     EthPacketPtr txPkt = tmp->txPkt;
     dp2rgFifo.pop();
 
-    if (rnic->descScheduler.qpStatusTable[qpc->srcQpn]->type == LAT_QP)
-    {
+    if (rnic->descScheduler.qpStatusTable[qpc->srcQpn]->type == LAT_QP) {
         HANGU_PRINT(RdmaEngine, "data received! qpn: 0x%x, curtick: %ld\n", qpc->srcQpn, curTick());
     }
     
@@ -814,6 +813,11 @@ void HanGuRnic::RdmaEngine::setRdmaHead(TxDescPtr desc, QpcResc* qpc, uint8_t* p
                 ((RETH *) pktPtr)->rVaddr_l, ((RETH *) pktPtr)->rVaddr_h, 
                 ((RETH *) pktPtr)->rKey, ((RETH *) pktPtr)->len);
     } 
+    else if (qpc->flag == 1) { // remote prefetch
+        HANGU_PRINT(RdmaEngine, "rguProcessing: prefetch packet!\n");
+        ((BTH *) pktPtr)->op_destQpn = 0xffffffff;
+        needAck = 0;
+    }
     else  {
         panic("Unsupported opcode and QP type combination, "
                 "opcode: %d, type: %d\n", desc->opcode, qpc->qpType);
@@ -886,7 +890,7 @@ HanGuRnic::RdmaEngine::scuProcessing () {
 
     assert(rnic->txCqcRspFifo.size());
     
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.scuProcessing: cq offset: %d, cq lkey %d, qpn %d, cqn %d, transtype: %d\n", 
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.scuProcessing: cq offset: %d, cq lkey %d, qpn 0x%x, cqn 0x%x, transtype: %d\n", 
             rnic->txCqcRspFifo.front()->txCqcRsp->offset, 
             rnic->txCqcRspFifo.front()->txCqcRsp->lkey, 
             rg2scFifo.front()->qpn, rg2scFifo.front()->cqn, rg2scFifo.front()->transType);
