@@ -466,6 +466,7 @@ const uint8_t CXT_RRSP_CQ = 0x05;
 const uint8_t CXT_RREQ_SQ = 0x06; /* read sq addr */
 const uint8_t CXT_CREQ_QP = 0x07; /* create request */
 const uint8_t CXT_PFCH_QP = 0x08;
+const uint8_t CXT_PFCH_CQ = 0x09;
 const uint8_t CXT_CHNL_TX = 0x01;
 const uint8_t CXT_CHNL_RX = 0x02;
 

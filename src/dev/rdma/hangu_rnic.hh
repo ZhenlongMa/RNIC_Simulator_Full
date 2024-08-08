@@ -99,6 +99,7 @@ class HanGuRnic : public RdmaNic {
          */
         std::queue<CxtReqRspPtr> txCqcReqFifo;
         std::queue<CxtReqRspPtr> rxCqcReqFifo;
+        std::queue<CxtReqRspPtr> txCqcPfetchFifo;
 
         std::queue<CxtReqRspPtr> txCqcRspFifo; /* CqcModule -(update rsp)-> scu */
         std::queue<CxtReqRspPtr> rxCqcRspFifo; /* CqcModule -(update rsp)-> rcu */

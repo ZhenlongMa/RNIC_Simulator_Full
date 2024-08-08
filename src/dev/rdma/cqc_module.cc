@@ -101,10 +101,11 @@ HanGuRnic::CqcModule::cqcReqProc() {
 
     HANGU_PRINT(CxtResc, " CqcModule.cqcReqProc!\n");
 
-    uint8_t CHNL_NUM = 2;
+    uint8_t CHNL_NUM = 3;
     bool isEmpty[CHNL_NUM];
     isEmpty[0] = rnic->txCqcReqFifo.empty();
     isEmpty[1] = rnic->rxCqcReqFifo.empty();
+    isEmpty[3] = rnic->txCqcPfetchFifo.empty();
 
     CxtReqRspPtr cqcReq;
     for (uint8_t cnt = 0; cnt < CHNL_NUM; ++cnt) {
