@@ -64,6 +64,11 @@ void HanGuRnic::RescPrefetcher::prefetchMemProc() {
     }
 }
 
+// void HanGuRnic::RescPrefetcher::prefetchRemote() {
+//     uint32_t remoteQpn = rNic->remotePrefetchInfoQue.front();
+//     dp2rgFifo.push(prefetch2rg);
+// }
+
 void HanGuRnic::RescPrefetcher::triggerPrefetch() {
     if ((rNic->descScheduler.lowPriorityQpnQue.size() < prefetchQue.size() + PREFETCH_WINDOW) && 
         prefetchQue.size() != 0 &&

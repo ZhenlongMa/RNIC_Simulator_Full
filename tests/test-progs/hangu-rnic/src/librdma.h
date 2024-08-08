@@ -130,8 +130,10 @@ struct rdma_cr {
     uint32_t src_qpn; /* client's QPN */
     uint32_t dst_qpn; /* server's QPN */
 
-    uint32_t rkey[32]; /* client's or server's MR rkey */
-    uint64_t raddr[32]; /* client's or server's remote Addr */
+    // uint32_t rkey[32]; /* client's or server's MR rkey */
+    // uint64_t raddr[32]; /* client's or server's remote Addr */
+    uint32_t rkey; /* client's or server's MR rkey */
+    uint64_t raddr; /* client's or server's remote Addr */
     uint32_t mr_num;
 
     /* Valid in RC trans type */
