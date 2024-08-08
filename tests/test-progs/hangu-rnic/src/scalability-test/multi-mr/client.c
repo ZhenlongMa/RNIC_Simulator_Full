@@ -36,33 +36,46 @@ int clt_update_qps(struct rdma_resc *resc, uint16_t svr_lid) {
 int clt_update_info(struct rdma_resc *resc, uint16_t svr_lid) {
     RDMA_PRINT(Client, "start clt_update_info\n");
     int num = 0;
+    int recv_num;
     struct rdma_cr *cr_snd;
-    uint16_t *dest_info = (uint16_t *)malloc(sizeof(uint16_t));
+    uint16_t *dest_info = (uint16_t *)malloc(sizeof(uint16_t) * resc->num_qp);
     struct rdma_cr *cr_rcv;
 
-    cr_snd = (struct rdma_cr *)malloc(sizeof(struct rdma_cr));
+    cr_snd = (struct rdma_cr *)malloc(sizeof(struct rdma_cr) * resc->num_qp);
     memset(cr_snd, 0, sizeof(struct rdma_cr));
 
-    cr_snd->flag    = CR_TYPE_REQ;
-    cr_snd->src_lid = resc->ctx->lid;
-    cr_snd->rkey    = resc->mr[0]->lkey; /* only use one mr in our design */
-    cr_snd->raddr   = (uintptr_t)resc->mr[0]->addr; /* only use one mr in our design */
-    // cr_snd->src_qpn = 
-    // cr_snd->dst_qpn = 
-    dest_info[0]    = svr_lid;
-    rdma_connect(resc, cr_snd, dest_info, 1); /* post connection request to server (QP0) */
+    for (int i = 0; i < resc->num_qp; i++) {
+        cr_snd[i]->flag             = CR_TYPE_REQ;
+        cr_snd[i]->src_lid          = resc->ctx->lid;
+        for (int j = 0; j < mr_per_qp; j++) {
+            cr_snd[i]->rkey[j]      = resc->mr[i * mr_per_qp + j]->lkey;
+            cr_snd[i]->raddr[j]     = (uintptr_t)resc->mr[i * mr_per_qp + j]->addr;
+        }
+        cr_snd[i]->src_qpn = resc->qp[i]->qp_num;
+        dest_info[i]    = svr_lid;
+    }
+    rdma_connect(resc, cr_snd, dest_info, resc->num_qp); /* post connection request to server (QP0) */
     RDMA_PRINT(Client, "clt_update_info: send raddr %ld, rkey 0x%x\n", cr_snd->raddr, cr_snd->rkey);
 
-    while (num == 0) {
-        cr_rcv = rdma_listen(resc, &num); /* listen connection request from client (QP0) */
-    }
-    RDMA_PRINT(Client, "clt_update_info: rdma_listen end, recved %d CR data\n", num);
+    // while (num == 0) {
+    //     cr_rcv = rdma_listen(resc, &num); /* listen connection request from client (QP0) */
+    // }
+    // RDMA_PRINT(Client, "clt_update_info: rdma_listen end, recved %d CR data\n", num);
 
-    /* get remote addr information */
-    resc->rinfo->dlid  = svr_lid;
-    resc->rinfo->raddr = cr_rcv->raddr;
-    resc->rinfo->rkey  = cr_rcv->rkey;
-    RDMA_PRINT(Client, "clt_update_info: raddr %ld, rkey 0x%x\n", resc->rinfo->raddr, resc->rinfo->rkey);
+    // /* get remote addr information */
+    // resc->rinfo->dlid  = svr_lid;
+    // resc->rinfo->raddr = cr_rcv->raddr;
+    // resc->rinfo->rkey  = cr_rcv->rkey;
+    // RDMA_PRINT(Client, "clt_update_info: raddr %ld, rkey 0x%x\n", resc->rinfo->raddr, resc->rinfo->rkey);
+
+    while (num < resc->num_qp) {
+        while (recv_num == 0) {
+            cr_rcv = rdma_listen(resc, &recv_num);
+            resc->rinfo->dlid = svr_lid;
+            resc->
+        }
+        num += recv_num;
+    }
 
     /* modify qp in client side */
     clt_update_qps(resc, svr_lid);
@@ -179,12 +192,14 @@ int main (int argc, char **argv) {
     // int group_num = 4;
     int *group_qp_num = (int *)malloc(sizeof(int) * group_num);
     int *group_weight = (int *)malloc(sizeof(int) * group_num);
+    int *group_mr_num = (int *)malloc(sizeof(int) * group_num);
     struct rdma_resc **grp_resc = (struct rdma_resc**)malloc(sizeof(struct rdma_resc *) * group_num);
 
     for (int i = 0; i < group_num; i++) {
-        group_qp_num[i] = qp_pre_group;
+        group_qp_num[i] = qp_per_group;
+        group_mr_num[i] = mr_per_group;
         group_weight[i] = 10;
-        grp_resc[i] = rdma_resc_init(ib_context, num_mr, num_cq, group_qp_num[i], llid, 1);
+        grp_resc[i] = rdma_resc_init(ib_context, group_mr_num[i], num_cq, group_qp_num[i], llid, 1);
         RDMA_PRINT(Client, "group[%d] resouce initialized! i: %d, cpu id: %d\n", grp_resc[i]->qos_group[0]->id, i, cpu_id);
     }
 

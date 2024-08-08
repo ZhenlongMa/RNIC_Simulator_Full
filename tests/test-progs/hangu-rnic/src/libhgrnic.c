@@ -685,10 +685,10 @@ int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint
     free(args);
 }
 
-void update_all_group_granularity(struct ibv_context *context) {
-    struct kfd_ioctl_set_group_args *args = (struct kfd_ioctl_set_group_args *)malloc(sizeof(struct kfd_ioctl_set_group_args));
-    struct hghca_context *dvr = (struct hghca_context *)context->dvr;
-    args->group_num = 0;
-    write_cmd(dvr->fd, HGKFD_IOC_SET_GROUP, args);
-    free(args);
-}
+// void update_all_group_granularity(struct ibv_context *context) {
+//     struct kfd_ioctl_set_group_args *args = (struct kfd_ioctl_set_group_args *)malloc(sizeof(struct kfd_ioctl_set_group_args));
+//     struct hghca_context *dvr = (struct hghca_context *)context->dvr;
+//     args->group_num = 0;
+//     write_cmd(dvr->fd, HGKFD_IOC_SET_GROUP, args);
+//     free(args);
+// }
