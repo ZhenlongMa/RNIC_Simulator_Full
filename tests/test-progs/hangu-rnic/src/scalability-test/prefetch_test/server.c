@@ -191,6 +191,7 @@ double throughput_test(struct ibv_context *ctx, struct rdma_resc **grp_resc, uin
             for (int j = 0; j < resc->num_qp; ++j) {
                 ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
                 ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
+                ibv_post_send(resc->ctx, elephant_wqe_list, resc->qp[i * resc->num_qp + j], elephant_wr_num);
             }
         }
     }

@@ -166,7 +166,7 @@ def config_rnic(system, options, node_num):
     if mac_addr == svr_mac:
         # system.platform.rdma_nic.mpt_cache_num = 8192
         # system.platform.rdma_nic.mtt_cache_num = 16384
-        system.platform.rdma_nic.mpt_cache_num = 2048
+        system.platform.rdma_nic.mpt_cache_num = 4096
         system.platform.rdma_nic.mtt_cache_num = 16384
         system.platform.rdma_nic.qpc_cache_cap = options.qpc_cache_cap
     else :
