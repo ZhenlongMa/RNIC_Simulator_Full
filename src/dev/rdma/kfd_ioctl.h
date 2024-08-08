@@ -173,7 +173,7 @@ struct kfd_ioctl_write_qpc_args {
     uint32_t qkey   [MAX_QPC_BATCH]; /* Queue key, used for UD incomming data validation */
     uint8_t  indicator [MAX_QPC_BATCH];
     uint8_t  weight    [MAX_QPC_BATCH];
-    uint8_t  groupID   [MAX_QPC_BATCH];
+    uint16_t groupID   [MAX_QPC_BATCH];
 };
 
 struct kfd_ioctl_get_time_args {
@@ -184,23 +184,23 @@ struct kfd_ioctl_get_time_args {
 
 struct kfd_ioctl_set_group_args {
     /* Input */
-    uint8_t group_num;
-    uint8_t group_id[MAX_GROUP_NUM];
+    uint16_t group_num;
+    uint16_t group_id[MAX_GROUP_NUM];
     // uint16_t granularity[MAX_GROUP_NUM];
     uint16_t weight[MAX_GROUP_NUM];
 };
 
 struct kfd_ioctl_alloc_group_args {
     /* Input */
-    uint8_t group_num;
+    uint16_t group_num;
     
     /* Output */
-    uint8_t group_id[MAX_GROUP_NUM];
+    uint16_t group_id[MAX_GROUP_NUM];
 };
 
 struct kfd_ioctl_update_group_args {
     /* Input */
-    uint8_t group_id;
+    uint16_t group_id;
     uint16_t granularity;
 };
 

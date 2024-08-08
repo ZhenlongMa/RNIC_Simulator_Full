@@ -176,8 +176,8 @@ class HanGuDriver final : public EmulatedDriver {
     void initQoS(PortProxy& portProxy, Process* process);
     void updateN(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_qp_args> &args);
     
-    std::unordered_map<uint32_t, uint8_t> qpGroup;
-    std::unordered_map<uint8_t, struct groupUnit> groupTable;
+    // std::unordered_map<uint32_t, uint8_t> qpGroup;
+    std::unordered_map<uint16_t, struct groupUnit> groupTable;
     Addr qosShareParamAddr;
     const int NOffset                   = 0;
     const int groupNumOffset            = 16;

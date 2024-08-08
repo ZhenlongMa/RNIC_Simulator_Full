@@ -373,7 +373,7 @@ class HanGuRnic : public RdmaNic {
                 std::queue<uint32_t> lowPriorityQpnQue;
                 std::queue<std::pair<uint32_t, QPStatusPtr>> wqeFetchInfoQue;
                 // std::queue<std::pair<uint32_t, uint32_t>> wqeFetchInfoQue;
-                std::unordered_map<uint8_t, uint16_t> groupTable;
+                std::unordered_map<uint16_t, uint16_t> groupTable;
                 std::unordered_map<uint32_t, QPStatusPtr> qpStatusTable;
                 std::string name() {
                     return _name;
@@ -502,6 +502,7 @@ class HanGuRnic : public RdmaNic {
 
                 /* Cache replace scheme, return key in cache */
                 uint32_t replaceScheme();
+                uint32_t lruReplaceScheme();
 
                 // Write evited elem back to memory
                 void storeReq(uint64_t addr, T *resc);
@@ -519,6 +520,8 @@ class HanGuRnic : public RdmaNic {
 
                 int hitNum;
                 int missNum;
+                int maxParam;
+                std::unordered_map<uint32_t, uint64_t> replaceParam;
 
             public:
 
@@ -527,11 +530,14 @@ class HanGuRnic : public RdmaNic {
                     _name(n),
                     capacity(cacheSize),
                     readProcEvent([this]{ readProc(); }, n),
-                    fetchCplEvent([this]{ fetchRsp(); }, n) { 
+                    fetchCplEvent([this]{ fetchRsp(); }, n),
+                    hitNum(0),
+                    missNum(0),
+                    maxParam(0) { 
                     icmPage = new uint64_t [ICM_MAX_PAGE_NUM]; 
                     rescSz = sizeof(T); 
-                    hitNum = 0;
-                    missNum = 0;
+                    // hitNum = 0;
+                    // missNum = 0;
                 }
 
                 /* Set base address of ICM space */
@@ -1112,6 +1118,10 @@ class HanGuRnic : public RdmaNic {
                 /* Channel selector for arbiter in read side and write side */
                 uint8_t readIdx, writeIdx;
 
+                uint64_t readByte;
+                uint64_t writeByte;
+                bool startDetect;
+
             public:
 
                 DmaEngine (HanGuRnic *i, const std::string n) 
@@ -1119,11 +1129,15 @@ class HanGuRnic : public RdmaNic {
                     _name(n),
                     readIdx(0),
                     writeIdx(0),
+                    readByte(0),
+                    writeByte(0),
+                    startDetect(false),
                     dmaWriteCplEvent([this]{ dmaWriteCplProcessing(); }, n),
                     dmaReadCplEvent([this]{ dmaReadCplProcessing(); }, n),
                     dmaChnlProcEvent([this]{ dmaChnlProc(); }, n),
                     dmaWriteEvent([this]{ dmaWriteProcessing();}, n),
-                    dmaReadEvent([this]{ dmaReadProcessing();}, n) { }
+                    dmaReadEvent([this]{ dmaReadProcessing();}, n),
+                    detectRateEvent([this]{detectRate();}, n) { }
 
 
                 std::queue<DmaReqPtr> dmaWrReq2RspFifo;
@@ -1140,12 +1154,14 @@ class HanGuRnic : public RdmaNic {
                 std::queue<DmaReqPtr> dmaRReqFifo;
                 std::queue<DmaReqPtr> dmaWReqFifo;
 
-
                 void dmaWriteProcessing();
                 EventFunctionWrapper dmaWriteEvent;
 
                 void dmaReadProcessing();
                 EventFunctionWrapper dmaReadEvent;
+
+                void detectRate();
+                EventFunctionWrapper detectRateEvent;
 
                 std::string name() { return _name; }
 

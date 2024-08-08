@@ -236,7 +236,7 @@ struct ibv_qp {
 
     uint8_t weight;
     enum perf_indicator indicator;
-    uint8_t group_id;
+    uint16_t group_id;
 };
 
 
@@ -382,7 +382,7 @@ struct hghca_cq {
 
 struct ibv_qos_group
 {
-    uint8_t id;
+    uint16_t id;
     uint8_t weight;
     // uint16_t granularity;
     struct ibv_qp **qp;
@@ -410,7 +410,7 @@ int cpu_sync(struct ibv_context *context);
 
 struct ibv_qos_group* create_qos_group(struct ibv_context *context, int weight);
 int set_qos_group(struct ibv_context *context, struct ibv_qos_group *group, uint8_t group_num, uint16_t *weight);
-void update_all_group_granularity(struct ibv_context *context);
+// void update_all_group_granularity(struct ibv_context *context);
 
 void trans_wait(struct ibv_context *context);
 
