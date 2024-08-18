@@ -588,6 +588,7 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
     /* put QpcResc into mailbox */
     HanGuRnicDef::GroupInfo group[MAX_QPC_BATCH];
     memset(group, 0, sizeof(HanGuRnicDef::GroupInfo) * args->batch_size);
+    assert(args->batch_size < MAX_QPC_BATCH);
     int setGroupNum = 0;
     std::unordered_map<uint8_t, uint8_t> setGroup;
     uint32_t groupWeightSum;

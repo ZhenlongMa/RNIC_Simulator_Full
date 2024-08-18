@@ -180,9 +180,11 @@ int main (int argc, char **argv) {
     struct rdma_resc **grp_resc = (struct rdma_resc**)malloc(sizeof(struct rdma_resc *) * group_num);
 
     for (int i = 0; i < group_num; i++) {
-        group_qp_num[i] = qp_pre_group;
+        group_qp_num[i] = qp_per_group;
         group_weight[i] = 10;
         grp_resc[i] = rdma_resc_init(ib_context, num_mr, num_cq, group_qp_num[i], llid, 1);
+        struct ibv_qos_group *group = create_comm_group(ib_context, group_weight[i]);
+        grp_resc[i]->qos_group[0] = group;
         RDMA_PRINT(Client, "group[%d] resouce initialized! i: %d, cpu id: %d\n", grp_resc[i]->qos_group[0]->id, i, cpu_id);
     }
 
