@@ -667,6 +667,9 @@ class HanGuRnic : public RdmaNic {
                 std::string _name;
 
                 uint8_t chnlIdx;
+
+                std::unordered_map<uint32_t, MptResc *> cqMpt;
+                std::queue<std::pair<MrReqRspPtr, MptResc *> cqMptRspQue;
                 
                 /* Temp store dma read request pkt until read rsp is back */
                 std::queue<std::pair<MrReqRspPtr, DmaReqPtr> > dmaReq2RspFifo;
