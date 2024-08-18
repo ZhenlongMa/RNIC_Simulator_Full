@@ -385,18 +385,18 @@ void HanGuRnic::RescCache<T, S>::readProc() {
     } else {
         panic("readProc: mismatch! capacity %d size %d\n", capacity, cache.size());
     }
-    if (std::is_same<T, MptResc>::value) {
-        HANGU_PRINT(RescCache, "readProc: MPT hitNum: %d, missNum: %d, key: 0x%x\n", hitNum, missNum, rescIdx);
-    }
-    else if (std::is_same<T, MttResc>::value) {
-        HANGU_PRINT(RescCache, "readProc: MTT hitNum: %d, missNum: %d\n", hitNum, missNum);
-    }
-    else if (std::is_same<T, CqcResc>::value) {
-        HANGU_PRINT(RescCache, "readProc: CQC hitNum: %d, missNum: %d\n", hitNum, missNum);
-    }
-    else {
-        panic("invalid type!\n");
-    }
+    // if (std::is_same<T, MptResc>::value) {
+    //     HANGU_PRINT(RescCache, "readProc: MPT hitNum: %d, missNum: %d, key: 0x%x\n", hitNum, missNum, rescIdx);
+    // }
+    // else if (std::is_same<T, MttResc>::value) {
+    //     HANGU_PRINT(RescCache, "readProc: MTT hitNum: %d, missNum: %d\n", hitNum, missNum);
+    // }
+    // else if (std::is_same<T, CqcResc>::value) {
+    //     HANGU_PRINT(RescCache, "readProc: CQC hitNum: %d, missNum: %d\n", hitNum, missNum);
+    // }
+    // else {
+    //     panic("invalid type!\n");
+    // }
     HANGU_PRINT(RescCache, "readProc: out! capacity: %d, size: %d\n", capacity, cache.size());
 }
 
