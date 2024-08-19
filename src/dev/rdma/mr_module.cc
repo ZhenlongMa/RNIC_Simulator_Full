@@ -62,7 +62,8 @@ HanGuRnic::MrRescModule::mptReqProcess (MrReqRspPtr mrReq) {
         mptCache.rescRead(mrReq->lkey, &mptRspEvent, mrReq);
     }
     else {
-        cqMptRspQue.push(mrReq, cqMpt[mrReq->lkey]);
+        HANGU_PRINT(MrResc, "CQ MPT!\n");
+        cqMptRspQue.emplace(mrReq, cqMpt[mrReq->lkey]);
         if (!mptRspEvent.scheduled()) {
             rnic->schedule(mptRspEvent, curTick() + rnic->clockPeriod());
         }
@@ -294,21 +295,21 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     assert(mptCache.rrspFifo.size() || cqMptRspQue.size());
     /* Get mpt resource & MR req pkt from mptCache rsp fifo */
     if (cqMptRspQue.size() != 0) {
+        reqPkt = cqMptRspQue.front().first;
+        mptResc = cqMptRspQue.front().second;
+        cqMptRspQue.pop();
+    }
+    else {
         mptResc = mptCache.rrspFifo.front().first;
         reqPkt = mptCache.rrspFifo.front().second;
         mptCache.rrspFifo.pop();
-    }
-    else {
-        mptResc = cqMptRspQue.front().first;
-        reqPkt = cqMptRspQue.front().second;
-        cqMptRspQue.pop();
     }
 
     reqPkt->mpt = mptResc;
 
     // cache all CQ MPT
     if (reqPkt->chnl == TPT_WCHNL_TX_CQUE) {
-        cqMpt[mpt->lkey] = mptResc;
+        cqMpt[mptResc->key] = mptResc;
     }
 
     assert(mptResc->startVAddr % PAGE_SIZE == 0);
