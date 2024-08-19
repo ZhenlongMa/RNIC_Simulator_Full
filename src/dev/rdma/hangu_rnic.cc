@@ -307,6 +307,7 @@ HanGuRnic::mboxFetchCpl () {
             MptResc *tmp = (((MptResc *)mboxBuf) + i);
             HANGU_PRINT(CcuEngine, " CcuEngine.CEU.mboxFetchCpl: WRITE_MPT command! mpt_index 0x%x tmp_addr 0x%lx\n", tmp->key, (uintptr_t)tmp);
             mrRescModule.mptCache.rescWrite(tmp->key, tmp);
+            mrRescModule.cqMpt[tmp->key] = tmp;
         }
         break;
       case WRITE_MTT:

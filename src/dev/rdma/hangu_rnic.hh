@@ -718,6 +718,9 @@ class HanGuRnic : public RdmaNic {
                 RescCache<MptResc, MrReqRspPtr> mptCache;
                 RescCache<MttResc, MrReqRspPtr> mttCache;
 
+                std::unordered_map<uint32_t, MptResc *> cqMpt;
+                std::queue<std::pair<MrReqRspPtr, MptResc *>> cqMptRspQue;
+
                 std::string name() { return _name; }
             
         };
