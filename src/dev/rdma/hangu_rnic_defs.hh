@@ -76,6 +76,8 @@
 
 #define DMA_DETECT_PERIOD 5000 // nanosecond
 
+#define CACHE_ALL_CQ_MPT
+
 // #define ENABLE_QOS
 
 #define PAGE_SIZE_LOG 12

@@ -720,6 +720,8 @@ class HanGuRnic : public RdmaNic {
 
                 std::unordered_map<uint32_t, MptResc *> cqMpt;
                 std::queue<std::pair<MrReqRspPtr, MptResc *>> cqMptRspQue;
+                std::unordered_map<uint32_t, MptResc *> qpMpt;
+                std::queue<std::pair<MrReqRspPtr, MptResc *>> qpMptRspQue;
 
                 std::string name() { return _name; }
             
