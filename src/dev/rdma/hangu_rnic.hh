@@ -258,6 +258,8 @@ class HanGuRnic : public RdmaNic {
                 std::queue<CqDescPtr> rp2rcFifo;
 
                 int onFlyPacketNum;
+                uint64_t sauSendByte;
+                bool startDetect;
 
             public:
 
@@ -272,6 +274,8 @@ class HanGuRnic : public RdmaNic {
                     messageEnd(true),
                     rs2rpVector(elemCap),
                     onFlyPacketNum(0),
+                    sauSendByte(0),
+                    startDetect(false),
                     dfuEvent ([this]{ dfuProcessing(); }, n),
                     dduEvent ([this]{ dduProcessing(); }, n),
                     dpuEvent ([this]{ dpuProcessing(); }, n),
@@ -282,7 +286,8 @@ class HanGuRnic : public RdmaNic {
                     rpuEvent ([this]{ rpuProcessing(); }, n),
                     rcvRpuEvent  ([this]{rcvRpuProcessing();  }, n),
                     rdCplRpuEvent([this]{rdCplRpuProcessing();}, n),
-                    rcuEvent([this]{ rcuProcessing();}, n) {
+                    rcuEvent([this]{ rcuProcessing();}, n),
+                    detectNetRateEvent([this]{detectNetRate();}, n) {
                         for (uint32_t x = 0; x < elemCap; ++x) {
                             dp2ddIdxFifo.push(x);
                             rp2raIdxFifo.push(x);
@@ -327,6 +332,9 @@ class HanGuRnic : public RdmaNic {
 
                 void rcuProcessing(); // Receive Completion Unit
                 EventFunctionWrapper rcuEvent;
+
+                void detectNetRate();
+                EventFunctionWrapper detectNetRateEvent;
 
                 std::queue<DoorbellPtr> df2ddFifo; // TODO: move this FIFO to Top level and change its name
         };
@@ -692,11 +700,13 @@ class HanGuRnic : public RdmaNic {
                 void mttRspProcessing();
                 EventFunctionWrapper mttRspEvent;
 
-                // added by mazhenlong @ 23230805
+                // added by mazhenlong @ 20230805
                 int onFlyDataMrRdReqNum;
                 int onFlyDescMrRdReqNum;
                 int onFlyDataDmaRdReqNum;
                 int onFlyDescDmaRdReqNum;
+                int onFlyMptRdReqNum;
+                int onFlyMttRdReqNum;
 
             public:
 

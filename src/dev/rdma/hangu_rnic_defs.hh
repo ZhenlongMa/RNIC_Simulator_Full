@@ -75,8 +75,10 @@
 #define UNSENT_BATCH_NUM_THRESHOLD 50
 
 #define DMA_DETECT_PERIOD 5000 // nanosecond
+#define NET_DETECT_PERIOD 5000
 
 #define CACHE_ALL_CQ_MPT
+// #define CACHE_ALL_QP_MPT
 
 // #define ENABLE_QOS
 

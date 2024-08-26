@@ -138,8 +138,8 @@ HanGuRnic::DmaEngine::dmaWriteProcessing () {
 void 
 HanGuRnic::DmaEngine::dmaReadCplProcessing() {
 
-    // HANGU_PRINT(DmaEngine, " DMAEngine.dmaReadCplProcessing! cplSize %d\n", 
-    //         dmaRdReq2RspFifo.front()->size);
+    HANGU_PRINT(DmaEngine, " DMAEngine.dmaReadCplProcessing! cplSize %d\n", 
+            dmaRdReq2RspFifo.front()->size);
 
     /* post related cpl pkt to related fifo */
     DmaReqPtr dmaReq = dmaRdReq2RspFifo.front();
@@ -255,7 +255,8 @@ HanGuRnic::DmaEngine::dmaReadProcessing () {
                 rnic->schedule(dmaReadEvent, curTick() + bwDelay);
             }
             
-            HANGU_PRINT(DmaEngine, " DMAEngine.dmaRead: out! \n");
+            HANGU_PRINT(DmaEngine, " DMAEngine.dmaRead: out! dmaRReqFifo size: %d, dmaRdReq2RspFifo size: %d\n",
+                dmaRReqFifo.size(), dmaRdReq2RspFifo.size());
             return;
         } else {
             ++cnt;
@@ -295,6 +296,7 @@ HanGuRnic::DmaEngine::dmaChnlProc () {
         }
     }
     if (startDetect == false) {
+        startDetect = true;
         if (!detectRateEvent.scheduled()) {
             rnic->schedule(detectRateEvent, curTick() + rnic->clockPeriod());
         }

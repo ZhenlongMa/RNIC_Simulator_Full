@@ -182,6 +182,13 @@ HanGuRnic::RdmaEngine::dduProcessing () {
             dp2ddIdxFifo.size(), rnic->txDescLaunchQue.size(), allowNewDb, df2ddFifo.size());
     }
 
+    if (startDetect == false) { 
+        startDetect = true;
+        if (!detectNetRateEvent.scheduled()) {
+            rnic->schedule(detectNetRateEvent, curTick() + rnic->clockPeriod());
+        }
+    }
+
     // HANGU_PRINT(RdmaEngine, " RdmaEngine.dduProcessing: out!\n");
 }
 
@@ -930,7 +937,7 @@ HanGuRnic::RdmaEngine::scuProcessing () {
 void
 HanGuRnic::RdmaEngine::sauProcessing () {
 
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing!\n");
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.sauProcessing! txsauFifo size: %d\n", txsauFifo.size());
 
     if (txsauFifo.empty()) {
         return;
@@ -977,6 +984,8 @@ HanGuRnic::RdmaEngine::sauProcessing () {
 
         rnic->txBytes += txsauFifo.front()->length;
         rnic->txPackets++;
+
+        sauSendByte += txsauFifo.front()->length;
 
         txsauFifo.pop();
     }
@@ -1501,6 +1510,13 @@ HanGuRnic::RdmaEngine::rcuProcessing () {
     }
 
     HANGU_PRINT(RdmaEngine, " RdmaEngine.rcuProcessing: out\n");
+}
+
+void HanGuRnic::RdmaEngine::detectNetRate() {
+    rnic->schedule(detectNetRateEvent, curTick() + rnic->clockPeriod() * NET_DETECT_PERIOD);
+    HANGU_PRINT(DmaEngine, "net sendRate: byte: %d, rate : %.2f Gbps!\n", 
+        sauSendByte, (float)sauSendByte * 1000000000 / NET_DETECT_PERIOD / 1024 / 1024 / 1024 * 8);
+    sauSendByte = 0;
 }
 
 ///////////////////////////// HanGuRnic::RDMA Engine relevant {end}//////////////////////////////
