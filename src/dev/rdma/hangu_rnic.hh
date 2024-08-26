@@ -408,6 +408,7 @@ class HanGuRnic : public RdmaNic {
                 EventFunctionWrapper prefetchMemProcEvent;
                 EventFunctionWrapper qpcPfetchRspProcEvent;
                 void triggerPrefetch();
+                std::unordered_map<uint32_t, bool> mrPrefetchFlag;
                 std::string name() {
                     return _name;
                 }
@@ -530,6 +531,8 @@ class HanGuRnic : public RdmaNic {
                 int missNum;
                 int maxParam;
                 std::unordered_map<uint32_t, uint64_t> replaceParam;
+
+                void recordMissHit(CacheRdPkt &pkt, bool hit);
 
             public:
 
@@ -707,6 +710,8 @@ class HanGuRnic : public RdmaNic {
                 int onFlyDescDmaRdReqNum;
                 int onFlyMptRdReqNum;
                 int onFlyMttRdReqNum;
+                int onFlyMptPrefetchReqNum;
+                std::unordered_map<int, int> onFlyMptNum;
 
             public:
 

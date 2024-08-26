@@ -300,35 +300,8 @@ void HanGuRnic::RescCache<T, S>::readProc() {
     HANGU_PRINT(RescCache, " RescCache.readProc! capacity: %d, rescIdx %d, is_write %d, rescSz: %d, size: %d\n", 
             capacity, rescIdx, (rreq.cplEvent == nullptr), sizeof(T), cache.size());
     if (cache.find(rescIdx) != cache.end()) { /* Cache hit */
-        if (std::is_same<T, MptResc>::value) {
-            if (rreq.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
-                hitNum++;
-                HANGU_PRINT(RescCache, "readProc: MPT fetch hit! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
-                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
-            }
-            else if (rreq.reqPkt->chnl == MR_RCHNL_TX_DESC_PREFETCH) {
-                HANGU_PRINT(RescCache, "readProc: desc MPT prefetch hit! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
-                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
-            }
-            else if (rreq.reqPkt->chnl == MR_RCHNL_TX_MPT_PREFETCH) {
-                HANGU_PRINT(RescCache, "readProc: data MPT prefetch hit! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
-                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
-            }
-        }
-        else if (std::is_same<T, MttResc>::value) {
-            if (rreq.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
-                hitNum++;
-                HANGU_PRINT(RescCache, "readProc: MTT hit! hitNum: %d, missNum: %d\n", hitNum, missNum);
-            }
-        }
-        else if (std::is_same<T, CqcResc>::value) {
-            hitNum++;
-            HANGU_PRINT(RescCache, "readProc: CQC hit! hitNum: %d, missNum: %d\n", hitNum, missNum);
-        }
-        else {
-            panic("invalid type!\n");
-        }
         HANGU_PRINT(RescCache, "readProc: Cache hit!\n");
+        recordMissHit(rreq, true);
         /** 
          * If rspResc is not nullptr, which means 
          * it need to put resc to rspResc, copy 
@@ -361,6 +334,50 @@ void HanGuRnic::RescCache<T, S>::readProc() {
             }
         }
     } else if (cache.size() <= capacity) { /* Cache miss & read elem */
+        recordMissHit(rreq, false);
+        /* Fetch required data */
+        uint64_t pAddr = rescNum2phyAddr(rescIdx);
+        fetchReq(pAddr, rreq.cplEvent, rescIdx, rreq.reqPkt, rreq.rspResc, rreq.rescUpdate);
+        HANGU_PRINT(RescCache, "readProc resc_index %d, ICM paddr 0x%lx\n", rescIdx, pAddr);
+    } else {
+        panic("readProc: mismatch! capacity %d size %d\n", capacity, cache.size());
+    }
+    HANGU_PRINT(RescCache, "readProc: out! capacity: %d, size: %d\n", capacity, cache.size());
+}
+
+template <class T, class S>
+void HanGuRnic::RescCache<T, S>::recordMissHit(CacheRdPkt &pkt, bool hit) {
+    if (hit == true) {
+        if (std::is_same<T, MptResc>::value) {
+            if (rreq.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
+                hitNum++;
+                HANGU_PRINT(RescCache, "readProc: MPT fetch hit! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
+                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
+            }
+            else if (rreq.reqPkt->chnl == MR_RCHNL_TX_DESC_PREFETCH) {
+                HANGU_PRINT(RescCache, "readProc: desc MPT prefetch hit! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
+                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
+            }
+            else if (rreq.reqPkt->chnl == MR_RCHNL_TX_MPT_PREFETCH) {
+                HANGU_PRINT(RescCache, "readProc: data MPT prefetch hit! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
+                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
+            }
+        }
+        else if (std::is_same<T, MttResc>::value) {
+            if (rreq.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
+                hitNum++;
+                HANGU_PRINT(RescCache, "readProc: MTT hit! hitNum: %d, missNum: %d\n", hitNum, missNum);
+            }
+        }
+        else if (std::is_same<T, CqcResc>::value) {
+            hitNum++;
+            HANGU_PRINT(RescCache, "readProc: CQC hit! hitNum: %d, missNum: %d\n", hitNum, missNum);
+        }
+        else {
+            panic("invalid type!\n");
+        }
+    }
+    else {
         if (std::is_same<T, MptResc>::value) {
             if (rreq.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
                 missNum++;
@@ -389,26 +406,7 @@ void HanGuRnic::RescCache<T, S>::readProc() {
         else {
             panic("invalid type!\n");
         }
-        /* Fetch required data */
-        uint64_t pAddr = rescNum2phyAddr(rescIdx);
-        fetchReq(pAddr, rreq.cplEvent, rescIdx, rreq.reqPkt, rreq.rspResc, rreq.rescUpdate);
-        HANGU_PRINT(RescCache, "readProc resc_index %d, ICM paddr 0x%lx\n", rescIdx, pAddr);
-    } else {
-        panic("readProc: mismatch! capacity %d size %d\n", capacity, cache.size());
     }
-    // if (std::is_same<T, MptResc>::value) {
-    //     HANGU_PRINT(RescCache, "readProc: MPT hitNum: %d, missNum: %d, key: 0x%x\n", hitNum, missNum, rescIdx);
-    // }
-    // else if (std::is_same<T, MttResc>::value) {
-    //     HANGU_PRINT(RescCache, "readProc: MTT hitNum: %d, missNum: %d\n", hitNum, missNum);
-    // }
-    // else if (std::is_same<T, CqcResc>::value) {
-    //     HANGU_PRINT(RescCache, "readProc: CQC hitNum: %d, missNum: %d\n", hitNum, missNum);
-    // }
-    // else {
-    //     panic("invalid type!\n");
-    // }
-    HANGU_PRINT(RescCache, "readProc: out! capacity: %d, size: %d\n", capacity, cache.size());
 }
 
 ///////////////////////////// HanGuRnic::Resource Cache {end}//////////////////////////////

@@ -411,6 +411,7 @@ struct MrReqRsp {
     uint32_t dmaRspNum;     /* number of responded DMA requests */ 
     uint32_t sentPktNum;    /* number of Ethernet packet that has finished */
     uint32_t qpn;
+    uint64_t reqTick;
     struct MptResc *mpt;
     union {
         TxDesc  *txDescRsp;

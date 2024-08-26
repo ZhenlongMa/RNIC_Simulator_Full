@@ -37,6 +37,7 @@ HanGuRnic::MrRescModule::MrRescModule (HanGuRnic *i, const std::string n,
     onFlyDescDmaRdReqNum(0),
     onFlyMptRdReqNum(0),
     onFlyMttRdReqNum(0),
+    onFlyMptPrefetchReqNum(0),
     transReqEvent([this]{ transReqProcessing();}, n),
     mptCache(i, mptCacheNum, n),
     mttCache(i, mttCacheNum, n)
@@ -81,8 +82,18 @@ HanGuRnic::MrRescModule::mptReqProcess (MrReqRspPtr mrReq) {
     else {
         mptCache.rescRead(mrReq->lkey, &mptRspEvent, mrReq);
     }
+
+    if (onFlyMptNum.find(mrReq->chnl) == onFlyMptNum.end()) {
+        onFlyMptNum[mrReq->chnl] = 1;
+    }
+    else {
+        onFlyMptNum[mrReq->chnl]++;
+    }
+    mrReq->reqTick = curTick();
+
     onFlyMptRdReqNum++;
-    HANGU_PRINT(MrResc, " mptReqProcess! qpn: 0x%x, onFlyMptRdReqNum: %d\n", mrReq->qpn, onFlyMptRdReqNum);
+    HANGU_PRINT(MrResc, " mptReqProcess! qpn: 0x%x, onFlyMptRdReqNum: %d, MPT[%d]: %d\n", 
+        mrReq->qpn, onFlyMptRdReqNum, mrReq->chnl, onFlyMptNum[mrReq->chnl]);
 }
 
 void 
@@ -310,8 +321,13 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
     }
 
     reqPkt->mpt = mptResc;
+
     onFlyMptRdReqNum--;
-    HANGU_PRINT(MrResc, "mptRspProcessing! onFlyMptRdReqNum: %d\n", onFlyMptRdReqNum);
+    assert(onFlyMptNum[reqPkt->chnl] > 0);
+    onFlyMptNum[reqPkt->chnl]--;
+
+    HANGU_PRINT(MrResc, "mptRspProcessing! onFlyMptRdReqNum: %d, MPT[%d]: %d, req time: %ld\n", 
+        onFlyMptRdReqNum, reqPkt->chnl, onFlyMptNum[reqPkt->chnl], curTick() - reqPkt->reqTick);
 
     // cache all CQ MPT
     #ifdef CACHE_ALL_CQ_MPT
@@ -328,6 +344,13 @@ HanGuRnic::MrRescModule::mptRspProcessing() {
         qpMpt[mptResc->key] = mptResc;
     }
     #endif
+
+    if (reqPkt->chnl == MR_RCHNL_TX_MPT_PREFETCH) {
+        assert(rnic->rescPrefetcher.mrPrefetchFlag[mptResc->key] == true);
+        rnic->rescPrefetcher.mrPrefetchFlag[mptResc->key] = false;
+        onFlyMptPrefetchReqNum--;
+        HANGU_PRINT(MrResc, "mptRspProcessing: receive MPT prefetch! onFlyMptPrefetchReqNum: %d\n", onFlyMptPrefetchReqNum);
+    }
 
     assert(mptResc->startVAddr % PAGE_SIZE == 0);
 
@@ -494,7 +517,10 @@ HanGuRnic::MrRescModule::transReqProcessing() {
                 case 3:
                     mrReq = rnic->mptPrefetchQue.front();
                     rnic->mptPrefetchQue.pop();
-                    HANGU_PRINT(MrResc, "transReqProcessing: MPT prefetch request! lkey: 0x%lx, qpn: 0x%x\n", mrReq->lkey, mrReq->qpn);
+                    assert(rnic->rescPrefetcher.mrPrefetchFlag[mrReq->lkey] == true);
+                    onFlyMptPrefetchReqNum++;
+                    HANGU_PRINT(MrResc, "transReqProcessing: MPT prefetch request! lkey: 0x%lx, qpn: 0x%x, on-fly: %d\n", 
+                        mrReq->lkey, mrReq->qpn, onFlyMptPrefetchReqNum);
                     break;
                 default:
                     panic("Illegal Channel!\n");

@@ -50,16 +50,21 @@ void HanGuRnic::RescPrefetcher::prefetchMemProc() {
     for (int i = 0; i < prefetchNum; i++) {
         lkey = rNic->memPrefetchLkeyQue.front();
         rNic->memPrefetchLkeyQue.pop();
-        if (i == 0) {
-            offset = rNic->descScheduler.qpStatusTable[qpn]->fetch_offset;
+        // this MPT is not supposed to being prefetched, 
+        // or otherwise it will cause a lot of redundant prefetch request
+        if (mrPrefetchFlag[lkey] == false) { 
+            mrPrefetchFlag[lkey] = true;
+            if (i == 0) {
+                offset = rNic->descScheduler.qpStatusTable[qpn]->fetch_offset;
+            }
+            else {
+                offset = 0;
+            }
+            mrReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_MPT_PREFETCH, lkey, 0, offset, qpn);
+            rNic->mptPrefetchQue.push(mrReq);
         }
-        else {
-            offset = 0;
-        }
-        mrReq = make_shared<MrReqRsp>(DMA_TYPE_RREQ, MR_RCHNL_TX_MPT_PREFETCH, lkey, 0, offset, qpn);
-        rNic->mptPrefetchQue.push(mrReq);
     }
-    if (!rNic->mrRescModule.transReqEvent.scheduled()) {
+    if (!rNic->mrRescModule.transReqEvent.scheduled() && rNic->mptPrefetchQue.size() != 0) {
         rNic->schedule(rNic->mrRescModule.transReqEvent, curTick() + rNic->clockPeriod());
     }
 }
