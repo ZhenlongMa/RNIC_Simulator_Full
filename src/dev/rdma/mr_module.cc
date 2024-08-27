@@ -236,8 +236,6 @@ HanGuRnic::MrRescModule::dmaRrspProcessing() {
             case MR_RCHNL_TX_DESC:
             case MR_RCHNL_TX_DESC_PREFETCH:
             case MR_RCHNL_TX_DESC_FETCH:
-                // event = &rnic->rdmaEngine.dduEvent;
-                // event = &rnic->descScheduler.wqeProcEvent;
                 event = &rnic->wqeBufferManage.wqeReadRspEvent;
                 rnic->wqeBufferManage.wqeRspQue.push(tptRsp);
 

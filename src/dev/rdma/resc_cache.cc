@@ -158,7 +158,7 @@ void HanGuRnic::RescCache<T, S>::fetchRsp() {
                 rnic->schedule(fetchCplEvent, curTick() + rnic->clockPeriod());
             }
         }
-    } else { /* schedule readProc if it do not has pending read req **/
+    } else { /* schedule readProc if it does not have pending read req **/
         if (!readProcEvent.scheduled()) {
             rnic->schedule(readProcEvent, curTick() + rnic->clockPeriod());
         }
