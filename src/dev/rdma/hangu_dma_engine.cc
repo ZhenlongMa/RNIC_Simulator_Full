@@ -295,10 +295,15 @@ HanGuRnic::DmaEngine::dmaChnlProc () {
             rnic->schedule(dmaChnlProcEvent, curTick() + rnic->clockPeriod());
         }
     }
+
+    blocked = false;
     if (startDetect == false) {
         startDetect = true;
         if (!detectRateEvent.scheduled()) {
             rnic->schedule(detectRateEvent, curTick() + rnic->clockPeriod());
+        }
+        if (!detectBlockEvent.scheduled()) {
+            rnic->schedule(detectBlockEvent, curTick() + rnic->clockPeriod());
         }
     }
 }
@@ -310,5 +315,15 @@ void HanGuRnic::DmaEngine::detectRate() {
         writeByte, (float)writeByte * 1000000000 / DMA_DETECT_PERIOD / 1024 / 1024 / 1024 * 8);
     readByte = 0;
     writeByte = 0;
+}
+
+void HanGuRnic::DmaEngine::detectBlock() {
+    rnic->schedule(detectBlockEvent, curTick() + rnic->clockPeriod() * BLOCK_DETECT_PERIOD);
+    if (blocked == true) {
+        panic("blocked!\n");
+    }
+    else {
+        blocked = true;
+    }
 }
 ///////////////////////////// HanGuRnic::DMA Engine {end}//////////////////////////////

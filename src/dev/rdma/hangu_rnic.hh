@@ -712,6 +712,8 @@ class HanGuRnic : public RdmaNic {
                 int onFlyMttRdReqNum;
                 int onFlyMptPrefetchReqNum;
                 std::unordered_map<int, int> onFlyMptNum;
+                std::unordered_map<int, std::queue<MrReqRspPtr>> pendingMrReqQueue;
+                bool reqReadyToReturn;
 
             public:
 
@@ -1141,6 +1143,7 @@ class HanGuRnic : public RdmaNic {
                 uint64_t readByte;
                 uint64_t writeByte;
                 bool startDetect;
+                bool blocked;
 
             public:
 
@@ -1157,7 +1160,8 @@ class HanGuRnic : public RdmaNic {
                     dmaChnlProcEvent([this]{ dmaChnlProc(); }, n),
                     dmaWriteEvent([this]{ dmaWriteProcessing();}, n),
                     dmaReadEvent([this]{ dmaReadProcessing();}, n),
-                    detectRateEvent([this]{detectRate();}, n) { }
+                    detectRateEvent([this]{detectRate();}, n),
+                    detectBlockEvent([this]{detectBlock();}, n) { }
 
 
                 std::queue<DmaReqPtr> dmaWrReq2RspFifo;
@@ -1182,6 +1186,9 @@ class HanGuRnic : public RdmaNic {
 
                 void detectRate();
                 EventFunctionWrapper detectRateEvent;
+
+                void detectBlock();
+                EventFunctionWrapper detectBlockEvent;
 
                 std::string name() { return _name; }
 
