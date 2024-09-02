@@ -65,7 +65,7 @@ void HanGuRnic::RescCache<T, S>::storeReq(uint64_t addr, T *resc) {
 template <class T, class S>
 void HanGuRnic::RescCache<T, S>::fetchReq(uint64_t addr, Event *cplEvent, 
         uint32_t rescIdx, S reqPkt, T *rspResc, const std::function<bool(T&)> &rescUpdate) {
-    HANGU_PRINT(RescCache, "fetchReq enter\n");
+    HANGU_PRINT(RescCache, "fetchReq: enter\n");
     T *rescDma = new T; /* This is the origin of resc pointer in cache */
     /* Post dma read request to DmaEngine.dmaReadProcessing */
     DmaReqPtr dmaReq = make_shared<DmaReq>(rnic->pciToDma(addr), rescSz, 
@@ -76,12 +76,12 @@ void HanGuRnic::RescCache<T, S>::fetchReq(uint64_t addr, Event *cplEvent,
     }
     /* push event to fetchRsp */
     rreq2rrspFifo.emplace(cplEvent, rescIdx, rescDma, reqPkt, dmaReq, rspResc, rescUpdate);
-    HANGU_PRINT(RescCache, " RescCache.fetchReq: fifo size %d\n", rreq2rrspFifo.size());
+    HANGU_PRINT(RescCache, "fetchReq: fifo size %d\n", rreq2rrspFifo.size());
 }
 
 template <class T, class S>
 void HanGuRnic::RescCache<T, S>::fetchRsp() {
-    HANGU_PRINT(RescCache, " RescCache.fetchRsp! capacity: %d, size %d, rescSz %d\n", capacity, cache.size(), sizeof(T));
+    HANGU_PRINT(RescCache, "fetchRsp: capacity: %d, size %d, rescSz %d\n", capacity, cache.size(), sizeof(T));
     if (rreq2rrspFifo.empty()) {
         return ;
     }
@@ -89,8 +89,11 @@ void HanGuRnic::RescCache<T, S>::fetchRsp() {
     if (rrsp.dmaReq->rdVld == 0) {
         return;
     }
+    if (std::is_same<T, MptResc>::value) {
+        HANGU_PRINT(RescCache, "fetchRsp: MPT[%d] request time until fetchRsp: %ld\n", rrsp.reqPkt->chnl, curTick() - rrsp.reqPkt->reqTick);
+    }
     rreq2rrspFifo.pop();
-    HANGU_PRINT(RescCache, " RescCache.fetchRsp: rescNum %d, dma_addr 0x%lx, rsp_addr 0x%lx, fifo size %d\n", 
+    HANGU_PRINT(RescCache, "fetchRsp: rescNum %d, dma_addr 0x%lx, rsp_addr 0x%lx, fifo size %d\n", 
             rrsp.rescIdx, (uint64_t)rrsp.rescDma, (uint64_t)rrsp.rspResc, rreq2rrspFifo.size());
     if (cache.find(rrsp.rescIdx) != cache.end()) { /* It has already been fetched */
         /* Abandon fetched resource, and put cache resource 
@@ -103,9 +106,9 @@ void HanGuRnic::RescCache<T, S>::fetchRsp() {
         /* Write new fetched entry to cache */
         if (cache.size() < capacity) {
             cache.emplace(rrsp.rescIdx, *(rrsp.rescDma));
-            HANGU_PRINT(RescCache, " RescCache.fetchRsp: capacity %d size %d\n", capacity, cache.size());
+            HANGU_PRINT(RescCache, "fetchRsp: capacity %d size %d\n", capacity, cache.size());
         } else { /* Cache is full */
-            HANGU_PRINT(RescCache, " RescCache.fetchRsp: Cache is full!\n");
+            HANGU_PRINT(RescCache, "fetchRsp: Cache is full!\n");
             // uint32_t wbRescNum = replaceScheme();
             uint32_t wbRescNum = lruReplaceScheme();
             uint64_t pAddr = rescNum2phyAddr(wbRescNum);
@@ -116,14 +119,14 @@ void HanGuRnic::RescCache<T, S>::fetchRsp() {
             if (sizeof(T) == sizeof(struct QpcResc)) {
                 struct QpcResc *val = (struct QpcResc *)(rrsp.rescDma);
                 struct QpcResc *rep = (struct QpcResc *)(wbReq);
-                HANGU_PRINT(RescCache, " RescCache.fetchRsp: qpn 0x%x, sndlkey 0x%x \n\n", 
+                HANGU_PRINT(RescCache, "fetchRsp: qpn 0x%x, sndlkey 0x%x \n\n", 
                         val->srcQpn, val->sndWqeBaseLkey);
-                HANGU_PRINT(RescCache, " RescCache.fetchRsp: replaced qpn 0x%x, sndlkey 0x%x \n\n", 
+                HANGU_PRINT(RescCache, "fetchRsp: replaced qpn 0x%x, sndlkey 0x%x \n\n", 
                         rep->srcQpn, rep->sndWqeBaseLkey);
             }
             cache.erase(wbRescNum);
             cache.emplace(rrsp.rescIdx, *(rrsp.rescDma));
-            HANGU_PRINT(RescCache, " RescCache.fetchRsp: capacity %d size %d, replaced idx %d pAddr 0x%lx\n", 
+            HANGU_PRINT(RescCache, "fetchRsp: capacity %d size %d, replaced idx %d pAddr 0x%lx\n", 
                     capacity, cache.size(), wbRescNum, pAddr);
         }
         /* Push fetched resource to FIFO */ 
@@ -133,21 +136,21 @@ void HanGuRnic::RescCache<T, S>::fetchRsp() {
     }
     /* Schedule read response cplEvent */
     if (rrsp.cplEvent == nullptr) { // this is a write request
-        HANGU_PRINT(RescCache, " RescCache.fetchRsp: this is a write request!\n");
+        HANGU_PRINT(RescCache, "fetchRsp: this is a write request!\n");
     } else { // this is a read request
         if (!rrsp.cplEvent->scheduled()) {
             rnic->schedule(rrsp.cplEvent, curTick() + rnic->clockPeriod());
         }
         rrspFifo.emplace(rrsp.rescDma, rrsp.reqPkt);
     }
-    HANGU_PRINT(RescCache, " RescCache.fetchRsp: Push fetched resource to FIFO!\n");
+    HANGU_PRINT(RescCache, "fetchRsp: Push fetched resource to FIFO!\n");
     /* Update content in cache entry
     * Note that this should be called last because 
     * we hope get older resource, not updated resource */
     if (rrsp.rescUpdate == nullptr) {
-        HANGU_PRINT(RescCache, " RescCache.fetchRsp: rescUpdate is null!\n");
+        HANGU_PRINT(RescCache, "fetchRsp: rescUpdate is null!\n");
     } else {
-        HANGU_PRINT(RescCache, " RescCache.fetchRsp: rescUpdate is not null\n");
+        HANGU_PRINT(RescCache, "fetchRsp: rescUpdate is not null\n");
         rrsp.rescUpdate(cache[rrsp.rescIdx]);
     }
     /* Schdeule myself if we have valid elem */
@@ -159,11 +162,11 @@ void HanGuRnic::RescCache<T, S>::fetchRsp() {
             }
         }
     } else { /* schedule readProc if it does not have pending read req **/
-        if (!readProcEvent.scheduled()) {
-            rnic->schedule(readProcEvent, curTick() + rnic->clockPeriod());
-        }
+        // if (!readProcEvent.scheduled()) {
+        //     rnic->schedule(readProcEvent, curTick() + rnic->clockPeriod());
+        // }
     }
-    HANGU_PRINT(RescCache, " RescCache.fetchRsp: out\n");
+    HANGU_PRINT(RescCache, "fetchRsp: out\n");
 }
 
 template <class T, class S>
@@ -210,31 +213,31 @@ uint64_t HanGuRnic::RescCache<T, S>::rescNum2phyAddr(uint32_t num) {
  */
 template <class T, class S>
 void HanGuRnic::RescCache<T, S>::rescWrite(uint32_t rescIdx, T *resc, const std::function<bool(T&, T&)> &rescUpdate) {
-    HANGU_PRINT(RescCache, " RescCache.rescWrite! capacity: %d, size: %d rescSz %d, rescIndex %d\n", 
+    HANGU_PRINT(RescCache, "rescWrite! capacity: %d, size: %d rescSz %d, rescIndex %d\n", 
             capacity, cache.size(), sizeof(T), rescIdx);
     // if (replaceParam.find(rescIdx) == replaceParam.end()) {
     //     replaceParam[rescIdx] = 0;
     // }
     if (cache.find(rescIdx) != cache.end()) { /* Cache hit */
-        HANGU_PRINT(RescCache, " RescCache.rescWrite: Cache hit\n");
+        HANGU_PRINT(RescCache, "rescWrite: Cache hit\n");
         /* If there's specified update function */
         if (rescUpdate == nullptr) {
             T tmp = cache[rescIdx];
             cache.erase(rescIdx);
             delete &tmp;
             cache.emplace(rescIdx, *resc);
-            HANGU_PRINT(RescCache, " RescCache.rescWrite: Resc is written\n");
+            HANGU_PRINT(RescCache, "rescWrite: Resc is written\n");
         } else {
             rescUpdate(cache[rescIdx], *resc);
-            HANGU_PRINT(RescCache, " RescCache.rescWrite: Desc updated\n");
+            HANGU_PRINT(RescCache, "rescWrite: Desc updated\n");
         }
         HANGU_PRINT(RescCache, " RescCache: capacity %d size %d\n", capacity, cache.size());
     } else if (cache.size() < capacity) { /* Cache miss & insert elem directly */
-        HANGU_PRINT(RescCache, " RescCache.rescWrite: Cache miss\n");
+        HANGU_PRINT(RescCache, "rescWrite: Cache miss\n");
         cache.emplace(rescIdx, *resc);
         HANGU_PRINT(RescCache, " RescCache: capacity %d size %d\n", capacity, cache.size());
     } else if (cache.size() == capacity) { /* Cache miss & replace */
-        HANGU_PRINT(RescCache, " RescCache.rescWrite: Cache miss & replace\n");
+        HANGU_PRINT(RescCache, "rescWrite: Cache miss & replace\n");
         /* Select one elem in cache to evict */
         // uint32_t wbRescNum = replaceScheme();
         uint32_t wbRescNum = lruReplaceScheme();
@@ -244,10 +247,10 @@ void HanGuRnic::RescCache<T, S>::rescWrite(uint32_t rescIdx, T *resc, const std:
         storeReq(pAddr, writeReq);
         cache.erase(wbRescNum);
         cache.emplace(rescIdx, *resc);
-        HANGU_PRINT(RescCache, " RescCache.rescWrite: wbRescNum %d, ICM_paddr_base 0x%x, new_index %d\n", wbRescNum, pAddr, rescIdx);
+        HANGU_PRINT(RescCache, "rescWrite: wbRescNum %d, ICM_paddr_base 0x%x, new_index %d\n", wbRescNum, pAddr, rescIdx);
         HANGU_PRINT(RescCache, " RescCache: capacity %d size %d\n", capacity, cache.size());
     } else {
-        panic(" RescCache.rescWrite: mismatch! capacity %d size %d\n", capacity, cache.size());
+        panic("rescWrite: mismatch! capacity %d size %d\n", capacity, cache.size());
     }
     replaceParam[rescIdx] = maxParam;
     maxParam++;
@@ -276,7 +279,11 @@ void HanGuRnic::RescCache<T, S>::rescRead(uint32_t rescIdx, Event *cplEvent, S r
     }
     replaceParam[rescIdx] = maxParam;
     maxParam++;
-    HANGU_PRINT(RescCache, " RescCache.rescRead: out!\n");
+    if (std::is_same<T, MptResc>::value) {
+        HANGU_PRINT(RescCache, "rescRead: MPT[%d] launch time: %ld, request time until rescRead: %ld\n", 
+            reqPkt->chnl, reqPkt->reqTick, curTick() - reqPkt->reqTick);
+    }
+    HANGU_PRINT(RescCache, "rescRead: out! reqFifo size: %d\n", reqFifo.size());
 }
 
 /**
@@ -289,15 +296,16 @@ template <class T, class S>
 void HanGuRnic::RescCache<T, S>::readProc() {
     /* If there's pending read req or there's no req in reqFifo, 
     * do not process next rquest */
-    if (rreq2rrspFifo.size() || reqFifo.empty()) {
-        return;
-    }
+    // if (rreq2rrspFifo.size() || reqFifo.empty()) {
+    //     return;
+    // }
     /* Get cache rd req pkt from reqFifo */
+    assert(reqFifo.size() > 0);
     CacheRdPkt rreq = reqFifo.front();
     uint32_t rescIdx = rreq.rescIdx;
     reqFifo.pop();
     /* only used to dump information */
-    HANGU_PRINT(RescCache, " RescCache.readProc! capacity: %d, rescIdx %d, is_write %d, rescSz: %d, size: %d\n", 
+    HANGU_PRINT(RescCache, "readProc: capacity: %d, rescIdx %d, is_write %d, rescSz: %d, size: %d\n", 
             capacity, rescIdx, (rreq.cplEvent == nullptr), sizeof(T), cache.size());
     if (cache.find(rescIdx) != cache.end()) { /* Cache hit */
         HANGU_PRINT(RescCache, "readProc: Cache hit!\n");
@@ -339,8 +347,16 @@ void HanGuRnic::RescCache<T, S>::readProc() {
         uint64_t pAddr = rescNum2phyAddr(rescIdx);
         fetchReq(pAddr, rreq.cplEvent, rescIdx, rreq.reqPkt, rreq.rspResc, rreq.rescUpdate);
         HANGU_PRINT(RescCache, "readProc resc_index %d, ICM paddr 0x%lx\n", rescIdx, pAddr);
+        if (reqFifo.size()) {
+            if (!readProcEvent.scheduled()) {
+                rnic->schedule(readProcEvent, curTick() + rnic->clockPeriod());
+            }
+        }
     } else {
         panic("readProc: mismatch! capacity %d size %d\n", capacity, cache.size());
+    }
+    if (std::is_same<T, MptResc>::value) {
+        HANGU_PRINT(RescCache, "readProc: MPT[%d] request time until readProc: %ld\n", rreq.reqPkt->chnl, curTick() - rreq.reqPkt->reqTick);
     }
     HANGU_PRINT(RescCache, "readProc: out! capacity: %d, size: %d\n", capacity, cache.size());
 }
@@ -349,22 +365,22 @@ template <class T, class S>
 void HanGuRnic::RescCache<T, S>::recordMissHit(CacheRdPkt &pkt, bool hit) {
     if (hit == true) {
         if (std::is_same<T, MptResc>::value) {
-            if (rreq.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
+            if (pkt.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && pkt.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
                 hitNum++;
                 HANGU_PRINT(RescCache, "readProc: MPT fetch hit! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
-                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
+                    hitNum, missNum, pkt.rescIdx, pkt.reqPkt->chnl, pkt.reqPkt->type);
             }
-            else if (rreq.reqPkt->chnl == MR_RCHNL_TX_DESC_PREFETCH) {
+            else if (pkt.reqPkt->chnl == MR_RCHNL_TX_DESC_PREFETCH) {
                 HANGU_PRINT(RescCache, "readProc: desc MPT prefetch hit! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
-                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
+                    hitNum, missNum, pkt.rescIdx, pkt.reqPkt->chnl, pkt.reqPkt->type);
             }
-            else if (rreq.reqPkt->chnl == MR_RCHNL_TX_MPT_PREFETCH) {
+            else if (pkt.reqPkt->chnl == MR_RCHNL_TX_MPT_PREFETCH) {
                 HANGU_PRINT(RescCache, "readProc: data MPT prefetch hit! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
-                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
+                    hitNum, missNum, pkt.rescIdx, pkt.reqPkt->chnl, pkt.reqPkt->type);
             }
         }
         else if (std::is_same<T, MttResc>::value) {
-            if (rreq.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
+            if (pkt.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && pkt.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
                 hitNum++;
                 HANGU_PRINT(RescCache, "readProc: MTT hit! hitNum: %d, missNum: %d\n", hitNum, missNum);
             }
@@ -379,22 +395,22 @@ void HanGuRnic::RescCache<T, S>::recordMissHit(CacheRdPkt &pkt, bool hit) {
     }
     else {
         if (std::is_same<T, MptResc>::value) {
-            if (rreq.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
+            if (pkt.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && pkt.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
                 missNum++;
-                HANGU_PRINT(RescCache, "readProc: MPT miss! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
-                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
+                HANGU_PRINT(RescCache, "readProc: MPT fetch miss! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
+                    hitNum, missNum, pkt.rescIdx, pkt.reqPkt->chnl, pkt.reqPkt->type);
             }
-            else if (rreq.reqPkt->chnl == MR_RCHNL_TX_DESC_PREFETCH) {
+            else if (pkt.reqPkt->chnl == MR_RCHNL_TX_DESC_PREFETCH) {
                 HANGU_PRINT(RescCache, "readProc: desc MPT prefetch miss! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
-                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
+                    hitNum, missNum, pkt.rescIdx, pkt.reqPkt->chnl, pkt.reqPkt->type);
             }
-            else if (rreq.reqPkt->chnl == MR_RCHNL_TX_MPT_PREFETCH) {
+            else if (pkt.reqPkt->chnl == MR_RCHNL_TX_MPT_PREFETCH) {
                 HANGU_PRINT(RescCache, "readProc: data MPT prefetch miss! hitNum: %d, missNum: %d, key: 0x%x, chnl: %d, type: %d\n", 
-                    hitNum, missNum, rescIdx, rreq.reqPkt->chnl, rreq.reqPkt->type);
+                    hitNum, missNum, pkt.rescIdx, pkt.reqPkt->chnl, pkt.reqPkt->type);
             }
         }
         else if (std::is_same<T, MttResc>::value) {
-            if (rreq.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && rreq.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
+            if (pkt.reqPkt->chnl != MR_RCHNL_TX_DESC_PREFETCH && pkt.reqPkt->chnl != MR_RCHNL_TX_MPT_PREFETCH) {
                 missNum++;
                 HANGU_PRINT(RescCache, "readProc: MTT miss! hitNum: %d, missNum: %d\n", hitNum, missNum);
             }

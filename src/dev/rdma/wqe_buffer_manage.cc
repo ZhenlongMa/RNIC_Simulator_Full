@@ -13,6 +13,9 @@ HanGuRnic::WqeBufferManage::WqeBufferManage(HanGuRnic *rNic, const std::string n
     maxReplaceParam(0),
     descBufferCap(wqeCacheNum),
     descBufferUsed(0),
+    accessNum(0),
+    hitNum(0),
+    missNum(0),
     wqeReqReturnEvent([this]{wqeReqReturn();}, name),
     wqeReadReqProcessEvent([this]{wqeReadReqProcess();}, name),
     wqeBufferUpdateEvent([this]{wqeBufferUpdate();}, name),
@@ -152,6 +155,7 @@ void HanGuRnic::WqeBufferManage::wqeReadRspProcess() {
     if (wqeBufferMetadataTable[qpn]->avaiNum >= wqeBufferMetadataTable[qpn]->fetchReqNum && wqeBufferMetadataTable[qpn]->fetchReqNum > 0) {
         HANGU_PRINT(WqeBufferManage, "wqeReadRspProcess: trigger WQE request return! qpn: 0x%x, avaiNum: %d, fetchReqNum: %d\n", 
             qpn, wqeBufferMetadataTable[qpn]->avaiNum, wqeBufferMetadataTable[qpn]->fetchReqNum);
+
         WqeRspPtr wqeRsp = std::make_shared<WqeRsp>(wqeBufferMetadataTable[qpn]->fetchReqNum, qpn);
         for (int i = 0; i < wqeBufferMetadataTable[qpn]->fetchReqNum; i++) {
             TxDescPtr txDesc = wqeBuffer[qpn]->descArray[i];
@@ -182,6 +186,7 @@ void HanGuRnic::WqeBufferManage::wqeReqReturn() {
     WqeRspPtr wqeRsp = wqeReturnQue.front();
     wqeReturnQue.pop();
     HANGU_PRINT(WqeBufferManage, "wqeReqReturn: descNum: %d, qpn: 0x%x!\n", wqeRsp->descNum, wqeRsp->qpn);
+    
     rNic->wqeRspInfoQue.push(make_pair(wqeRsp->descNum, wqeRsp->qpn));
     for (int i = 0; i < wqeRsp->descNum; i++) {
         rNic->txdescRspFifo.push(wqeRsp->descList.front());

@@ -242,8 +242,8 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
         dd2dpVector[idx] = nullptr;
         assert(desc->len <= 16384); // TO DO: the final step is to remove this
         HANGU_PRINT(RdmaEngine, " RdmaEngine.dpuProcessing:"
-                    " Get descriptor entry from RdmaEngine.dduProcessing, len: %d, lkey: %d, opcode: %d, rkey: %d\n", 
-                    desc->len, desc->lkey, desc->opcode, desc->rdmaType.rkey);
+                    " Get descriptor entry from RdmaEngine.dduProcessing, qpn: 0x%x, len: %d, lkey: %d, opcode: %d, rkey: %d\n", 
+                    dpuQpc->txQpcRsp->srcQpn, desc->len, desc->lkey, desc->opcode, desc->rdmaType.rkey);
 
         /* schedule ddu if dp2ddIdxFifo is capable */
         dp2ddIdxFifo.push(idx);
@@ -352,16 +352,16 @@ void
 HanGuRnic::RdmaEngine::postTxCpl(uint8_t qpType, uint32_t qpn, 
         uint32_t cqn, TxDescPtr desc) {
     
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.postTxCpl! qpn %d, cqn %d \n", qpn, cqn);
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.postTxCpl! qpn 0x%x, cqn %d \n", qpn, cqn);
 
     /* signaled to CQ based on the info from wqe */
     if (!desc->isSignaled()) {
-        HANGU_PRINT(RdmaEngine, "Do not post completion! QPN: %d, desc flag: 0x%lx\n", qpn, desc->flags);
+        HANGU_PRINT(RdmaEngine, "Do not post completion! QPN: 0x%x, desc flag: 0x%lx\n", qpn, desc->flags);
         return;
     }
     else
     {
-        HANGU_PRINT(RdmaEngine, "Post completioin! QPN: %d, desc flag: 0x%lx\n", qpn, desc->flags);
+        HANGU_PRINT(RdmaEngine, "Post completioin! QPN: 0x%x, desc flag: 0x%lx\n", qpn, desc->flags);
     }
     
     /* Post related info into scu Fifo */
@@ -554,10 +554,13 @@ HanGuRnic::RdmaEngine::rguProcessing () {
     // txPktToSend->length = ETH_ADDR_LEN * 2 + getRdmaHeadSize(desc->opcode, qpc->qpType); /* ETH_ADDR_LEN * 2 means length of 2 MAC addr */
     
     if (desc->opcode == OPCODE_SEND || desc->opcode == OPCODE_RDMA_WRITE) {
+        HANGU_PRINT(RdmaEngine, "rguProcessing: txdataRspFifo size: %d\n", rnic->txdataRspFifo.size());
+
         assert(rnic->txdataRspFifo.size());
         rspData = rnic->txdataRspFifo.front();
         rnic->txdataRspFifo.pop();
         assert(rspData->sentPktNum < rspData->mttNum);
+        assert(rspData->qpn == qpc->srcQpn);
 
         HANGU_PRINT(RdmaEngine, " RdmaEngine.RGRRU.rguProcessing: "
                 "Get Request Data: 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n", 

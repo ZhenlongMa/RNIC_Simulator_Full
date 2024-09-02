@@ -1155,6 +1155,7 @@ class HanGuRnic : public RdmaNic {
                     readByte(0),
                     writeByte(0),
                     startDetect(false),
+                    blocked(false),
                     dmaWriteCplEvent([this]{ dmaWriteCplProcessing(); }, n),
                     dmaReadCplEvent([this]{ dmaReadCplProcessing(); }, n),
                     dmaChnlProcEvent([this]{ dmaChnlProc(); }, n),

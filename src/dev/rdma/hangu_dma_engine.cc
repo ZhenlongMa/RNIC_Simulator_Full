@@ -319,7 +319,7 @@ void HanGuRnic::DmaEngine::detectRate() {
 
 void HanGuRnic::DmaEngine::detectBlock() {
     rnic->schedule(detectBlockEvent, curTick() + rnic->clockPeriod() * BLOCK_DETECT_PERIOD);
-    if (blocked == true) {
+    if (blocked == true && curTick() > START_DETECT_TICK) {
         panic("blocked!\n");
     }
     else {
