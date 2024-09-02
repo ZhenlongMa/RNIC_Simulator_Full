@@ -702,6 +702,9 @@ class HanGuRnic : public RdmaNic {
                 void mttReqProcess(uint64_t mttIdx, MrReqRspPtr tptReq);
                 void mttRspProcessing();
                 EventFunctionWrapper mttRspEvent;
+                
+                void mrRspProcessing();
+                EventFunctionWrapper mrRspProcEvent;
 
                 // added by mazhenlong @ 20230805
                 int onFlyDataMrRdReqNum;
@@ -741,7 +744,6 @@ class HanGuRnic : public RdmaNic {
                 std::queue<std::pair<MrReqRspPtr, MptResc *>> qpMptRspQue;
 
                 std::string name() { return _name; }
-            
         };
 
         MrRescModule mrRescModule;
