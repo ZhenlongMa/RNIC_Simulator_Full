@@ -61,6 +61,8 @@ class HanGuRnic(RdmaNic):
         "Number of cqc cache enteries")
     wqe_cache_cap = Param.Int(512,
         "Number of wqe cache enteries")
+    prefetch_window_size = Param.Int(8,
+        "Prefetch Window")
     
     VendorID = 0x8086
     DeviceID = 0x1075

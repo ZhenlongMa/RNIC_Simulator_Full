@@ -163,6 +163,7 @@ def config_rnic(system, options, node_num):
     system.platform.rdma_nic.wqe_cache_cap = 8192
     system.platform.rdma_nic.reorder_cap   = options.reorder_cap
     system.platform.rdma_nic.cpu_num       = options.num_cpus
+    system.platform.rdma_nic.prefetch_window_size       = 8
     if mac_addr == svr_mac:
         # system.platform.rdma_nic.mpt_cache_num = 8192
         # system.platform.rdma_nic.mtt_cache_num = 16384

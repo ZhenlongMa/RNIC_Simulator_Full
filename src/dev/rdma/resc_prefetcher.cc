@@ -8,10 +8,11 @@ using namespace HanGuRnicDef;
 using namespace Net;
 using namespace std;
 
-HanGuRnic::RescPrefetcher::RescPrefetcher(HanGuRnic *rNic, const std::string name):
+HanGuRnic::RescPrefetcher::RescPrefetcher(HanGuRnic *rNic, const std::string name, int prefetchWindowSize):
     rNic(rNic),
     _name(name),
     prefetchCnt(0),
+    prefetchWindowSize(prefetchWindowSize),
     prefetchProcEvent([this]{prefetchProc();}, name),
     prefetchMemProcEvent([this]{prefetchMemProc();}, name),
     qpcPfetchRspProcEvent([this]{qpcPfetchRspProc();}, name) {
@@ -75,11 +76,13 @@ void HanGuRnic::RescPrefetcher::prefetchMemProc() {
 // }
 
 void HanGuRnic::RescPrefetcher::triggerPrefetch() {
+    #ifdef ENABLE_PREFETCH
     if ((rNic->descScheduler.lowPriorityQpnQue.size() < prefetchQue.size() + PREFETCH_WINDOW) && 
         prefetchQue.size() != 0 &&
         !prefetchProcEvent.scheduled()) {
         rNic->schedule(prefetchProcEvent, curTick() + rNic->clockPeriod());
     }
+    #endif
 }
 
 void HanGuRnic::RescPrefetcher::qpcPfetchRspProc() {

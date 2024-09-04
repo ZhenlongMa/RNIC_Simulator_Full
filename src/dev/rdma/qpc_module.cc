@@ -144,7 +144,9 @@ HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
     if (qpcCache.lookupHit(qpcReq->num)) { /* cache hit, and return related rsp to related fifo */
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: cache hit, qpn 0x%x\n", qpcReq->num);
         hitProc(chnlNum, qpcReq);
-        hitNum++;
+        if (qpcReq->type != CXT_PFCH_QP) {
+            hitNum++;
+        }
     } else { /* cache miss */
         HANGU_PRINT(CxtResc, " QpcModule.qpcReqProc.readProc: cache miss, qpn 0x%x, rtnCnt %d\n", qpcReq->num, rtnCnt);
         /* save req to pending fifo */

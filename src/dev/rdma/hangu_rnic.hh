@@ -401,6 +401,7 @@ class HanGuRnic : public RdmaNic {
                 uint64_t prefetchCnt;
                 // uint64_t prefetchQueTick
                 void qpcPfetchRspProc();
+                int prefetchWindowSize;
             public:
                 RescPrefetcher(HanGuRnic *rNic, std::string name);
                 std::queue<uint32_t> prefetchQue;

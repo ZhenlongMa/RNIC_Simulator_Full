@@ -55,7 +55,7 @@ HanGuRnic::HanGuRnic(const Params *p)
     mboxEvent           ([this]{ mboxFetchCpl();    }, name()),
     rdmaEngine          (this, name() + ".RdmaEngine", p->reorder_cap),
     descScheduler       (this, name() + ".DescScheduler"),
-    rescPrefetcher      (this, name() + ".RescPrefetcher"),
+    rescPrefetcher      (this, name() + ".RescPrefetcher", p->prefetch_window_size),
     wqeBufferManage     (this, name() + ".WqeBufferManage", p->wqe_cache_cap),
     mrRescModule        (this, name() + ".MrRescModule", p->mpt_cache_num, p->mtt_cache_num),
     cqcModule           (this, name() + ".CqcModule", p->cqc_cache_num),

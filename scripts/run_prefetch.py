@@ -88,9 +88,6 @@ def main():
     num_nodes = params.num_nodes
     svr_lid = SERVER_LID
 
-    # debug = ""
-    # debug = "HanGuDriver"
-    # debug += ",CxtResc"
     debug = "PioEngine,CcuEngine,MrResc,HanGuDriver,RescCache,Ethernet,RdmaEngine,"
     debug +="HanGuRnic,CxtResc,DmaEngine,"
     debug +="DescScheduler,"
