@@ -36,6 +36,10 @@ void HanGuRnic::WqeBufferManage::wqeReadReqProcess() {
     QPStatusPtr qpStatus = rNic->descScheduler.wqeFetchInfoQue.front().second;
     rNic->descScheduler.wqeFetchInfoQue.pop();
     // assert(wqeBufferMetadataTable.find(qpStatus->qpn) != wqeBufferMetadataTable.end());
+    if (wqeBufferMetadataTable.find(qpStatus->qpn) == wqeBufferMetadataTable.end()) {
+        wqeBufferMetadataTable[qpStatus->qpn] = std::make_shared<WqeBufferMetadata>();
+        HANGU_PRINT(WqeBufferManage, "wqeReadReqProcess: create WQE buffer metadata! qpn: 0x%x\n", qpStatus->qpn);
+    }
     wqeBufferMetadataTable[qpStatus->qpn]->replaceParam = maxReplaceParam;
     maxReplaceParam++;
     HANGU_PRINT(WqeBufferManage, "wqeReadReqProcess: fetch wqe! qpn: 0x%x, descNum: %d, head: %d, tail: %d\n", 
