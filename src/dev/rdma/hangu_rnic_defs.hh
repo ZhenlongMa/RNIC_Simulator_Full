@@ -71,7 +71,7 @@
 #define BIGN 20480
 #define WINDOW_CAP 20
 // #define MAX_SUBWQE_SIZE 1024
-#define PREFETCH_WINDOW 0
+#define PREFETCH_WINDOW 12
 #define UNSENT_BATCH_NUM_THRESHOLD 4
 
 #define DMA_DETECT_PERIOD 5000 // ns
@@ -198,29 +198,29 @@ const uint8_t MPT_FLAG_REMOTE = (1 << 3);
 // WRITE_QP
 // WARNING: The size of QPC must be 256B!
 struct QpcResc {
-    uint8_t flag; // QP state, not useed now
-    uint8_t qpType;
-    uint8_t sqSizeLog; /* The size of SQ in log (It is now fixed at 4KB, which is 12) */
-    uint8_t rqSizeLog; /* The size of RQ in log (It is now fixed at 4KB, which is 12) */
-    uint16_t sndWqeOffset;
-    uint16_t rcvWqeOffset;
-    uint16_t lLid; // Local LID
-    uint16_t dLid; // Dest  LID
-    uint32_t srcQpn; // Local qpn
-    uint32_t destQpn; // Dest qpn
-    uint32_t sndPsn; // next send psn
-    uint32_t ackPsn; // last acked psn
-    uint32_t expPsn; // next receive (expect) psn
-    uint32_t cqn;
-    uint32_t sndWqeBaseLkey; // send wqe base lkey
-    uint32_t rcvWqeBaseLkey; // receive wqe base lkey
-    uint32_t qkey;
-    uint32_t reserved[51];
+    uint8_t     flag; // QP state, not useed now
+    uint8_t     qpType;
+    uint8_t     sqSizeLog; /* The size of SQ in log (It is now fixed at 4KB, which is 12) */
+    uint8_t     rqSizeLog; /* The size of RQ in log (It is now fixed at 4KB, which is 12) */
+    uint16_t    sndWqeOffset;
+    uint16_t    rcvWqeOffset;
+    uint16_t    lLid; // Local LID
+    uint16_t    dLid; // Dest  LID
+    uint32_t    srcQpn; // Local qpn
+    uint32_t    destQpn; // Dest qpn
+    uint32_t    sndPsn; // next send psn
+    uint32_t    ackPsn; // last acked psn
+    uint32_t    expPsn; // next receive (expect) psn
+    uint32_t    cqn;
+    uint32_t    sndWqeBaseLkey; // send wqe base lkey
+    uint32_t    rcvWqeBaseLkey; // receive wqe base lkey
+    uint32_t    qkey;
+    uint32_t    reserved[50];
 
-    uint8_t  indicator; // 1: latency-sensitive; 2: bandwidth-sensitive; 3: message rate sensitive
-    uint8_t  perfWeight;
-    uint8_t  groupID;
-    uint8_t  qosReserve;
+    uint8_t     indicator; // 1: latency-sensitive; 2: bandwidth-sensitive; 3: message rate sensitive
+    uint8_t     perfWeight;
+    uint16_t    groupID;
+    uint8_t     qosReserve;
 };
 
 const uint8_t QP_TYPE_RC = 0x00;
