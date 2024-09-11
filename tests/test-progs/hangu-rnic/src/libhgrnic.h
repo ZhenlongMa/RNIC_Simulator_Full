@@ -26,7 +26,7 @@
 #define SND_WR_BASE 3000
 #define RCV_WR_MAX 70
 #define __SND_WR_MAX ((RCV_WR_MAX / num_client) - 1)
-#define SND_WR_MAX ( ( __SND_WR_MAX < 25 ) ? __SND_WR_MAX : 25 )
+#define SND_WR_MAX ( ( __SND_WR_MAX < 20 ) ? __SND_WR_MAX : 20 )
 
 #define MAX_CPL_NUM 100
 

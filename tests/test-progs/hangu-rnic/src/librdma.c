@@ -67,6 +67,8 @@ int cm_post_send(struct ibv_context *ctx, struct rdma_cr *cr_info, int wr_num, u
 
         RDMA_PRINT(librdma, "cm_post_send[%d]: flag 0x%x base addr 0x%lx, off 0x%lx, wr_num: %d\n", 
             i, cr_info[i].flag, (uint64_t)send_wqe[i].mr->addr, (uint64_t)send_wqe[i].offset, wr_num);
+        // make sure the request does not exceed the border of the memory region
+        assert(send_wqe[i].offset + send_wqe[i].length <= ctx->cm_mr->length);
 
         ctx->cm_snd_off += sizeof(struct rdma_cr);
         if (ctx->cm_snd_off + sizeof(struct rdma_cr) > SND_WR_BASE + SND_WR_MAX * sizeof(struct rdma_cr)) {
@@ -277,7 +279,8 @@ int rdma_connect(struct rdma_resc *resc, struct rdma_cr *cr_info, uint16_t *dest
         }
 
         /* Post Same destination in one doorbell */
-        RDMA_PRINT(librdma, "rdma_connect: cm_post_send dest_info 0x%x cnt %d\n", dest_info[i], cnt);
+        RDMA_PRINT(librdma, "rdma_connect: cm_post_send dest_info 0x%x cnt %d, flag: %d, src_lid: 0x%x, rkey: 0x%x, raddr: 0x%lx\n", 
+            dest_info[i], cnt, cr_info->flag, cr_info->src_lid, cr_info->rkey, cr_info->raddr);
 
         cm_post_send(ctx, &(cr_info[i]), cnt, dest_info[i]);
         i += cnt;

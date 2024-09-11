@@ -423,6 +423,7 @@ HanGuRnic::ceuProc () {
         HANGU_PRINT(CcuEngine, " CcuEngine.ceuProc: SET_GROUP command!\n");
         size = regs.outParam._data * sizeof(GroupInfo);
         mboxBuf = (uint8_t *)new GroupInfo[regs.outParam._data];
+        HANGU_PRINT(CcuEngine, "ceuProc: data: %d, size: %d\n", regs.outParam._data, size);
         break;
       case ALLOC_GROUP:
         HANGU_PRINT(CcuEngine, " CcuEngine.ceuProc: SET_GROUP command!\n");

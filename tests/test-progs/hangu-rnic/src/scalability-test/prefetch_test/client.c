@@ -49,7 +49,7 @@ int clt_update_info(struct rdma_resc *resc, uint16_t svr_lid) {
     cr_snd->raddr   = (uintptr_t)resc->mr[0]->addr; /* only use one mr in our design */
     dest_info[0]    = svr_lid;
     rdma_connect(resc, cr_snd, dest_info, 1); /* post connection request to server (QP0) */
-    RDMA_PRINT(Client, "clt_update_info: send raddr %ld, rkey 0x%x\n", cr_snd->raddr, cr_snd->rkey);
+    RDMA_PRINT(Client, "clt_update_info: send raddr 0x%lx, rkey 0x%x\n", cr_snd->raddr, cr_snd->rkey);
 
     while (num == 0) {
         cr_rcv = rdma_listen(resc, &num); /* listen connection request from client (QP0) */
@@ -60,7 +60,7 @@ int clt_update_info(struct rdma_resc *resc, uint16_t svr_lid) {
     resc->rinfo->dlid  = svr_lid;
     resc->rinfo->raddr = cr_rcv->raddr;
     resc->rinfo->rkey  = cr_rcv->rkey;
-    RDMA_PRINT(Client, "clt_update_info: raddr %ld, rkey 0x%x\n", resc->rinfo->raddr, resc->rinfo->rkey);
+    RDMA_PRINT(Client, "clt_update_info: receive raddr %ld, rkey 0x%x\n", resc->rinfo->raddr, resc->rinfo->rkey);
 
     /* modify qp in client side */
     clt_update_qps(resc, svr_lid);
@@ -186,15 +186,17 @@ int main (int argc, char **argv) {
         struct ibv_qos_group *group = create_comm_group(ib_context, group_weight[i]);
         grp_resc[i]->qos_group[0] = group;
         RDMA_PRINT(Client, "group[%d] resouce initialized! i: %d, cpu id: %d\n", grp_resc[i]->qos_group[0]->id, i, cpu_id);
+        clt_update_info(grp_resc[i], svr_lid);
+        RDMA_PRINT(Client, "group [%d] update info! i: %d, cpu id: %d\n", grp_resc[i]->qos_group[0]->id, i, cpu_id);
     }
 
     RDMA_PRINT(Client, "client ready to update info! cpu id: %d\n", cpu_id);
 
     /* Connect QPs to server's QP */
-    for (int i = 0; i < group_num; i++) {
-        clt_update_info(grp_resc[i], svr_lid);
-        RDMA_PRINT(Client, "group [%d] update info! i: %d, cpu id: %d\n", grp_resc[i]->qos_group[0]->id, i, cpu_id);
-    }
+    // for (int i = 0; i < group_num; i++) {
+    //     clt_update_info(grp_resc[i], svr_lid);
+    //     RDMA_PRINT(Client, "group [%d] update info! i: %d, cpu id: %d\n", grp_resc[i]->qos_group[0]->id, i, cpu_id);
+    // }
 
     /* sync to make sure that we could get start */
     rdma_send_sync(grp_resc[0]);

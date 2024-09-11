@@ -53,7 +53,7 @@
 #define MAILBOX_PAGE_NUM 32
 
 /* max group number*/
-#define MAX_GROUP_NUM 128
+#define MAX_GROUP_NUM 4096
 /* -------software-hardware interface{end}------- */
 
 struct kfd_ioctl_init_dev_args {

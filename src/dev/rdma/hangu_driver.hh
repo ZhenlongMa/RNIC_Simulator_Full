@@ -185,10 +185,11 @@ class HanGuDriver final : public EmulatedDriver {
     const int groupWeightOffset         = 256;
     const int groupQPWeightSumOffset    = 512;
     const int groupGranularityOffset    = 1536;
+
     const int barShareAddrOffset        = 0x30;
     const int barShareAddrFlagOffset    = 0x40;
-    const int qpAmountOffset            = 0x50;
-    const int qosSharePageNum           = 1;
+    const int qpAmountOffset            = 0xa00;
+    const int qosSharePageNum           = 16;
     // int qpAmount = 0;
     const int chunkSizePerQP = 4096;
     /* -------QoS Group resources {end}------- */

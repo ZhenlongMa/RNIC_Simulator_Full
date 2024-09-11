@@ -648,6 +648,7 @@ int ibv_poll_cpl(struct ibv_cq *cq, struct cpl_desc **desc, int max_num) {
  * @note create one QoS group
 */
 struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight) {
+    HGRNIC_PRINT("into create_qos_group!\n");
     context->group_num++;
     struct hghca_context *dvr = (struct hghca_context *)context->dvr;
     struct kfd_ioctl_alloc_group_args *args = (struct kfd_ioctl_alloc_group_args *)malloc(sizeof(struct kfd_ioctl_alloc_group_args));
@@ -660,7 +661,7 @@ struct ibv_qos_group *create_qos_group(struct ibv_context *context, int weight) 
     new_group->weight = weight;
     new_group->id = args->group_id[0];
     // context->total_group_weight += weight;
-    // HGRNIC_PRINT("QoS group created! id: %d, weight: %d\n", args->group_id[0], weight);
+    HGRNIC_PRINT("QoS group created! id: %d, weight: %d\n", args->group_id[0], weight);
     uint16_t *weight_temp = (uint16_t*)malloc(sizeof(uint16_t));
     *weight_temp = weight;
     set_qos_group(context, new_group, 1, weight_temp);

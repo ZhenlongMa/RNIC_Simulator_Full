@@ -66,7 +66,9 @@ int svr_update_info(struct rdma_resc *resc) {
             resc->rinfo[sum].dlid  = cr_info[i].src_lid;
             resc->rinfo[sum].raddr = cr_info[i].raddr;
             resc->rinfo[sum].rkey  = cr_info[i].rkey;
-            ++sum;
+
+            RDMA_PRINT(Server, "svr_update_info: receive cr info! cr_info src_lid: 0x%x, dlid: %d, raddr: 0x%lx, rkey: 0x%x\n", 
+                    cr_info[i].src_lid, resc->rinfo[sum].dlid, resc->rinfo[sum].raddr, resc->rinfo[sum].rkey);
 
             /* Generate Connect Request to respond client */
             cr_info[i].flag = CR_TYPE_ACK;
@@ -74,8 +76,10 @@ int svr_update_info(struct rdma_resc *resc) {
             cr_info[i].rkey  = resc->mr[0]->lkey;
             dest_info[i] = cr_info[i].src_lid;
 
-            RDMA_PRINT(Server, "svr_update_info: sum %d resc_num_rem %d, cr_info[i].raddr %ld cr_info[i].rkey %d dest_info[i] %d\n", 
+            RDMA_PRINT(Server, "svr_update_info: sum: %d resc_num_rem: %d, cr_info[i].raddr: 0x%lx cr_info[i].rkey 0x%x dest_info[i] %d\n", 
                     sum, resc->num_rem, cr_info[i].raddr, cr_info[i].rkey, dest_info[i]);
+            
+            ++sum;
         }
         RDMA_PRINT(Server, "svr_update_info: start rdma_connect, sum %d\n", sum);
         rdma_connect(resc, cr_info, dest_info, num); /* post connection request to client (QP0) */
@@ -254,16 +258,16 @@ struct rdma_resc *set_group_resource(struct ibv_context *ctx, int num_mr, int nu
     uint8_t  op_mode = OPMODE_RDMA_WRITE; /* 0: RDMA Write; 1: RDMA Read */
     uint32_t offset;
     struct rdma_resc *resc = rdma_resc_init(ctx, num_mr, num_cq, num_qp, llid, num_client);
-    RDMA_PRINT(Server, "group resource initialized!\n");
+    RDMA_PRINT(Server, "set_group_resource: group resource initialized!\n");
     // struct ibv_qos_group *group = create_comm_group(resc->ctx, grp_weight);
     struct ibv_qos_group *group = create_comm_group(ctx, grp_weight);
-    RDMA_PRINT(Server, "group created! group id: %d, group weight: %d\n", group->id, group->weight);
+    RDMA_PRINT(Server, "set_group_resource: group created! group id: %d, group weight: %d\n", group->id, group->weight);
     resc->qos_group[0] = group;
 
     /* Connect QPs to client's QP */
     svr_update_info(resc);
 
-    RDMA_PRINT(Server, "Server finishes connection!\n");
+    RDMA_PRINT(Server, "set_group_resource: Server finishes connection! group ID: %d\n", group->id);
 
     /* If this is RDMA WRITE, write data to mr, preparing for server writting */
     if (op_mode == OPMODE_RDMA_WRITE) {
@@ -360,6 +364,8 @@ int main (int argc, char **argv) {
         grp_resc[i] = set_group_resource(ib_context, num_mr, num_cq, group_qp_num[i], svr_lid, num_client, group_weight[i]);
         RDMA_PRINT(Server, "finish group[%d] resource init! i: %d, group num: %d\n", grp_resc[i]->qos_group[0]->id, i, group_num);
     }
+
+    RDMA_PRINT(Server, "finish all group resource init! group num: %d\n", group_num);
 
     /* sync to make sure that we could get start */
     rdma_recv_sync(grp_resc[0]);

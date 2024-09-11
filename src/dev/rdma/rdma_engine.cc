@@ -1082,6 +1082,7 @@ HanGuRnic::RdmaEngine::rauProcessing () {
         // if (!rpuEvent.scheduled()) { /* Schedule RdmaEngine.rpuProcessing */
         //     rnic->schedule(rpuEvent, curTick() + rnic->clockPeriod());
         // }
+        HANGU_PRINT(RdmaEngine, "rauProcessing: request QPC, qpn: 0x%x", bth->op_destQpn & 0xFFFFFF);
     }
 
     /* If there still has elem in fifo, schedule myself again */
@@ -1125,7 +1126,8 @@ HanGuRnic::RdmaEngine::rcvRpuProcessing () {
     EthPacketPtr rxPkt = tmp.first; 
     QpcResc* qpcCopy = tmp.second; /* just a copy of qpc, original has been written back */
     rp2rcvRpFifo.pop();
-    HANGU_PRINT(RdmaEngine, " RdmaEngine.RPU.rcvRpuProcessing: get Received packet and qpc!\n");
+    HANGU_PRINT(RdmaEngine, " RdmaEngine.RPU.rcvRpuProcessing: get Received packet and qpc! qpn: 0x%x\n", 
+        qpcCopy->srcQpn);
 
     /* Write received data back to memory through MR Module */
     MrReqRspPtr dataWreq = make_shared<MrReqRsp>(
