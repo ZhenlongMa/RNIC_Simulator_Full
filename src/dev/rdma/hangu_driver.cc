@@ -89,6 +89,7 @@ HanGuDriver::mmap(ThreadContext *tc, Addr start, uint64_t length, int prot,
 
 int
 HanGuDriver::ioctl(ThreadContext *tc, unsigned req, Addr ioc_buf) {
+    HANGU_PRINT(HanGuDriver, " ioctl: req: %d\n", req);
     auto &virt_proxy = tc->getVirtProxy();
 
     if (HGKFD_IOC_GET_TIME == req) {
@@ -445,13 +446,11 @@ HanGuDriver::writeIcm(PortProxy& portProxy, uint8_t rescType, RescMeta &rescMeta
 /**
  * @note set group weight, update all group granularities, make sure all weight related parameters are correct
 */
-void HanGuDriver::initQoS(PortProxy& portProxy, Process* process)
-{
+void HanGuDriver::initQoS(PortProxy& portProxy, Process* process) {
     // allocate shared memory for QoS
     Addr sharePhysAddr;
     portProxy.readBlob(hcrAddr + barShareAddrOffset, &sharePhysAddr, sizeof(Addr));
-    if (sharePhysAddr == 0)
-    {
+    if (sharePhysAddr == 0) {
         sharePhysAddr = process->system->allocPhysPages(qosSharePageNum);
         portProxy.writeBlob(hcrAddr + barShareAddrOffset, &sharePhysAddr, sizeof(Addr));
         HANGU_PRINT(HanGuDriver, "physical qosShareAddr set into BAR0: 0x%x\n", sharePhysAddr);
@@ -468,8 +467,7 @@ void HanGuDriver::initQoS(PortProxy& portProxy, Process* process)
         uint64_t qpNum = 0;
         portProxy.writeBlob(qosShareParamAddr + qpAmountOffset, &qpNum, sizeof(uint64_t));
     }
-    else
-    {
+    else {
         HANGU_PRINT(HanGuDriver, "physical qosShareAddr already set: 0x%x\n", sharePhysAddr);
         // Assume mmap grows down, as in x86 Linux.
         auto mem_state = process->memState;
@@ -479,21 +477,19 @@ void HanGuDriver::initQoS(PortProxy& portProxy, Process* process)
     }
 }
 
-void HanGuDriver::setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args)
-{
+void HanGuDriver::setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_group_args> &args) {
     HanGuRnicDef::GroupInfo group[MAX_GROUP_NUM];
 
     uint32_t bigN;
     portProxy.readBlob(qosShareParamAddr + NOffset, &bigN, sizeof(uint32_t));
 
-    uint8_t groupNum;
-    portProxy.readBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint8_t));
+    uint16_t groupNum;
+    portProxy.readBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint16_t));
 
     HANGU_PRINT(HanGuDriver, "into setGroup command in driver! group num: %d, table size: %d\n", groupNum, groupTable.size());
 
     // update group weight
-    for (int i = 0; i < args->group_num; i++)
-    {
+    for (int i = 0; i < args->group_num; i++) {
         portProxy.writeBlob(qosShareParamAddr + groupWeightOffset + args->group_id[i] * 1, &(args->weight[i]), sizeof(uint8_t));
         HANGU_PRINT(HanGuDriver, "write group weight to shared space, group id: %d, weight: %d\n", i, args->weight[i]);
     }
@@ -501,16 +497,14 @@ void HanGuDriver::setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_gr
     // calculate group weight sum
     uint32_t groupWeightSum = 0;
     uint8_t tempWeight;
-    for (int i = 0; i < groupNum; i++)
-    {
+    for (int i = 0; i < groupNum; i++) {
         portProxy.readBlob(qosShareParamAddr + groupWeightOffset + i * 1, &tempWeight, sizeof(uint8_t));
         groupWeightSum += tempWeight;
     }
     portProxy.writeBlob(qosShareParamAddr + groupWeightSumOffset, &groupWeightSum, sizeof(uint32_t));
     HANGU_PRINT(HanGuDriver, "write group weight sum to shared space: %d\n", groupWeightSum);
 
-    for (int i = 0; i < groupNum; i++)
-    {
+    for (int i = 0; i < groupNum; i++) {
         uint8_t groupWeight;
         uint32_t qpWeightSum;
         uint32_t granularity;
@@ -529,10 +523,9 @@ void HanGuDriver::setGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_set_gr
     postHcr(portProxy, (uint64_t)mailbox.paddr, 1, groupNum, HanGuRnicDef::SET_GROUP);
 }
 
-void HanGuDriver::printQoS(PortProxy& portProxy)
-{
-    uint8_t groupNum;
-    portProxy.readBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint8_t));
+void HanGuDriver::printQoS(PortProxy& portProxy) {
+    uint16_t groupNum;
+    portProxy.readBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint16_t));
     HANGU_PRINT(HanGuDriver, "---------------------------\n");
     HANGU_PRINT(HanGuDriver, "print QoS info! group num: %d\n", groupNum);
     for (int i = 0; i < groupNum; i++)
@@ -552,21 +545,19 @@ void HanGuDriver::printQoS(PortProxy& portProxy)
 /**
  * @note hardware related function, create entries in group granularity table
 */
-void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args)
-{
-    uint8_t groupNum;
-    portProxy.readBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint8_t));
+void HanGuDriver::allocGroup(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_group_args> &args) {
+    uint16_t groupNum;
+    portProxy.readBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint16_t));
     // HANGU_PRINT(HanGuDriver, "into allocGroup! groupNum: %d, args->group_num: %d\n", groupNum, args->group_num);
     postHcr(portProxy, (uint64_t)mailbox.paddr, 1, args->group_num, HanGuRnicDef::ALLOC_GROUP);
     assert(args->group_num == 1);
     args->group_id[0] = groupNum;
     groupNum += args->group_num;
-    portProxy.writeBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint8_t));
+    portProxy.writeBlob(qosShareParamAddr + groupNumOffset, &groupNum, sizeof(uint16_t));
     HANGU_PRINT(HanGuDriver, "group allocated! group ID: %d, groupNum: %d\n", args->group_id[0], groupNum);
 }
 
-void HanGuDriver::updateN(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_qp_args> &args)
-{
+void HanGuDriver::updateN(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_qp_args> &args) {
     // qpAmount += args->batch_size;
     // update QP amount
     uint64_t qpAmount;
@@ -583,8 +574,7 @@ void HanGuDriver::updateN(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_alloc_q
 /**
  * @note update several groups in case that some QPs change their weight
 */
-void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_args> &args)
-{
+void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_write_qpc_args> &args) {
     /* put QpcResc into mailbox */
     HanGuRnicDef::GroupInfo group[MAX_QPC_BATCH];
     memset(group, 0, sizeof(HanGuRnicDef::GroupInfo) * args->batch_size);
@@ -596,13 +586,11 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
     uint32_t bigN;
     portProxy.readBlob(qosShareParamAddr + NOffset, &bigN, sizeof(uint32_t));
     // modify QP weight in group table and record the groups to be updated
-    for (uint32_t i = 0; i < args->batch_size; ++i)
-    {
+    for (uint32_t i = 0; i < args->batch_size; ++i) {
         if (groupTable[args->groupID[i]].qpWeight[args->src_qpn[i]] != args->weight[i])
         {
             groupTable[args->groupID[i]].qpWeight[args->src_qpn[i]] = args->weight[i];
-            if (setGroup.find(args->groupID[i]) == setGroup.end())
-            {
+            if (setGroup.find(args->groupID[i]) == setGroup.end()) {
                 setGroup[args->groupID[i]] = 1;
                 setGroupNum++;
             }
@@ -611,8 +599,7 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
         }
     }
     assert(args->batch_size > 0);
-    if (setGroupNum == 0)
-    {
+    if (setGroupNum == 0) {
         HANGU_PRINT(HanGuDriver, "setGroupNum is ZERO!\n");
         return;
     }
@@ -626,8 +613,7 @@ void HanGuDriver::updateQpWeight(PortProxy& portProxy, TypedBufferArg<kfd_ioctl_
         uint8_t groupID = iter->first;
         // recalculate group granularity
         uint32_t qpWeightSum = 0;
-        for (std::unordered_map<uint32_t, uint8_t>::iterator it = groupTable[groupID].qpWeight.begin(); it != groupTable[groupID].qpWeight.end(); it++)
-        {
+        for (std::unordered_map<uint32_t, uint8_t>::iterator it = groupTable[groupID].qpWeight.begin(); it != groupTable[groupID].qpWeight.end(); it++) {
             qpWeightSum += it->second;
         }
         uint8_t groupWeight;
