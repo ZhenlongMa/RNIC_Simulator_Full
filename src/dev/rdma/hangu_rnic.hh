@@ -403,7 +403,7 @@ class HanGuRnic : public RdmaNic {
                 void qpcPfetchRspProc();
                 int prefetchWindowSize;
             public:
-                RescPrefetcher(HanGuRnic *rNic, std::string name);
+                RescPrefetcher(HanGuRnic *rNic, std::string name, int windowSize);
                 std::queue<uint32_t> prefetchQue;
                 EventFunctionWrapper prefetchProcEvent;
                 EventFunctionWrapper prefetchMemProcEvent;
