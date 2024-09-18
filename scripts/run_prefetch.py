@@ -83,7 +83,7 @@ def main():
     qpc_cache_cap = 512
     reorder_cap = 512
 
-    params = Param(node_num, qpc_cache_cap, reorder_cap, WRITE, testcase)
+    params = Param(node_num, qpc_cache_cap, reorder_cap, READ, testcase)
 
     num_nodes = params.num_nodes
     svr_lid = SERVER_LID

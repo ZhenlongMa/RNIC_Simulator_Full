@@ -164,7 +164,7 @@ HanGuRnic::QpcModule::readProc(uint8_t chnlNum, CxtReqRspPtr qpcReq) {
             missNum++;
         }
     }
-    HANGU_PRINT(CxtResc, " readProc: out! qpn: 0x%x, hitNum: %d, missNum: %d, accessNum: %d\n", qpcReq->num, hitNum, missNum, accessNum);
+    HANGU_PRINT(CxtResc, " readProc: out! qpn: 0x%x, QPC hitNum: %d, missNum: %d, accessNum: %d\n", qpcReq->num, hitNum, missNum, accessNum);
     return true;
 }
 
