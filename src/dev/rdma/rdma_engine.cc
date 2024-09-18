@@ -247,6 +247,7 @@ HanGuRnic::RdmaEngine::dpuProcessing () {
 
         /* schedule ddu if dp2ddIdxFifo is capable */
         dp2ddIdxFifo.push(idx);
+        
         // bug fix: 20240301
         if ((dp2ddIdxFifo.size() == 1) && 
             //  rnic->txdescRspFifo.size() && 
