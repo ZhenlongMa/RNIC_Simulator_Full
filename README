@@ -23,3 +23,13 @@ This is the V1.5 version of our implemented RNIC.
 In this version, we implement the followinng features based on RNIC-V1.1: 
     1. out of order execution for qpc request in one qpc request channel, with 
     three channels in total: two for sender side, and one for receiver side.
+
+If you want to deploy this project, please download newest Gem-5 and copy the following files:
+
+- `configs/example/rdma/*`
+- `scripts/*`
+- `src/dev/rdma/*`
+- `src/dev/rnicPlatform.cc`
+- `src/dev/rnicPlatform.hh`
+- `src/dev/RnicPlatform.py`
+- `tests/test-progs/hangu-rnic/*`
